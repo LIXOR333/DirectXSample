@@ -1,0 +1,57 @@
+name: Build DirectX Sample DLL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Install MinGW
+    - name: Install MinGW
+      run: |
+        choco install mingw -y
+
+    # Install 7z for extracting DirectX SDK
+    - name: Install 7z
+      run: |
+        choco install 7zip -y
+
+    # Download DirectX SDK from Transfiles
+    - name: Download DirectX SDK
+      run: |
+        curl -L -o dxsdk.exe "https://transfiles.ru/ha8kj"
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+    # Extract DirectX SDK
+    - name: Extract DirectX SDK
+      run: |
+        mkdir dxsdk
+        7z x dxsdk.exe -odxsdk -y
+
+    # Set up environment variables for DirectX SDK
+    - name: Set up DirectX SDK environment
+      run: |
+        echo "DXSDK_DIR=$GITHUB_WORKSPACE\dxsdk" >> $GITHUB_ENV
+        echo "INCLUDE=$GITHUB_WORKSPACE\dxsdk\Include;$INCLUDE" >> $GITHUB_ENV
+        echo "LIB=$GITHUB_WORKSPACE\dxsdk\Lib\x64;$LIB" >> $GITHUB_ENV
+
+    # Compile the DLL
+    - name: Build DLL
+      run: |
+        g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$GITHUB_WORKSPACE/dxsdk/Include" -L"$GITHUB_WORKSPACE/dxsdk/Lib/x64" -ld3d9 -ld3dx9 -Wall
+
+    # Upload the DLL as an artifact
+    - name: Upload DLL artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: DirectXSample-DLL
+        path: DirectXSample.dll
