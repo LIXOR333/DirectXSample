@@ -12,29 +12,44 @@ jobs:
     timeout-minutes: 15 # Prevent hanging
 
     steps:
-    # Checkout the repository
-    - name: Checkout code
+    # Step 1: Checkout the repository
+    - name: Step 1 - Checkout code
       uses: actions/checkout@v3
-
-    # Install Chocolatey (for MinGW and archiver fallback)
-    - name: Install Chocolatey
       run: |
+        echo "Step 1: Checkout completed"
+
+    # Step 2: Install Chocolatey
+    - name: Step 2 - Install Chocolatey
+      shell: pwsh
+      run: |
+        echo "Step 2: Starting Chocolatey installation..."
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-        echo "Chocolatey installed"
+        if ($LASTEXITCODE -ne 0) {
+          echo "Step 2: Chocolatey installation failed with exit code $LASTEXITCODE"
+          exit 1
+        }
+        echo "Step 2: Chocolatey installed successfully"
 
-    # Install MinGW
-    - name: Install MinGW
+    # Step 3: Install MinGW
+    - name: Step 3 - Install MinGW
+      shell: pwsh
       run: |
+        echo "Step 3: Starting MinGW installation..."
         choco install mingw --version 8.1.0 -y
-        if ($LASTEXITCODE -ne 0) { exit 1 }
+        if ($LASTEXITCODE -ne 0) {
+          echo "Step 3: MinGW installation failed with exit code $LASTEXITCODE"
+          exit 1
+        }
         g++ --version
-        echo "MinGW installed"
+        echo "Step 3: MinGW installed successfully"
 
-    # Download and set up archivers
-    - name: Download and set up archivers
+    # Step 4: Download and set up archivers
+    - name: Step 4 - Download and set up archivers
+      shell: pwsh
       run: |
+        echo "Step 4: Starting archiver setup..."
         $archiver = ""
         
         # Try PeaZip
@@ -48,22 +63,22 @@ jobs:
         )
         $success = $false
         foreach ($url in $urls) {
-          echo "Attempting to download PeaZip from $url..."
+          echo "Step 4: Attempting to download PeaZip from $url..."
           curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
           $httpStatus = $LASTEXITCODE
           if ($httpStatus -eq 0) {
             $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
-            if ($fileSize -gt 10000000) { # ~10 MB
-              echo "PeaZip download succeeded from $url (size: $fileSize bytes)"
+            if ($fileSize -gt 10000000) {
+              echo "Step 4: PeaZip download succeeded from $url (size: $fileSize bytes)"
               $success = $true
               $archiver = "PeaZip"
               break
             } else {
-              echo "File too small ($fileSize bytes), trying next mirror..."
+              echo "Step 4: File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
           } else {
-            echo "Download failed with status $httpStatus, trying next mirror..."
+            echo "Step 4: Download failed with status $httpStatus, trying next mirror..."
             Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
           }
         }
@@ -79,22 +94,22 @@ jobs:
             "https://www.majorgeeks.com/files/details/bandizip.html"
           )
           foreach ($url in $urls) {
-            echo "Attempting to download Bandizip from $url..."
+            echo "Step 4: Attempting to download Bandizip from $url..."
             curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
             $httpStatus = $LASTEXITCODE
             if ($httpStatus -eq 0) {
               $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
-              if ($fileSize -gt 5000000) { # ~5 MB
-                echo "Bandizip download succeeded from $url (size: $fileSize bytes)"
+              if ($fileSize -gt 5000000) {
+                echo "Step 4: Bandizip download succeeded from $url (size: $fileSize bytes)"
                 $success = $true
                 $archiver = "Bandizip"
                 break
               } else {
-                echo "File too small ($fileSize bytes), trying next mirror..."
+                echo "Step 4: File too small ($fileSize bytes), trying next mirror..."
                 Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
               }
             } else {
-              echo "Download failed with status $httpStatus, trying next mirror..."
+              echo "Step 4: Download failed with status $httpStatus, trying next mirror..."
               Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
           }
@@ -102,10 +117,10 @@ jobs:
 
         # If Bandizip failed, fallback to Chocolatey (WinZip or 7-Zip)
         if (-not $success) {
-          echo "All download attempts failed, falling back to Chocolatey..."
+          echo "Step 4: All download attempts failed, falling back to Chocolatey..."
           choco install 7zip -y
           if ($LASTEXITCODE -eq 0) {
-            echo "7-Zip installed via Chocolatey, using default path..."
+            echo "Step 4: 7-Zip installed via Chocolatey, using default path..."
             $env:Path += ";C:\Program Files\7-Zip"
             echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
             $archiver = "7-Zip"
@@ -113,10 +128,10 @@ jobs:
           } else {
             choco install winzip -y
             if ($LASTEXITCODE -ne 0) {
-              echo "Failed to install WinZip or 7-Zip via Chocolatey"
+              echo "Step 4: Failed to install WinZip or 7-Zip via Chocolatey"
               exit 1
             }
-            echo "WinZip installed via Chocolatey, using default path..."
+            echo "Step 4: WinZip installed via Chocolatey, using default path..."
             $env:Path += ";C:\Program Files\WinZip"
             echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
             $archiver = "WinZip"
@@ -126,36 +141,38 @@ jobs:
 
         # Extract the downloaded archiver (PeaZip or Bandizip)
         if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") {
-          echo "Extracting $archiver..."
+          echo "Step 4: Extracting $archiver..."
           if (Test-Path archiver.zip) {
             Expand-Archive -Path archiver.zip -DestinationPath archiver -Force
             if ($LASTEXITCODE -eq 0) {
               if ($archiver -eq "PeaZip") {
-                echo "Adding PeaZip to PATH..."
+                echo "Step 4: Adding PeaZip to PATH..."
                 echo "Path=$env:GITHUB_WORKSPACE\archiver\peazip_portable-9.8.0.WIN64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
                 dir archiver\peazip_portable-9.8.0.WIN64\peazip.exe
               } elseif ($archiver -eq "Bandizip") {
-                echo "Adding Bandizip to PATH..."
+                echo "Step 4: Adding Bandizip to PATH..."
                 echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
                 dir archiver\bzip.exe
               }
             } else {
-              echo "Failed to extract archiver.zip - possibly not a valid archive"
+              echo "Step 4: Failed to extract archiver.zip - possibly not a valid archive"
               Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
           } else {
-            echo "archiver.zip not found after download"
+            echo "Step 4: archiver.zip not found after download"
             Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
           }
         }
 
         # Save the archiver type for later steps
         echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
-        echo "Archiver setup completed: $archiver"
+        echo "Step 4: Archiver setup completed: $archiver"
 
-    # Download DirectX SDK with multiple mirrors
-    - name: Download DirectX SDK
+    # Step 5: Download DirectX SDK
+    - name: Step 5 - Download DirectX SDK
+      shell: pwsh
       run: |
+        echo "Step 5: Starting DirectX SDK download..."
         $urls = @(
           "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
           "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
@@ -168,40 +185,42 @@ jobs:
         )
         $success = $false
         foreach ($url in $urls) {
-          echo "Attempting to download DirectX SDK from $url..."
+          echo "Step 5: Attempting to download DirectX SDK from $url..."
           curl -L -o dxsdk.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
           $httpStatus = $LASTEXITCODE
           if ($httpStatus -eq 0) {
             $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
             if ($fileSize -gt 500000000) {
-              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
+              echo "Step 5: DirectX SDK download succeeded from $url (size: $fileSize bytes)"
               $success = $true
               break
             } else {
-              echo "File too small ($fileSize bytes), trying next mirror..."
+              echo "Step 5: File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
             }
           } else {
-            echo "Download failed with status $httpStatus, trying next mirror..."
+            echo "Step 5: Download failed with status $httpStatus, trying next mirror..."
             Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
           }
         }
         if (-not $success) {
-          echo "All download attempts failed for DirectX SDK"
+          echo "Step 5: All download attempts failed for DirectX SDK"
           exit 1
         }
-        echo "DirectX SDK download completed"
+        echo "Step 5: DirectX SDK download completed"
 
-    # Extract DirectX SDK using archivers
-    - name: Extract DirectX SDK
+    # Step 6: Extract DirectX SDK
+    - name: Step 6 - Extract DirectX SDK
+      shell: pwsh
       run: |
+        echo "Step 6: Starting DirectX SDK extraction..."
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
           $extractSuccess = $false
           
           # Try PeaZip
           if ($env:ARCHIVER -eq "PeaZip") {
-            echo "Attempting to extract DirectX SDK (dxsdk.exe) with PeaZip..."
+            echo "Step 6: Attempting to extract DirectX SDK (dxsdk.exe) with PeaZip..."
             Start-Process -FilePath peazip.exe -ArgumentList "-ext2here dxsdk.exe" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -211,15 +230,15 @@ jobs:
                   Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
                   if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
                     $extractSuccess = $true
-                    echo "PeaZip extraction succeeded, Include folder found"
+                    echo "Step 6: PeaZip extraction succeeded, Include folder found"
                   } else {
-                    echo "PeaZip extraction succeeded, but Include folder not found"
+                    echo "Step 6: PeaZip extraction succeeded, but Include folder not found"
                   }
                 } else {
-                  echo "Failed to extract DirectX SDK with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Step 6: Failed to extract DirectX SDK with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
-                echo "PeaZip extraction timed out after $timeout seconds, skipping to next method..."
+                echo "Step 6: PeaZip extraction timed out after $timeout seconds, skipping to next method..."
                 $process.Kill()
               }
             }
@@ -227,7 +246,7 @@ jobs:
           
           # Try Bandizip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
-            echo "Attempting to extract DirectX SDK (dxsdk.exe) with Bandizip..."
+            echo "Step 6: Attempting to extract DirectX SDK (dxsdk.exe) with Bandizip..."
             Start-Process -FilePath bzip.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -236,15 +255,15 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
                     $extractSuccess = $true
-                    echo "Bandizip extraction succeeded, Include folder found"
+                    echo "Step 6: Bandizip extraction succeeded, Include folder found"
                   } else {
-                    echo "Bandizip extraction succeeded, but Include folder not found"
+                    echo "Step 6: Bandizip extraction succeeded, but Include folder not found"
                   }
                 } else {
-                  echo "Failed to extract DirectX SDK with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Step 6: Failed to extract DirectX SDK with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
-                echo "Bandizip extraction timed out after $timeout seconds, skipping to next method..."
+                echo "Step 6: Bandizip extraction timed out after $timeout seconds, skipping to next method..."
                 $process.Kill()
               }
             }
@@ -252,7 +271,7 @@ jobs:
           
           # Try WinZip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
-            echo "Attempting to extract DirectX SDK (dxsdk.exe) with WinZip..."
+            echo "Step 6: Attempting to extract DirectX SDK (dxsdk.exe) with WinZip..."
             Start-Process -FilePath winzip.exe -ArgumentList "-e dxsdk.exe dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -261,15 +280,15 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
                     $extractSuccess = $true
-                    echo "WinZip extraction succeeded, Include folder found"
+                    echo "Step 6: WinZip extraction succeeded, Include folder found"
                   } else {
-                    echo "WinZip extraction succeeded, but Include folder not found"
+                    echo "Step 6: WinZip extraction succeeded, but Include folder not found"
                   }
                 } else {
-                  echo "Failed to extract DirectX SDK with WinZip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Step 6: Failed to extract DirectX SDK with WinZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
-                echo "WinZip extraction timed out after $timeout seconds, skipping to next method..."
+                echo "Step 6: WinZip extraction timed out after $timeout seconds, skipping to next method..."
                 $process.Kill()
               }
             }
@@ -277,7 +296,7 @@ jobs:
           
           # Try 7-Zip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "7-Zip") {
-            echo "Attempting to extract DirectX SDK (dxsdk.exe) with 7-Zip..."
+            echo "Step 6: Attempting to extract DirectX SDK (dxsdk.exe) with 7-Zip..."
             Start-Process -FilePath 7z.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -286,15 +305,15 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
                     $extractSuccess = $true
-                    echo "7-Zip extraction succeeded, Include folder found"
+                    echo "Step 6: 7-Zip extraction succeeded, Include folder found"
                   } else {
-                    echo "7-Zip extraction succeeded, but Include folder not found"
+                    echo "Step 6: 7-Zip extraction succeeded, but Include folder not found"
                   }
                 } else {
-                  echo "Failed to extract DirectX SDK with 7-Zip, exit code: $($process.ExitCode)"
+                  echo "Step 6: Failed to extract DirectX SDK with 7-Zip, exit code: $($process.ExitCode)"
                 }
               } else {
-                echo "7-Zip extraction timed out after $timeout seconds"
+                echo "Step 6: 7-Zip extraction timed out after $timeout seconds"
                 $process.Kill()
                 exit 1
               }
@@ -303,23 +322,21 @@ jobs:
           
           if ($extractSuccess) {
             dir dxsdk
-            echo "DirectX SDK extraction completed successfully"
+            echo "Step 6: DirectX SDK extraction completed successfully"
           } else {
-            echo "All attempts to extract DirectX SDK (dxsdk.exe) failed"
+            echo "Step 6: All attempts to extract DirectX SDK (dxsdk.exe) failed"
             exit 1
           }
         } else {
-          echo "dxsdk.exe not found after download"
+          echo "Step 6: dxsdk.exe not found after download"
           exit 1
         }
-      shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-      env:
-        Path: D:\a\DirectXSample\DirectXSample\archiver\peazip_portable-9.8.0.WIN64;C:\Program Files\PowerShell\7;C:\Program Files\MongoDB\Server\5.0\bin;C:\aliyun-cli;C:\vcpkg;C:\Program Files (x86)\NSIS\;C:\tools\zstd;C:\Program Files\Mercurial\;C:\hostedtoolcache\windows\stack\3.5.1\x64;C:\cabal\bin;C:\\ghcup\bin;C:\mingw64\bin;C:\Program Files\dotnet;C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\R\R-4.4.2\bin\x64;C:\SeleniumWebDrivers\GeckoDriver;C:\SeleniumWebDrivers\EdgeDriver\;C:\SeleniumWebDrivers\ChromeDriver;C:\Program Files (x86)\sbt\bin;C:\Program Files (x86)\GitHub CLI;C:\Program Files\Git\bin;C:\Program Files (x86)\pipx_bin;C:\npm\prefix;C:\hostedtoolcache\windows\go\1.24.3\x64\bin;C:\hostedtoolcache\windows\Python\3.9.13\x64\Scripts;C:\hostedtoolcache\windows\Python\3.9.13\x64;C:\hostedtoolcache\windows\Ruby\3.0.7\x64\bin;C:\Program Files\OpenSSL\bin;C:\tools\kotlinc\bin;C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\8.0.452-9\x64\bin;C:\Program Files\ImageMagick-7.1.1-Q16-HDRI;C:
-        ARCHIVER: PeaZip
 
-    # Set up environment variables for DirectX SDK
-    - name: Set up DirectX SDK environment
+    # Step 7: Set up environment variables
+    - name: Step 7 - Set up DirectX SDK environment
+      shell: pwsh
       run: |
+        echo "Step 7: Setting up environment variables..."
         if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -327,36 +344,40 @@ jobs:
           echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           dir $env:GITHUB_WORKSPACE\dxsdk\Include
           dir $env:GITHUB_WORKSPACE\dxsdk\Lib\x64
-          echo "Environment variables set successfully"
+          echo "Step 7: Environment variables set successfully"
         } else {
-          echo "DirectX SDK Include folder not found, setup failed"
+          echo "Step 7: DirectX SDK Include folder not found, setup failed"
           exit 1
         }
-      shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-      env:
-        Path: D:\a\DirectXSample\DirectXSample\archiver\peazip_portable-9.8.0.WIN64;C:\Program Files\PowerShell\7;C:\Program Files\MongoDB\Server\5.0\bin;C:\aliyun-cli;C:\vcpkg;C:\Program Files (x86)\NSIS\;C:\tools\zstd;C:\Program Files\Mercurial\;C:\hostedtoolcache\windows\stack\3.5.1\x64;C:\cabal\bin;C:\\ghcup\bin;C:\mingw64\bin;C:\Program Files\dotnet;C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\R\R-4.4.2\bin\x64;C:\SeleniumWebDrivers\GeckoDriver;C:\SeleniumWebDrivers\EdgeDriver\;C:\SeleniumWebDrivers\ChromeDriver;C:\Program Files (x86)\sbt\bin;C:\Program Files (x86)\GitHub CLI;C:\Program Files\Git\bin;C:\Program Files (x86)\pipx_bin;C:\npm\prefix;C:\hostedtoolcache\windows\go\1.24.3\x64\bin;C:\hostedtoolcache\windows\Python\3.9.13\x64\Scripts;C:\hostedtoolcache\windows\Python\3.9.13\x64;C:\hostedtoolcache\windows\Ruby\3.0.7\x64\bin;C:\Program Files\OpenSSL\bin;C:\tools\kotlinc\bin;C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\8.0.452-9\x64\bin;C:\Program Files\ImageMagick-7.1.1-Q16-HDRI;C:
-        ARCHIVER: PeaZip
 
-    # Verify MinGW and DirectX SDK setup
-    - name: Verify build environment
+    # Step 8: Verify build environment
+    - name: Step 8 - Verify build environment
+      shell: pwsh
       run: |
+        echo "Step 8: Verifying build environment..."
         g++ --version
         dir "%DXSDK_DIR%\Include\d3d9.h"
         dir "%DXSDK_DIR%\Lib\x64\d3d9.lib"
-        echo "Build environment verified"
+        echo "Step 8: Build environment verified"
 
-    # Compile the DLL
-    - name: Build DLL
+    # Step 9: Compile the DLL
+    - name: Step 9 - Build DLL
+      shell: pwsh
       run: |
+        echo "Step 9: Compiling DLL..."
         g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
-        if ($LASTEXITCODE -ne 0) { exit 1 }
+        if ($LASTEXITCODE -ne 0) {
+          echo "Step 9: DLL compilation failed with exit code $LASTEXITCODE"
+          exit 1
+        }
         dir DirectXSample.dll
-        echo "DLL compilation completed"
+        echo "Step 9: DLL compilation completed"
 
-    # Upload the DLL as an artifact
-    - name: Upload DLL artifact
+    # Step 10: Upload the DLL as an artifact
+    - name: Step 10 - Upload DLL artifact
       uses: actions/upload-artifact@v4
       with:
         name: DirectXSample-DLL
         path: DirectXSample.dll
-        echo "Artifact upload completed"
+      run: |
+        echo "Step 10: Artifact upload completed"
