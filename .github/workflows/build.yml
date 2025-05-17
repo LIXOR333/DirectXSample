@@ -30,7 +30,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download and set up archiver (PeaZip -> Bandizip -> WinZip -> Chocolatey fallback)
+    # Download and set up archiver (PeaZip -> Bandizip -> WinZip -> 7-Zip -> Chocolatey fallback)
     - name: Download and set up archiver
       run: |
         $archiver = ""
@@ -98,19 +98,28 @@ jobs:
           }
         }
 
-        # If both failed, fallback to Chocolatey (WinZip)
+        # If both failed, fallback to Chocolatey (WinZip or 7-Zip)
         if (-not $success) {
           echo "All download attempts failed, falling back to Chocolatey..."
-          choco install winzip -y
-          if ($LASTEXITCODE -ne 0) {
-            echo "Failed to install WinZip via Chocolatey"
-            exit 1
+          choco install 7zip -y
+          if ($LASTEXITCODE -eq 0) {
+            echo "7-Zip installed via Chocolatey, using default path..."
+            $env:Path += ";C:\Program Files\7-Zip"
+            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $archiver = "7-Zip"
+            $success = $true
+          } else {
+            choco install winzip -y
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to install WinZip or 7-Zip via Chocolatey"
+              exit 1
+            }
+            echo "WinZip installed via Chocolatey, using default path..."
+            $env:Path += ";C:\Program Files\WinZip"
+            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $archiver = "WinZip"
+            $success = $true
           }
-          echo "WinZip installed via Chocolatey, using default path..."
-          $env:Path += ";C:\Program Files\WinZip"
-          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-          $archiver = "WinZip"
-          $success = $true
         }
 
         # Extract the downloaded archiver (PeaZip or Bandizip)
@@ -178,13 +187,26 @@ jobs:
           exit 1
         }
 
-    # Extract DirectX SDK using the selected archiver
+    # Extract DirectX SDK using the selected archiver or self-extract
     - name: Extract DirectX SDK
       run: |
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
           $extractSuccess = $false
-          if ($env:ARCHIVER -eq "PeaZip") {
+          
+          # Try self-extraction first
+          echo "Attempting to self-extract dxsdk.exe..."
+          Start-Process -FilePath dxsdk.exe -ArgumentList "/C" -Wait -NoNewWindow
+          if ($LASTEXITCODE -eq 0 -and (Test-Path "DXSDK")) {
+            Move-Item -Path DXSDK\* -Destination dxsdk -Force
+            Remove-Item -Path DXSDK -Recurse
+            $extractSuccess = $true
+          } else {
+            echo "Self-extraction failed or no DXSDK folder found, trying archivers..."
+          }
+          
+          # Try PeaZip if self-extraction failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "PeaZip") {
             echo "Attempting to extract dxsdk.exe with PeaZip..."
             peazip.exe -ext2here dxsdk.exe
             if ($LASTEXITCODE -eq 0) {
@@ -194,6 +216,8 @@ jobs:
               echo "Failed to extract dxsdk.exe with PeaZip, trying next archiver..."
             }
           }
+          
+          # Try Bandizip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
             echo "Attempting to extract dxsdk.exe with Bandizip..."
             bzip.exe x dxsdk.exe -o:dxsdk
@@ -203,15 +227,29 @@ jobs:
               echo "Failed to extract dxsdk.exe with Bandizip, trying next archiver..."
             }
           }
+          
+          # Try WinZip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
             echo "Attempting to extract dxsdk.exe with WinZip..."
             winzip.exe -e dxsdk.exe dxsdk
             if ($LASTEXITCODE -eq 0) {
               $extractSuccess = $true
             } else {
-              echo "Failed to extract dxsdk.exe with WinZip"
+              echo "Failed to extract dxsdk.exe with WinZip, trying next archiver..."
             }
           }
+          
+          # Try 7-Zip if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "7-Zip") {
+            echo "Attempting to extract dxsdk.exe with 7-Zip..."
+            7z.exe x dxsdk.exe -o:dxsdk
+            if ($LASTEXITCODE -eq 0) {
+              $extractSuccess = $true
+            } else {
+              echo "Failed to extract dxsdk.exe with 7-Zip"
+            }
+          }
+          
           if ($extractSuccess) {
             dir dxsdk
           } else {
