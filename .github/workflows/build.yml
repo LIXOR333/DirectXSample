@@ -30,67 +30,106 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download and set up 7z from the internet
-    - name: Download and set up 7z
+    # Download WinRAR (UnRAR) and DirectX SDK in parallel
+    - name: Download WinRAR and DirectX SDK
       run: |
-        $urls = @(
-          "https://www.7-zip.org/a/7z2301.zip",
-          "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301.zip/download",
-          "https://www.softpedia.com/get/Compression-tools/7-Zip.shtml",
-          "https://archive.org/download/7zip-23.01/7z2301.zip",
-          "https://github.com/7zip/7zip/releases/download/v23.01/7z2301.zip"
+        # Define URLs for WinRAR (UnRAR) - Fastest first, older as backups
+        $unrarUrls = @(
+          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/unrarw64.zip",
+          "https://www.rarlab.com/rar/unrarw64.zip",
+          "https://sourceforge.net/projects/winrar-official/files/UnRAR/unrarw64.zip/download",
+          "https://archive.org/download/winrar-unrar/unrarw64.zip"
         )
-        $success = $false
-        foreach ($url in $urls) {
-          echo "Trying to download 7z from $url..."
-          curl -L -o 7z.zip $url --retry 3 --retry-delay 5 -w "%{http_code}\n"
-          $httpStatus = $LASTEXITCODE
-          if ($httpStatus -eq 0 -and (Get-Item 7z.zip).Length -gt 1000000) {
-            echo "Download succeeded (size: $(Get-Item 7z.zip).Length bytes)"
-            $success = $true
-            break
-          } else {
-            echo "Download failed or file too small (size: $(Get-Item 7z.zip).Length bytes), trying next mirror..."
-            Remove-Item -Path 7z.zip -Force -ErrorAction SilentlyContinue
+        # Define URLs for DirectX SDK - Fastest first, older as backups
+        $dxsdkUrls = @(
+          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
+        )
+
+        # Start parallel downloads
+        $unrarJob = Start-Job -ScriptBlock {
+          param($urls)
+          $success = $false
+          foreach ($url in $urls) {
+            Write-Output "Trying to download WinRAR (UnRAR) from $url..."
+            curl -L -o unrar.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n"
+            if ($LASTEXITCODE -eq 0 -and (Get-Item unrar.zip).Length -gt 100000) {
+              Write-Output "UnRAR download succeeded (size: $(Get-Item unrar.zip).Length bytes)"
+              $success = $true
+              break
+            } else {
+              Write-Output "UnRAR download failed or file too small (size: $(Get-Item unrar.zip).Length bytes)"
+              Remove-Item -Path unrar.zip -Force -ErrorAction SilentlyContinue
+            }
           }
-        }
-        if (-not $success) {
-          echo "All download attempts failed"
+          if (-not $success) { exit 1 }
+        } -ArgumentList $unrarUrls
+
+        $dxsdkJob = Start-Job -ScriptBlock {
+          param($urls)
+          $success = $false
+          foreach ($url in $urls) {
+            Write-Output "Trying to download DirectX SDK from $url..."
+            curl -L -o dxsdk.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n"
+            if ($LASTEXITCODE -eq 0 -and (Get-Item dxsdk.exe).Length -gt 500000000) {
+              Write-Output "DirectX SDK download succeeded (size: $(Get-Item dxsdk.exe).Length bytes)"
+              $success = $true
+              break
+            } else {
+              Write-Output "DirectX SDK download failed or file too small (size: $(Get-Item dxsdk.exe).Length bytes)"
+              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (-not $success) { exit 1 }
+        } -ArgumentList $dxsdkUrls
+
+        # Wait for both jobs to complete
+        Wait-Job $unrarJob, $dxsdkJob
+        $unrarResult = Receive-Job $unrarJob
+        $dxsdkResult = Receive-Job $dxsdkJob
+        Write-Output $unrarResult
+        Write-Output $dxsdkResult
+
+        # Check if either job failed
+        if ($unrarJob.State -eq "Failed" -or $dxsdkJob.State -eq "Failed") {
+          echo "One or more downloads failed"
           exit 1
         }
-        echo "Extracting 7z..."
-        if (Test-Path 7z.zip) {
-          Expand-Archive -Path 7z.zip -DestinationPath 7z -Force
+
+    # Set up WinRAR (UnRAR)
+    - name: Set up WinRAR
+      run: |
+        echo "Extracting WinRAR (UnRAR)..."
+        if (Test-Path unrar.zip) {
+          Expand-Archive -Path unrar.zip -DestinationPath unrar -Force
           if ($LASTEXITCODE -ne 0) {
-            echo "Failed to extract 7z.zip"
+            echo "Failed to extract unrar.zip"
             exit 1
           }
-          echo "Adding 7z to PATH..."
-          echo "Path=$env:GITHUB_WORKSPACE\7z;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-          dir 7z\7z.exe
+          echo "Adding UnRAR to PATH..."
+          echo "Path=$env:GITHUB_WORKSPACE\unrar;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          dir unrar\unrar.exe
         } else {
-          echo "7z.zip not found after download"
+          echo "unrar.zip not found after download"
           exit 1
         }
 
-    # Download DirectX SDK from Microsoft archive
-    - name: Download DirectX SDK
-      run: |
-        echo "Downloading DirectX SDK from Microsoft archive..."
-        curl -L -o dxsdk.exe "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe" --retry 3 --retry-delay 5
-        if ($LASTEXITCODE -ne 0) {
-          echo "Failed to download DirectX SDK from Microsoft archive"
-          exit 1
-        }
-        dir dxsdk.exe
-
-    # Extract DirectX SDK
+    # Extract DirectX SDK using WinRAR (UnRAR)
     - name: Extract DirectX SDK
       run: |
-        mkdir dxsdk
-        7z x dxsdk.exe -odxsdk -y
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        dir dxsdk
+        if (Test-Path dxsdk.exe) {
+          mkdir dxsdk
+          unrar x dxsdk.exe -y -idq -o+ dxsdk\
+          if ($LASTEXITCODE -ne 0) {
+            echo "Failed to extract dxsdk.exe with UnRAR"
+            exit 1
+          }
+          dir dxsdk
+        } else {
+          echo "dxsdk.exe not found after download"
+          exit 1
+        }
 
     # Set up environment variables for DirectX SDK
     - name: Set up DirectX SDK environment
