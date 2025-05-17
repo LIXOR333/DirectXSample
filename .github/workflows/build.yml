@@ -14,9 +14,9 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # Install Chocolatey (for MinGW only)
+    # Install Chocolatey (for MinGW and potential WinRAR fallback)
     - name: Install Chocolatey
       run: |
         Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -30,88 +30,107 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download WinRAR (UnRAR) and DirectX SDK in parallel
-    - name: Download WinRAR and DirectX SDK
+    # Download WinRAR (UnRAR) with multiple mirrors and Chocolatey fallback
+    - name: Download and set up WinRAR
       run: |
-        # Define URLs for WinRAR (UnRAR) - Fastest first, older as backups
-        $unrarUrls = @(
+        $urls = @(
           "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/unrarw64.zip",
           "https://www.rarlab.com/rar/unrarw64.zip",
           "https://sourceforge.net/projects/winrar-official/files/UnRAR/unrarw64.zip/download",
-          "https://archive.org/download/winrar-unrar/unrarw64.zip"
+          "https://archive.org/download/winrar-unrar/unrarw64.zip",
+          "https://www.softpedia.com/get/Compression-tools/WinRAR.shtml",
+          "https://download.cnet.com/WinRAR/3000-2250_4-10007677.html",
+          "https://www.filehorse.com/download-winrar/previous-versions/",
+          "https://www.oldversion.com/windows/winrar/",
+          "https://github.com/winrar/winrar-mirror/releases/download/v1.0/unrarw64.zip",
+          "https://www.majorgeeks.com/files/details/winrar.html",
+          "https://www.fosshub.com/WinRAR.html"
         )
-        # Define URLs for DirectX SDK - Fastest first, older as backups
-        $dxsdkUrls = @(
-          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
-          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
-        )
-
-        # Start parallel downloads
-        $unrarJob = Start-Job -ScriptBlock {
-          param($urls)
-          $success = $false
-          foreach ($url in $urls) {
-            Write-Output "Trying to download WinRAR (UnRAR) from $url..."
-            curl -L -o unrar.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n"
-            if ($LASTEXITCODE -eq 0 -and (Get-Item unrar.zip).Length -gt 100000) {
-              Write-Output "UnRAR download succeeded (size: $(Get-Item unrar.zip).Length bytes)"
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download WinRAR (UnRAR) from $url..."
+          curl -L -o unrar.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item unrar.zip).Length
+            if ($fileSize -gt 100000) {
+              echo "UnRAR download succeeded from $url (size: $fileSize bytes)"
               $success = $true
               break
             } else {
-              Write-Output "UnRAR download failed or file too small (size: $(Get-Item unrar.zip).Length bytes)"
+              echo "File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path unrar.zip -Force -ErrorAction SilentlyContinue
             }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path unrar.zip -Force -ErrorAction SilentlyContinue
           }
-          if (-not $success) { exit 1 }
-        } -ArgumentList $unrarUrls
+        }
+        if (-not $success) {
+          echo "All download attempts failed, falling back to Chocolatey..."
+          choco install winrar -y
+          if ($LASTEXITCODE -ne 0) {
+            echo "Failed to install WinRAR via Chocolatey"
+            exit 1
+          }
+          echo "WinRAR installed via Chocolatey, using default path..."
+          $env:Path += ";C:\Program Files\WinRAR"
+          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+        } else {
+          echo "Extracting WinRAR (UnRAR)..."
+          if (Test-Path unrar.zip) {
+            Expand-Archive -Path unrar.zip -DestinationPath unrar -Force
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to extract unrar.zip"
+              exit 1
+            }
+            echo "Adding UnRAR to PATH..."
+            echo "Path=$env:GITHUB_WORKSPACE\unrar;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+            dir unrar\unrar.exe
+          } else {
+            echo "unrar.zip not found after download"
+            exit 1
+          }
+        }
 
-        $dxsdkJob = Start-Job -ScriptBlock {
-          param($urls)
-          $success = $false
-          foreach ($url in $urls) {
-            Write-Output "Trying to download DirectX SDK from $url..."
-            curl -L -o dxsdk.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n"
-            if ($LASTEXITCODE -eq 0 -and (Get-Item dxsdk.exe).Length -gt 500000000) {
-              Write-Output "DirectX SDK download succeeded (size: $(Get-Item dxsdk.exe).Length bytes)"
+    # Download DirectX SDK with multiple mirrors
+    - name: Download DirectX SDK
+      run: |
+        $urls = @(
+          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-9-0c-SDK.shtml",
+          "https://www.fileplanet.com/archive/p-20341/DirectX-SDK",
+          "https://www.oldversion.com/windows/directx-sdk/",
+          "https://www.majorgeeks.com/files/details/microsoft_directx_sdk_june_2010.html",
+          "https://download.cnet.com/DirectX-SDK/3000-2121_4-10176690.html",
+          "https://www.fosshub.com/DirectX-SDK.html",
+          "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
+          "https://github.com/microsoft-archive/dxsdk/releases/download/jun10/DXSDK_Jun10.exe"
+        )
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download DirectX SDK from $url..."
+          curl -L -o dxsdk.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item dxsdk.exe).Length
+            if ($fileSize -gt 500000000) {
+              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
               $success = $true
               break
             } else {
-              Write-Output "DirectX SDK download failed or file too small (size: $(Get-Item dxsdk.exe).Length bytes)"
+              echo "File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
             }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
           }
-          if (-not $success) { exit 1 }
-        } -ArgumentList $dxsdkUrls
-
-        # Wait for both jobs to complete
-        Wait-Job $unrarJob, $dxsdkJob
-        $unrarResult = Receive-Job $unrarJob
-        $dxsdkResult = Receive-Job $dxsdkJob
-        Write-Output $unrarResult
-        Write-Output $dxsdkResult
-
-        # Check if either job failed
-        if ($unrarJob.State -eq "Failed" -or $dxsdkJob.State -eq "Failed") {
-          echo "One or more downloads failed"
-          exit 1
         }
-
-    # Set up WinRAR (UnRAR)
-    - name: Set up WinRAR
-      run: |
-        echo "Extracting WinRAR (UnRAR)..."
-        if (Test-Path unrar.zip) {
-          Expand-Archive -Path unrar.zip -DestinationPath unrar -Force
-          if ($LASTEXITCODE -ne 0) {
-            echo "Failed to extract unrar.zip"
-            exit 1
-          }
-          echo "Adding UnRAR to PATH..."
-          echo "Path=$env:GITHUB_WORKSPACE\unrar;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-          dir unrar\unrar.exe
-        } else {
-          echo "unrar.zip not found after download"
+        if (-not $success) {
+          echo "All download attempts failed for DirectX SDK"
           exit 1
         }
 
