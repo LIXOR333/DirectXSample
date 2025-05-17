@@ -14,7 +14,7 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     # Install Chocolatey (for MinGW only)
     - name: Install Chocolatey
@@ -34,25 +34,32 @@ jobs:
     - name: Download and set up 7z
       run: |
         echo "Trying to download 7z from official site..."
-        curl -L -o 7z.zip "https://www.7-zip.org/a/7z2301-x64.zip" --retry 3 --retry-delay 5
-        if ($LASTEXITCODE -ne 0) {
-          echo "Official site failed, trying SourceForge mirror..."
-          curl -L -o 7z.zip "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.zip" --retry 3 --retry-delay 5
-          if ($LASTEXITCODE -ne 0) {
+        curl -L -o 7z.zip "https://www.7-zip.org/a/7z2301-x64.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
+        $httpStatus = $LASTEXITCODE
+        if ($httpStatus -ne 0 -or (Get-Item 7z.zip).Length -lt 1000) {
+          echo "Official site failed or file too small (size: $(Get-Item 7z.zip).Length bytes), trying SourceForge mirror..."
+          curl -L -o 7z.zip "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
+          if ($LASTEXITCODE -ne 0 -or (Get-Item 7z.zip).Length -lt 1000) {
             echo "All download attempts failed"
             exit 1
           }
+        } else {
+          echo "Download from official site succeeded (size: $(Get-Item 7z.zip).Length bytes)"
         }
         echo "Extracting 7z..."
-        Expand-Archive -Path 7z.zip -DestinationPath 7z -Force
-        if ($LASTEXITCODE -ne 0) {
-          echo "Failed to extract 7z.zip"
+        if (Test-Path 7z.zip) {
+          Expand-Archive -Path 7z.zip -DestinationPath 7z -Force
+          if ($LASTEXITCODE -ne 0) {
+            echo "Failed to extract 7z.zip"
+            exit 1
+          }
+          echo "Adding 7z to PATH..."
+          echo "Path=$env:GITHUB_WORKSPACE\7z;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          dir 7z\7z.exe
+        } else {
+          echo "7z.zip not found after download"
           exit 1
         }
-        echo "Adding 7z to PATH..."
-        echo "Path=$env:GITHUB_WORKSPACE\7z;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-        dir 7z\7z.exe
-        7z --help 2>&1 | findstr /C:"7-Zip"
 
     # Download DirectX SDK from Microsoft archive
     - name: Download DirectX SDK
