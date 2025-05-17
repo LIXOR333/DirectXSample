@@ -14,9 +14,9 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
-    # Install Chocolatey (for MinGW and potential WinRAR fallback)
+    # Install Chocolatey (for MinGW and archiver fallback)
     - name: Install Chocolatey
       run: |
         Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -30,68 +30,115 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download WinRAR (UnRAR) with multiple mirrors and Chocolatey fallback
-    - name: Download and set up WinRAR
+    # Download and set up archiver (PeaZip -> Bandizip -> WinZip -> Chocolatey fallback)
+    - name: Download and set up archiver
       run: |
+        $archiver = ""
+        
+        # Try PeaZip
         $urls = @(
-          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/unrarw64.zip",
-          "https://www.rarlab.com/rar/unrarw64.zip",
-          "https://sourceforge.net/projects/winrar-official/files/UnRAR/unrarw64.zip/download",
-          "https://archive.org/download/winrar-unrar/unrarw64.zip",
-          "https://www.softpedia.com/get/Compression-tools/WinRAR.shtml",
-          "https://download.cnet.com/WinRAR/3000-2250_4-10007677.html",
-          "https://www.filehorse.com/download-winrar/previous-versions/",
-          "https://www.oldversion.com/windows/winrar/",
-          "https://github.com/winrar/winrar-mirror/releases/download/v1.0/unrarw64.zip",
-          "https://www.majorgeeks.com/files/details/winrar.html",
-          "https://www.fosshub.com/WinRAR.html"
+          "https://github.com/peazip/PeaZip/releases/download/9.8.0/peazip_portable-9.8.0.WIN64.zip",
+          "https://sourceforge.net/projects/peazip/files/9.8.0/peazip_portable-9.8.0.WIN64.zip/download",
+          "https://www.softpedia.com/get/Compression-tools/PeaZip.shtml",
+          "https://www.majorgeeks.com/files/details/peazip.html",
+          "https://www.filehorse.com/download-peazip/64/",
+          "https://peazip.github.io/peazip_portable-9.8.0.WIN64.zip"
         )
         $success = $false
         foreach ($url in $urls) {
-          echo "Attempting to download WinRAR (UnRAR) from $url..."
-          curl -L -o unrar.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          echo "Attempting to download PeaZip from $url..."
+          curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
           $httpStatus = $LASTEXITCODE
           if ($httpStatus -eq 0) {
-            $fileSize = (Get-Item unrar.zip).Length
-            if ($fileSize -gt 100000) {
-              echo "UnRAR download succeeded from $url (size: $fileSize bytes)"
+            $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+            if ($fileSize -gt 10000000) { # ~10 MB
+              echo "PeaZip download succeeded from $url (size: $fileSize bytes)"
               $success = $true
+              $archiver = "PeaZip"
               break
             } else {
               echo "File too small ($fileSize bytes), trying next mirror..."
-              Remove-Item -Path unrar.zip -Force -ErrorAction SilentlyContinue
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
           } else {
             echo "Download failed with status $httpStatus, trying next mirror..."
-            Remove-Item -Path unrar.zip -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
           }
         }
+
+        # If PeaZip failed, try Bandizip
+        if (-not $success) {
+          $urls = @(
+            "https://www.bandisoft.com/bandizip/dl.php?portable",
+            "https://sourceforge.net/projects/bandizip/files/bandizip_portable_7.32.zip/download",
+            "https://www.softpedia.com/get/Compression-tools/Bandizip.shtml",
+            "https://www.filehorse.com/download-bandizip/64/",
+            "https://en.bandisoft.com/bandizip/dl.php?portable",
+            "https://www.majorgeeks.com/files/details/bandizip.html"
+          )
+          foreach ($url in $urls) {
+            echo "Attempting to download Bandizip from $url..."
+            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+            $httpStatus = $LASTEXITCODE
+            if ($httpStatus -eq 0) {
+              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 5000000) { # ~5 MB
+                echo "Bandizip download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                $archiver = "Bandizip"
+                break
+              } else {
+                echo "File too small ($fileSize bytes), trying next mirror..."
+                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Download failed with status $httpStatus, trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+            }
+          }
+        }
+
+        # If both failed, fallback to Chocolatey (WinZip)
         if (-not $success) {
           echo "All download attempts failed, falling back to Chocolatey..."
-          choco install winrar -y
+          choco install winzip -y
           if ($LASTEXITCODE -ne 0) {
-            echo "Failed to install WinRAR via Chocolatey"
+            echo "Failed to install WinZip via Chocolatey"
             exit 1
           }
-          echo "WinRAR installed via Chocolatey, using default path..."
-          $env:Path += ";C:\Program Files\WinRAR"
+          echo "WinZip installed via Chocolatey, using default path..."
+          $env:Path += ";C:\Program Files\WinZip"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-        } else {
-          echo "Extracting WinRAR (UnRAR)..."
-          if (Test-Path unrar.zip) {
-            Expand-Archive -Path unrar.zip -DestinationPath unrar -Force
+          $archiver = "WinZip"
+          $success = $true
+        }
+
+        # Extract the downloaded archiver (PeaZip or Bandizip)
+        if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") {
+          echo "Extracting $archiver..."
+          if (Test-Path archiver.zip) {
+            Expand-Archive -Path archiver.zip -DestinationPath archiver -Force
             if ($LASTEXITCODE -ne 0) {
-              echo "Failed to extract unrar.zip"
+              echo "Failed to extract archiver.zip - possibly not a valid archive"
               exit 1
             }
-            echo "Adding UnRAR to PATH..."
-            echo "Path=$env:GITHUB_WORKSPACE\unrar;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-            dir unrar\unrar.exe
+            if ($archiver -eq "PeaZip") {
+              echo "Adding PeaZip to PATH..."
+              echo "Path=$env:GITHUB_WORKSPACE\archiver\peazip_portable-9.8.0.WIN64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              dir archiver\peazip_portable-9.8.0.WIN64\peazip.exe
+            } elseif ($archiver -eq "Bandizip") {
+              echo "Adding Bandizip to PATH..."
+              echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              dir archiver\bzip.exe
+            }
           } else {
-            echo "unrar.zip not found after download"
+            echo "archiver.zip not found after download"
             exit 1
           }
         }
+
+        # Save the archiver type for later steps
+        echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     # Download DirectX SDK with multiple mirrors
     - name: Download DirectX SDK
@@ -100,14 +147,9 @@ jobs:
           "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
           "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
           "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
-          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-9-0c-SDK.shtml",
-          "https://www.fileplanet.com/archive/p-20341/DirectX-SDK",
-          "https://www.oldversion.com/windows/directx-sdk/",
-          "https://www.majorgeeks.com/files/details/microsoft_directx_sdk_june_2010.html",
-          "https://download.cnet.com/DirectX-SDK/3000-2121_4-10176690.html",
-          "https://www.fosshub.com/DirectX-SDK.html",
           "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
-          "https://github.com/microsoft-archive/dxsdk/releases/download/jun10/DXSDK_Jun10.exe"
+          "https://www.majorgeeks.com/files/details/directx_sdk_june_2010.html",
+          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-SDK-June-2010.shtml"
         )
         $success = $false
         foreach ($url in $urls) {
@@ -115,7 +157,7 @@ jobs:
           curl -L -o dxsdk.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
           $httpStatus = $LASTEXITCODE
           if ($httpStatus -eq 0) {
-            $fileSize = (Get-Item dxsdk.exe).Length
+            $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
             if ($fileSize -gt 500000000) {
               echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
               $success = $true
@@ -134,15 +176,30 @@ jobs:
           exit 1
         }
 
-    # Extract DirectX SDK using WinRAR (UnRAR)
+    # Extract DirectX SDK using the selected archiver
     - name: Extract DirectX SDK
       run: |
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
-          unrar x dxsdk.exe -y -idq -o+ dxsdk\
-          if ($LASTEXITCODE -ne 0) {
-            echo "Failed to extract dxsdk.exe with UnRAR"
-            exit 1
+          if ($env:ARCHIVER -eq "PeaZip") {
+            peazip.exe -ext2here dxsdk.exe
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to extract dxsdk.exe with PeaZip"
+              exit 1
+            }
+            Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
+          } elseif ($env:ARCHIVER -eq "Bandizip") {
+            bzip.exe x dxsdk.exe -o:dxsdk
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to extract dxsdk.exe with Bandizip"
+              exit 1
+            }
+          } elseif ($env:ARCHIVER -eq "WinZip") {
+            winzip.exe -e dxsdk.exe dxsdk
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to extract dxsdk.exe with WinZip"
+              exit 1
+            }
           }
           dir dxsdk
         } else {
