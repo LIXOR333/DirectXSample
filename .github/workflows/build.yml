@@ -149,12 +149,14 @@ jobs:
           "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
           "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
           "https://www.majorgeeks.com/files/details/directx_sdk_june_2010.html",
-          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-SDK-June-2010.shtml"
+          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-SDK-June-2010.shtml",
+          "https://archive.org/details/dxsdk_jun10",
+          "https://archive.org/details/microsoft_directx_sdk_june_2010"
         )
         $success = $false
         foreach ($url in $urls) {
           echo "Attempting to download DirectX SDK from $url..."
-          curl -L -o dxsdk.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          curl -L -o dxsdk.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
           $httpStatus = $LASTEXITCODE
           if ($httpStatus -eq 0) {
             $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
@@ -181,27 +183,41 @@ jobs:
       run: |
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
+          $extractSuccess = $false
           if ($env:ARCHIVER -eq "PeaZip") {
+            echo "Attempting to extract dxsdk.exe with PeaZip..."
             peazip.exe -ext2here dxsdk.exe
-            if ($LASTEXITCODE -ne 0) {
-              echo "Failed to extract dxsdk.exe with PeaZip"
-              exit 1
-            }
-            Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
-          } elseif ($env:ARCHIVER -eq "Bandizip") {
-            bzip.exe x dxsdk.exe -o:dxsdk
-            if ($LASTEXITCODE -ne 0) {
-              echo "Failed to extract dxsdk.exe with Bandizip"
-              exit 1
-            }
-          } elseif ($env:ARCHIVER -eq "WinZip") {
-            winzip.exe -e dxsdk.exe dxsdk
-            if ($LASTEXITCODE -ne 0) {
-              echo "Failed to extract dxsdk.exe with WinZip"
-              exit 1
+            if ($LASTEXITCODE -eq 0) {
+              Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
+              $extractSuccess = $true
+            } else {
+              echo "Failed to extract dxsdk.exe with PeaZip, trying next archiver..."
             }
           }
-          dir dxsdk
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
+            echo "Attempting to extract dxsdk.exe with Bandizip..."
+            bzip.exe x dxsdk.exe -o:dxsdk
+            if ($LASTEXITCODE -eq 0) {
+              $extractSuccess = $true
+            } else {
+              echo "Failed to extract dxsdk.exe with Bandizip, trying next archiver..."
+            }
+          }
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
+            echo "Attempting to extract dxsdk.exe with WinZip..."
+            winzip.exe -e dxsdk.exe dxsdk
+            if ($LASTEXITCODE -eq 0) {
+              $extractSuccess = $true
+            } else {
+              echo "Failed to extract dxsdk.exe with WinZip"
+            }
+          }
+          if ($extractSuccess) {
+            dir dxsdk
+          } else {
+            echo "All attempts to extract dxsdk.exe failed"
+            exit 1
+          }
         } else {
           echo "dxsdk.exe not found after download"
           exit 1
