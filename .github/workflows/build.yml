@@ -34,12 +34,12 @@ jobs:
     - name: Download and set up 7z
       run: |
         echo "Trying to download 7z from official site..."
-        curl -L -o 7z.zip "https://www.7-zip.org/a/7z2301-x64.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
+        curl -L -o 7z.zip "https://www.7-zip.org/a/7z2301.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
         $httpStatus = $LASTEXITCODE
-        if ($httpStatus -ne 0 -or (Get-Item 7z.zip).Length -lt 1000) {
+        if ($httpStatus -ne 0 -or (Get-Item 7z.zip).Length -lt 1000000) {
           echo "Official site failed or file too small (size: $(Get-Item 7z.zip).Length bytes), trying SourceForge mirror..."
-          curl -L -o 7z.zip "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
-          if ($LASTEXITCODE -ne 0 -or (Get-Item 7z.zip).Length -lt 1000) {
+          curl -L -o 7z.zip "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301.zip/download" --retry 3 --retry-delay 5 -w "%{http_code}\n"
+          if ($LASTEXITCODE -ne 0 -or (Get-Item 7z.zip).Length -lt 1000000) {
             echo "All download attempts failed"
             exit 1
           }
