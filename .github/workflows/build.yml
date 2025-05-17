@@ -14,7 +14,7 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     # Install Chocolatey (for MinGW and 7z)
     - name: Install Chocolatey
@@ -39,22 +39,27 @@ jobs:
           exit 1
         }
         echo "7zip installed, checking version..."
-        7z | findstr Version
-        if ($LASTEXITCODE -ne 0) {
-          echo "Version check failed with exit code $LASTEXITCODE"
+        if (Test-Path "C:\Program Files\7-Zip\7z.exe") {
+          $version = & "C:\Program Files\7-Zip\7z.exe" --help 2>&1 | Select-String "Version"
+          if ($version) {
+            echo "7zip version check passed: $version"
+          } else {
+            echo "Version check failed: no 'Version' string found"
+            exit 1
+          }
+        } else {
+          echo "7zip executable not found"
           exit 1
         }
-        echo "7zip version check passed"
 
-    # Download DirectX SDK (try Transfiles first, fallback to GitHub mirror)
+    # Download DirectX SDK from Microsoft archive
     - name: Download DirectX SDK
       run: |
-        echo "Trying to download from Transfiles..."
-        curl -L -o dxsdk.exe "https://transfiles.ru/ha8kj" --retry 3 --retry-delay 5
+        echo "Downloading DirectX SDK from Microsoft archive..."
+        curl -L -o dxsdk.exe "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe" --retry 3 --retry-delay 5
         if ($LASTEXITCODE -ne 0) {
-          echo "Transfiles failed, trying GitHub mirror..."
-          curl -L -o dxsdk.exe "https://github.com/user-attachments/files/DXSDK_Jun10.exe" --retry 3 --retry-delay 5
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          echo "Failed to download DirectX SDK from Microsoft archive"
+          exit 1
         }
         dir dxsdk.exe
 
