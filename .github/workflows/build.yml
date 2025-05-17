@@ -1,0 +1,89 @@
+name: Build DirectX Sample DLL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15 # Prevent hanging
+
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Install Chocolatey (for MinGW and 7z)
+    - name: Install Chocolatey
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+    # Install MinGW
+    - name: Install MinGW
+      run: |
+        choco install mingw --version 8.1.0 -y
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        g++ --version
+
+    # Install 7z for extracting DirectX SDK
+    - name: Install 7z
+      run: |
+        choco install 7zip --version 23.01 -y
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        7z | findstr Version
+
+    # Download DirectX SDK (try Transfiles first, fallback to GitHub mirror)
+    - name: Download DirectX SDK
+      run: |
+        echo "Trying to download from Transfiles..."
+        curl -L -o dxsdk.exe "https://transfiles.ru/ha8kj" --retry 3 --retry-delay 5
+        if ($LASTEXITCODE -ne 0) {
+          echo "Transfiles failed, trying GitHub mirror..."
+          curl -L -o dxsdk.exe "https://github.com/user-attachments/files/DXSDK_Jun10.exe" --retry 3 --retry-delay 5
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+        }
+        dir dxsdk.exe
+
+    # Extract DirectX SDK
+    - name: Extract DirectX SDK
+      run: |
+        mkdir dxsdk
+        7z x dxsdk.exe -odxsdk -y
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        dir dxsdk
+
+    # Set up environment variables for DirectX SDK
+    - name: Set up DirectX SDK environment
+      run: |
+        echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+        dir $env:GITHUB_WORKSPACE\dxsdk\Include
+        dir $env:GITHUB_WORKSPACE\dxsdk\Lib\x64
+
+    # Verify MinGW and DirectX SDK setup
+    - name: Verify build environment
+      run: |
+        g++ --version
+        dir "%DXSDK_DIR%\Include\d3d9.h"
+        dir "%DXSDK_DIR%\Lib\x64\d3d9.lib"
+
+    # Compile the DLL
+    - name: Build DLL
+      run: |
+        g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        dir DirectXSample.dll
+
+    # Upload the DLL as an artifact
+    - name: Upload DLL artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: DirectXSample-DLL
+        path: DirectXSample.dll
