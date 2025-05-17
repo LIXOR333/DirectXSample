@@ -14,7 +14,7 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Install Chocolatey (for MinGW and 7z)
     - name: Install Chocolatey
@@ -30,20 +30,21 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-   - name: Install 7z
-  run: |
-    choco install 7zip --version 23.01 --force -y
-    if ($LASTEXITCODE -ne 0) {
-      echo "Chocolatey failed with exit code $LASTEXITCODE"
-      exit 1
-    }
-    echo "7zip installed, checking version..."
-    7z | findstr Version
-    if ($LASTEXITCODE -ne 0) {
-      echo "Version check failed with exit code $LASTEXITCODE"
-      exit 1
-    }
-    echo "7zip version check passed"
+    # Install 7z for extracting DirectX SDK
+    - name: Install 7z
+      run: |
+        choco install 7zip --version 23.01 --force -y
+        if ($LASTEXITCODE -ne 0) {
+          echo "Chocolatey failed with exit code $LASTEXITCODE"
+          exit 1
+        }
+        echo "7zip installed, checking version..."
+        7z | findstr Version
+        if ($LASTEXITCODE -ne 0) {
+          echo "Version check failed with exit code $LASTEXITCODE"
+          exit 1
+        }
+        echo "7zip version check passed"
 
     # Download DirectX SDK (try Transfiles first, fallback to GitHub mirror)
     - name: Download DirectX SDK
