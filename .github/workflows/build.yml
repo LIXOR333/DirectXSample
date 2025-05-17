@@ -9,252 +9,312 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 15 # Prevent hanging
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        run: |
-          echo "Checkout completed"
-          if (-not (Test-Path src/dllmain.cpp)) {
-            echo "Error: src/dllmain.cpp not found in repository"
-            exit 1
-          }
-          dir src
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Install Chocolatey
-        shell: pwsh
-        run: |
-          echo "Installing Chocolatey..."
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    # Install Chocolatey (for MinGW and archiver fallback)
+    - name: Install Chocolatey
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+    # Install MinGW
+    - name: Install MinGW
+      run: |
+        choco install mingw --version 8.1.0 -y
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        g++ --version
+
+    # Download and set up archivers
+    - name: Download and set up archivers
+      run: |
+        $archiver = ""
+        
+        # Try PeaZip
+        $urls = @(
+          "https://github.com/peazip/PeaZip/releases/download/9.8.0/peazip_portable-9.8.0.WIN64.zip",
+          "https://sourceforge.net/projects/peazip/files/9.8.0/peazip_portable-9.8.0.WIN64.zip/download",
+          "https://www.softpedia.com/get/Compression-tools/PeaZip.shtml",
+          "https://www.majorgeeks.com/files/details/peazip.html",
+          "https://www.filehorse.com/download-peazip/64/",
+          "https://peazip.github.io/peazip_portable-9.8.0.WIN64.zip"
+        )
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download PeaZip from $url..."
+          curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+            if ($fileSize -gt 10000000) { # ~10 MB
+              echo "PeaZip download succeeded from $url (size: $fileSize bytes)"
+              $success = $true
+              $archiver = "PeaZip"
+              break
+            } else {
+              echo "File too small ($fileSize bytes), trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+            }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+          }
+        }
+
+        # If PeaZip failed, try Bandizip
+        if (-not $success) {
           $urls = @(
-            "https://chocolatey.org/install.ps1",
-            "https://community.chocolatey.org/install.ps1",
-            "https://raw.githubusercontent.com/chocolatey/choco/master/install.ps1",
-            "https://github.com/chocolatey/choco/raw/master/install.ps1",
-            "https://archive.org/download/chocolatey-install/install.ps1",
-            "https://web.archive.org/web/*/https://chocolatey.org/install.ps1",
-            "https://mirror.clarkson.edu/chocolatey/install.ps1",
-            "https://mirrors.tuna.tsinghua.edu.cn/chocolatey/install.ps1",
-            "https://mirrors.ustc.edu.cn/chocolatey/install.ps1",
-            "https://mirror.gcr.io/chocolatey/install.ps1",
-            "https://cdn.jsdelivr.net/gh/chocolatey/choco@master/install.ps1",
-            "https://objects.githubusercontent.com/chocolatey/install.ps1",
-            "https://choco-mirror.example.com/install.ps1"
+            "https://www.bandisoft.com/bandizip/dl.php?portable",
+            "https://sourceforge.net/projects/bandizip/files/bandizip_portable_7.32.zip/download",
+            "https://www.softpedia.com/get/Compression-tools/Bandizip.shtml",
+            "https://www.filehorse.com/download-bandizip/64/",
+            "https://en.bandisoft.com/bandizip/dl.php?portable",
+            "https://www.majorgeeks.com/files/details/bandizip.html"
           )
-          $success = $false
           foreach ($url in $urls) {
-            echo "Trying to download Chocolatey install script from $url..."
-            try {
-              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 5 -ErrorAction Stop
-              if ($response.StatusCode -eq 200) {
-                $scriptContent = $response.Content
-                if ($scriptContent -match "chocolatey") {
-                  echo "Chocolatey install script downloaded from $url"
-                  Set-Content -Path install.ps1 -Value $scriptContent
-                  $success = $true
-                  break
-                } else {
-                  echo "Content does not appear to be Chocolatey install script, retrying..."
-                }
+            echo "Attempting to download Bandizip from $url..."
+            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+            $httpStatus = $LASTEXITCODE
+            if ($httpStatus -eq 0) {
+              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 5000000) { # ~5 MB
+                echo "Bandizip download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                $archiver = "Bandizip"
+                break
+              } else {
+                echo "File too small ($fileSize bytes), trying next mirror..."
+                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
               }
-            } catch {
-              echo "Failed to download from $url with error: $_"
+            } else {
+              echo "Download failed with status $httpStatus, trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
           }
-          if (-not $success) {
-            echo "All attempts to download Chocolatey install script failed"
-            exit 1
-          }
-          iex (Get-Content install.ps1 -Raw)
-          if ($LASTEXITCODE -ne 0) {
-            echo "Chocolatey installation failed with exit code $LASTEXITCODE"
-            exit 1
-          }
-          echo "Chocolatey installed successfully"
+        }
 
-      - name: Install MinGW
-        shell: pwsh
-        run: |
-          echo "Installing MinGW..."
-          $urls = @(
-            "https://community.chocolatey.org/api/v2/package/mingw",
-            "https://packages.chocolatey.org/mingw.nupkg",
-            "https://mirror.clarkson.edu/chocolatey/api/v2/package/mingw",
-            "https://mirrors.tuna.tsinghua.edu.cn/chocolatey/api/v2/package/mingw",
-            "https://mirrors.ustc.edu.cn/chocolatey/api/v2/package/mingw",
-            "https://mirror.gcr.io/chocolatey/api/v2/package/mingw",
-            "https://cdn.jsdelivr.net/chocolatey/api/v2/package/mingw",
-            "https://archive.org/download/chocolatey-mingw/mingw.nupkg",
-            "https://web.archive.org/web/*/https://community.chocolatey.org/api/v2/package/mingw",
-            "https://choco-mirror.example.com/api/v2/package/mingw",
-            "https://github.com/chocolatey/choco-packages/raw/master/mingw.nupkg",
-            "https://objects.githubusercontent.com/chocolatey/mingw.nupkg",
-            "https://alternate-choco-mirror.net/api/v2/package/mingw"
-          )
-          $success = $false
-          foreach ($url in $urls) {
-            echo "Trying to install MinGW from $url..."
-            choco install mingw -y --source $url --no-progress
+        # If Bandizip failed, fallback to Chocolatey (WinZip or 7-Zip)
+        if (-not $success) {
+          echo "All download attempts failed, falling back to Chocolatey..."
+          choco install 7zip -y
+          if ($LASTEXITCODE -eq 0) {
+            echo "7-Zip installed via Chocolatey, using default path..."
+            $env:Path += ";C:\Program Files\7-Zip"
+            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $archiver = "7-Zip"
+            $success = $true
+          } else {
+            choco install winzip -y
+            if ($LASTEXITCODE -ne 0) {
+              echo "Failed to install WinZip or 7-Zip via Chocolatey"
+              exit 1
+            }
+            echo "WinZip installed via Chocolatey, using default path..."
+            $env:Path += ";C:\Program Files\WinZip"
+            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $archiver = "WinZip"
+            $success = $true
+          }
+        }
+
+        # Extract the downloaded archiver (PeaZip or Bandizip)
+        if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") {
+          echo "Extracting $archiver..."
+          if (Test-Path archiver.zip) {
+            Expand-Archive -Path archiver.zip -DestinationPath archiver -Force
             if ($LASTEXITCODE -eq 0) {
-              echo "MinGW installed successfully from $url"
+              if ($archiver -eq "PeaZip") {
+                echo "Adding PeaZip to PATH..."
+                echo "Path=$env:GITHUB_WORKSPACE\archiver\peazip_portable-9.8.0.WIN64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                dir archiver\peazip_portable-9.8.0.WIN64\peazip.exe
+              } elseif ($archiver -eq "Bandizip") {
+                echo "Adding Bandizip to PATH..."
+                echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                dir archiver\bzip.exe
+              }
+            } else {
+              echo "Failed to extract archiver.zip - possibly not a valid archive"
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+            }
+          } else {
+            echo "archiver.zip not found after download"
+            Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+          }
+        }
+
+        # Save the archiver type for later steps
+        echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    # Download DirectX SDK with multiple mirrors
+    - name: Download DirectX SDK
+      run: |
+        $urls = @(
+          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+          "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
+          "https://www.majorgeeks.com/files/details/directx_sdk_june_2010.html",
+          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-SDK-June-2010.shtml",
+          "https://archive.org/details/dxsdk_jun10",
+          "https://archive.org/details/microsoft_directx_sdk_june_2010"
+        )
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download DirectX SDK from $url..."
+          curl -L -o dxsdk.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
+            if ($fileSize -gt 500000000) {
+              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
               $success = $true
               break
             } else {
-              echo "Failed to install MinGW from $url, retrying..."
-            }
-          }
-          if (-not $success) {
-            echo "All attempts to install MinGW failed, falling back to default source..."
-            choco install mingw -y --no-progress
-            if ($LASTEXITCODE -ne 0) {
-              echo "MinGW installation failed with exit code $LASTEXITCODE"
-              exit 1
-            }
-          }
-          $env:Path += ";C:\tools\mingw64\bin"
-          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-          g++ --version
-          if ($LASTEXITCODE -ne 0) {
-            echo "g++ not found after MinGW installation"
-            exit 1
-          }
-          echo "MinGW installed successfully"
-
-      - name: Download DirectX SDK
-        shell: pwsh
-        run: |
-          echo "Downloading DirectX SDK..."
-          $urls = @(
-            "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-            "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
-            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
-            "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
-            "https://web.archive.org/web/*/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-            "https://software.mirror.ac.uk/sites/microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-            "https://mirror.gcr.io/microsoft/DXSDK_Jun10.exe",
-            "https://cdn.jsdelivr.net/microsoft/DXSDK_Jun10.exe",
-            "https://archive.org/details/dxsdk_jun10/DXSDK_Jun10.exe",
-            "https://archive.org/details/microsoft_directx_sdk_june_2010/DXSDK_Jun10.exe",
-            "https://alternate-mirror.net/microsoft/DXSDK_Jun10.exe",
-            "https://mirror.example.com/microsoft/DXSDK_Jun10.exe",
-            "https://objects.githubusercontent.com/microsoft/DXSDK_Jun10.exe",
-            "https://backup-mirror.net/microsoft/DXSDK_Jun10.exe"
-          )
-          $success = $false
-          foreach ($url in $urls) {
-            echo "Trying $url..."
-            curl -L -o dxsdk.exe $url --retry 15 --retry-delay 5 -w "%{http_code}\n" -s
-            if ($LASTEXITCODE -eq 0) {
-              $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
-              if ($fileSize -gt 500000000) {
-                echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
-                $success = $true
-                break
-              } else {
-                echo "File size too small ($fileSize bytes), retrying..."
-                Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
-              }
-            } else {
-              echo "Download failed with status $LASTEXITCODE, retrying..."
+              echo "File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
             }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
           }
-          if (-not $success) {
-            echo "All DirectX SDK download attempts failed"
-            exit 1
-          }
-          echo "DirectX SDK download completed"
+        }
+        if (-not $success) {
+          echo "All download attempts failed for DirectX SDK"
+          exit 1
+        }
 
-      - name: Extract DirectX SDK
-        shell: pwsh
-        run: |
-          echo "Extracting DirectX SDK..."
-          if (-not (Test-Path dxsdk.exe)) {
-            echo "dxsdk.exe not found after download"
-            exit 1
-          }
-          mkdir dxsdk -ErrorAction SilentlyContinue
-          echo "Attempting to extract with Shell.Application..."
-          try {
-            $shell = New-Object -ComObject Shell.Application
-            $zip = $shell.NameSpace($PWD.Path + "\dxsdk.exe")
-            if (-not $zip) {
-              throw "Failed to initialize Shell.Application zip namespace"
+    # Extract DirectX SDK using archivers
+    - name: Extract DirectX SDK
+      run: |
+        if (Test-Path dxsdk.exe) {
+          mkdir dxsdk
+          $extractSuccess = $false
+          
+          # Try PeaZip
+          if ($env:ARCHIVER -eq "PeaZip") {
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with PeaZip..."
+            Start-Process -FilePath peazip.exe -ArgumentList "-ext2here dxsdk.exe" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract DirectX SDK with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
+                }
+              } else {
+                echo "PeaZip extraction timed out after $timeout seconds, skipping to next method..."
+                $process.Kill()
+              }
             }
-            $dest = $shell.NameSpace($PWD.Path + "\dxsdk")
-            if (-not $dest) {
-              throw "Failed to initialize Shell.Application destination namespace"
+          }
+          
+          # Try Bandizip if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with Bandizip..."
+            Start-Process -FilePath bzip.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract DirectX SDK with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
+                }
+              } else {
+                echo "Bandizip extraction timed out after $timeout seconds, skipping to next method..."
+                $process.Kill()
+              }
             }
-            $dest.CopyHere($zip.Items(), 156) # 4 + 8 + 144 for overwrite and no progress UI
-            if (Test-Path dxsdk\Include) {
-              echo "Extraction with Shell.Application succeeded"
-            } else {
-              throw "Include folder not found after Shell.Application extraction"
+          }
+          
+          # Try WinZip if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with WinZip..."
+            Start-Process -FilePath winzip.exe -ArgumentList "-e dxsdk.exe dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract DirectX SDK with WinZip, exit code: $($process.ExitCode), skipping to next method..."
+                }
+              } else {
+                echo "WinZip extraction timed out after $timeout seconds, skipping to next method..."
+                $process.Kill()
+              }
             }
-          } catch {
-            echo "Shell.Application extraction failed: $_"
-            echo "Falling back to Expand-Archive..."
-            Expand-Archive -Path dxsdk.exe -DestinationPath dxsdk -Force -ErrorAction Stop
-            if (-not (Test-Path dxsdk\Include)) {
-              echo "Expand-Archive failed, Include folder not found"
-              exit 1
+          }
+          
+          # Try 7-Zip if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "7-Zip") {
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with 7-Zip..."
+            Start-Process -FilePath 7z.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract DirectX SDK with 7-Zip, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "7-Zip extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
             }
-            echo "Extraction with Expand-Archive succeeded"
           }
-          echo "DirectX SDK extracted successfully"
+          
+          if ($extractSuccess) {
+            dir dxsdk
+          } else {
+            echo "All attempts to extract DirectX SDK (dxsdk.exe) failed"
+            exit 1
+          }
+        } else {
+          echo "dxsdk.exe not found after download"
+          exit 1
+        }
 
-      - name: Set up DirectX SDK environment
-        shell: pwsh
-        run: |
-          echo "Setting up DirectX SDK environment..."
-          if (-not (Test-Path dxsdk\Include)) {
-            echo "DirectX SDK Include folder not found"
-            exit 1
-          }
-          echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "Environment variables set successfully"
+    # Set up environment variables for DirectX SDK
+    - name: Set up DirectX SDK environment
+      run: |
+        echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+        dir $env:GITHUB_WORKSPACE\dxsdk\Include
+        dir $env:GITHUB_WORKSPACE\dxsdk\Lib\x64
 
-      - name: Verify build environment
-        shell: pwsh
-        run: |
-          echo "Verifying build environment..."
-          g++ --version
-          if ($LASTEXITCODE -ne 0) {
-            echo "g++ not found"
-            exit 1
-          }
-          if (-not (Test-Path "$env:DXSDK_DIR\Include\d3d9.h")) {
-            echo "d3d9.h not found"
-            exit 1
-          }
-          if (-not (Test-Path "$env:DXSDK_DIR\Lib\x64\d3d9.lib")) {
-            echo "d3d9.lib not found"
-            exit 1
-          }
-          echo "Build environment verified"
+    # Verify MinGW and DirectX SDK setup
+    - name: Verify build environment
+      run: |
+        g++ --version
+        dir "%DXSDK_DIR%\Include\d3d9.h"
+        dir "%DXSDK_DIR%\Lib\x64\d3d9.lib"
 
-      - name: Build DLL
-        shell: pwsh
-        run: |
-          echo "Compiling DLL..."
-          g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
-          if ($LASTEXITCODE -ne 0) {
-            echo "DLL compilation failed with exit code $LASTEXITCODE"
-            exit 1
-          }
-          if (-not (Test-Path DirectXSample.dll)) {
-            echo "DirectXSample.dll not created"
-            exit 1
-          }
-          echo "DLL compilation completed"
+    # Compile the DLL
+    - name: Build DLL
+      run: |
+        g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        dir DirectXSample.dll
 
-      - name: Upload DLL artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: DirectXSample-DLL
-          path: DirectXSample.dll
+    # Upload the DLL as an artifact
+    - name: Upload DLL artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: DirectXSample-DLL
+        path: DirectXSample.dll
