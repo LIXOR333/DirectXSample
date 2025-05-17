@@ -30,7 +30,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download and set up archiver (PeaZip -> Bandizip -> WinZip -> 7-Zip -> Chocolatey fallback)
+    # Download and set up archiver (PeaZip -> Bandizip -> HAMMER -> IZArc -> UltimateZip -> WinZip -> Chocolatey fallback)
     - name: Download and set up archiver
       run: |
         $archiver = ""
@@ -98,32 +98,119 @@ jobs:
           }
         }
 
-        # If both failed, fallback to Chocolatey (WinZip or 7-Zip)
+        # If Bandizip failed, try HAMMER
         if (-not $success) {
-          echo "All download attempts failed, falling back to Chocolatey..."
-          choco install 7zip -y
-          if ($LASTEXITCODE -eq 0) {
-            echo "7-Zip installed via Chocolatey, using default path..."
-            $env:Path += ";C:\Program Files\7-Zip"
-            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-            $archiver = "7-Zip"
-            $success = $true
-          } else {
-            choco install winzip -y
-            if ($LASTEXITCODE -ne 0) {
-              echo "Failed to install WinZip or 7-Zip via Chocolatey"
-              exit 1
+          $urls = @(
+            "https://www.hamstersoft.com/downloads/hammer-portable.zip",
+            "https://sourceforge.net/projects/hammer-archiver/files/hammer-portable-2.0.zip/download",
+            "https://www.softpedia.com/get/Compression-tools/HAMMER.shtml",
+            "https://www.filehorse.com/download-hammer/64/",
+            "https://www.majorgeeks.com/files/details/hammer.html",
+            "https://www.hammersoft.com/hammer-portable-2.0.zip"
+          )
+          foreach ($url in $urls) {
+            echo "Attempting to download HAMMER from $url..."
+            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+            $httpStatus = $LASTEXITCODE
+            if ($httpStatus -eq 0) {
+              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 9000000) { # ~9 MB
+                echo "HAMMER download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                $archiver = "HAMMER"
+                break
+              } else {
+                echo "File too small ($fileSize bytes), trying next mirror..."
+                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Download failed with status $httpStatus, trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
-            echo "WinZip installed via Chocolatey, using default path..."
-            $env:Path += ";C:\Program Files\WinZip"
-            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-            $archiver = "WinZip"
-            $success = $true
           }
         }
 
-        # Extract the downloaded archiver (PeaZip or Bandizip)
-        if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") {
+        # If HAMMER failed, try IZArc
+        if (-not $success) {
+          $urls = @(
+            "https://www.izarc.org/download/izarc-portable.zip",
+            "https://sourceforge.net/projects/izarc/files/izarc-portable-4.5.zip/download",
+            "https://www.softpedia.com/get/Compression-tools/IZArc.shtml",
+            "https://www.filehorse.com/download-izarc/64/",
+            "https://www.majorgeeks.com/files/details/izarc.html",
+            "https://www.izarc.org/downloads/izarc-portable-4.5.zip"
+          )
+          foreach ($url in $urls) {
+            echo "Attempting to download IZArc from $url..."
+            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+            $httpStatus = $LASTEXITCODE
+            if ($httpStatus -eq 0) {
+              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 4000000) { # ~4 MB
+                echo "IZArc download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                $archiver = "IZArc"
+                break
+              } else {
+                echo "File too small ($fileSize bytes), trying next mirror..."
+                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Download failed with status $httpStatus, trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+            }
+          }
+        }
+
+        # If IZArc failed, try UltimateZip
+        if (-not $success) {
+          $urls = @(
+            "https://www.ultimatezip.com/download/ultimatezip-portable.zip",
+            "https://sourceforge.net/projects/ultimatezip/files/ultimatezip-portable-3.0.zip/download",
+            "https://www.softpedia.com/get/Compression-tools/UltimateZip.shtml",
+            "https://www.filehorse.com/download-ultimatezip/64/",
+            "https://www.majorgeeks.com/files/details/ultimatezip.html",
+            "https://www.ultimatezip.org/ultimatezip-portable-3.0.zip"
+          )
+          foreach ($url in $urls) {
+            echo "Attempting to download UltimateZip from $url..."
+            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+            $httpStatus = $LASTEXITCODE
+            if ($httpStatus -eq 0) {
+              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 7000000) { # ~7 MB
+                echo "UltimateZip download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                $archiver = "UltimateZip"
+                break
+              } else {
+                echo "File too small ($fileSize bytes), trying next mirror..."
+                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Download failed with status $httpStatus, trying next mirror..."
+              Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
+            }
+          }
+        }
+
+        # If all failed, fallback to Chocolatey (WinZip)
+        if (-not $success) {
+          echo "All download attempts failed, falling back to Chocolatey..."
+          choco install winzip -y
+          if ($LASTEXITCODE -ne 0) {
+            echo "Failed to install WinZip via Chocolatey"
+            exit 1
+          }
+          echo "WinZip installed via Chocolatey, using default path..."
+          $env:Path += ";C:\Program Files\WinZip"
+          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $archiver = "WinZip"
+          $success = $true
+        }
+
+        # Extract the downloaded archiver
+        if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip" -or $archiver -eq "HAMMER" -or $archiver -eq "IZArc" -or $archiver -eq "UltimateZip") {
           echo "Extracting $archiver..."
           if (Test-Path archiver.zip) {
             Expand-Archive -Path archiver.zip -DestinationPath archiver -Force
@@ -139,6 +226,18 @@ jobs:
               echo "Adding Bandizip to PATH..."
               echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
               dir archiver\bzip.exe
+            } elseif ($archiver -eq "HAMMER") {
+              echo "Adding HAMMER to PATH..."
+              echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              dir archiver\hammer.exe
+            } elseif ($archiver -eq "IZArc") {
+              echo "Adding IZArc to PATH..."
+              echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              dir archiver\izarc.exe
+            } elseif ($archiver -eq "UltimateZip") {
+              echo "Adding UltimateZip to PATH..."
+              echo "Path=$env:GITHUB_WORKSPACE\archiver;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              dir archiver\ultimatezip.exe
             }
           } else {
             echo "archiver.zip not found after download"
@@ -187,66 +286,137 @@ jobs:
           exit 1
         }
 
-    # Extract DirectX SDK using the selected archiver or self-extract
+    # Extract DirectX SDK using the selected archiver
     - name: Extract DirectX SDK
       run: |
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
           $extractSuccess = $false
           
-          # Try self-extraction first
-          echo "Attempting to self-extract dxsdk.exe..."
-          Start-Process -FilePath dxsdk.exe -ArgumentList "/C" -Wait -NoNewWindow
-          if ($LASTEXITCODE -eq 0 -and (Test-Path "DXSDK")) {
-            Move-Item -Path DXSDK\* -Destination dxsdk -Force
-            Remove-Item -Path DXSDK -Recurse
-            $extractSuccess = $true
-          } else {
-            echo "Self-extraction failed or no DXSDK folder found, trying archivers..."
-          }
-          
-          # Try PeaZip if self-extraction failed
-          if (-not $extractSuccess -and $env:ARCHIVER -eq "PeaZip") {
+          # Try PeaZip
+          if ($env:ARCHIVER -eq "PeaZip") {
             echo "Attempting to extract dxsdk.exe with PeaZip..."
-            peazip.exe -ext2here dxsdk.exe
-            if ($LASTEXITCODE -eq 0) {
-              Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
-              $extractSuccess = $true
-            } else {
-              echo "Failed to extract dxsdk.exe with PeaZip, trying next archiver..."
+            Start-Process -FilePath peazip.exe -ArgumentList "-ext2here dxsdk.exe" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with PeaZip, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "PeaZip extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
             }
           }
           
           # Try Bandizip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
             echo "Attempting to extract dxsdk.exe with Bandizip..."
-            bzip.exe x dxsdk.exe -o:dxsdk
-            if ($LASTEXITCODE -eq 0) {
-              $extractSuccess = $true
-            } else {
-              echo "Failed to extract dxsdk.exe with Bandizip, trying next archiver..."
+            Start-Process -FilePath bzip.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with Bandizip, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "Bandizip extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
+            }
+          }
+          
+          # Try HAMMER if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "HAMMER") {
+            echo "Attempting to extract dxsdk.exe with HAMMER..."
+            Start-Process -FilePath hammer.exe -ArgumentList "-x dxsdk.exe dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with HAMMER, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "HAMMER extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
+            }
+          }
+          
+          # Try IZArc if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "IZArc") {
+            echo "Attempting to extract dxsdk.exe with IZArc..."
+            Start-Process -FilePath izarc.exe -ArgumentList "-x dxsdk.exe -d dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with IZArc, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "IZArc extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
+            }
+          }
+          
+          # Try UltimateZip if previous failed
+          if (-not $extractSuccess -and $env:ARCHIVER -eq "UltimateZip") {
+            echo "Attempting to extract dxsdk.exe with UltimateZip..."
+            Start-Process -FilePath ultimatezip.exe -ArgumentList "-x dxsdk.exe -o dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with UltimateZip, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "UltimateZip extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
             }
           }
           
           # Try WinZip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
             echo "Attempting to extract dxsdk.exe with WinZip..."
-            winzip.exe -e dxsdk.exe dxsdk
-            if ($LASTEXITCODE -eq 0) {
-              $extractSuccess = $true
-            } else {
-              echo "Failed to extract dxsdk.exe with WinZip, trying next archiver..."
-            }
-          }
-          
-          # Try 7-Zip if previous failed
-          if (-not $extractSuccess -and $env:ARCHIVER -eq "7-Zip") {
-            echo "Attempting to extract dxsdk.exe with 7-Zip..."
-            7z.exe x dxsdk.exe -o:dxsdk
-            if ($LASTEXITCODE -eq 0) {
-              $extractSuccess = $true
-            } else {
-              echo "Failed to extract dxsdk.exe with 7-Zip"
+            Start-Process -FilePath winzip.exe -ArgumentList "-e dxsdk.exe dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 180 # 3 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited) {
+                if ($process.ExitCode -eq 0) {
+                  $extractSuccess = $true
+                } else {
+                  echo "Failed to extract dxsdk.exe with WinZip, exit code: $($process.ExitCode)"
+                }
+              } else {
+                echo "WinZip extraction timed out after $timeout seconds"
+                $process.Kill()
+                exit 1
+              }
             }
           }
           
