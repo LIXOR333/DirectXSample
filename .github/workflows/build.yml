@@ -9,181 +9,252 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      run: echo "Checkout completed"
-
-    - name: Install Chocolatey
-      shell: pwsh
-      run: |
-        echo "Starting Chocolatey installation..."
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-        if ($LASTEXITCODE -ne 0) {
-          echo "Chocolatey installation failed, retrying with curl..."
-          curl -L https://chocolatey.org/install.ps1 -o install.ps1
-          iex (Get-Content install.ps1 -Raw)
-        }
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        echo "Chocolatey installed successfully"
-
-    - name: Install MinGW
-      shell: pwsh
-      run: |
-        echo "Starting MinGW installation..."
-        choco install mingw -y
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        $env:Path += ";C:\tools\mingw64\bin"
-        echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-        g++ --version
-        echo "MinGW installed successfully"
-
-    - name: Download and set up IZArc
-      shell: pwsh
-      run: |
-        echo "Starting IZArc setup..."
-        $urls = @(
-          "https://www.izarc.org/download/IZArc2_70.exe",
-          "https://www.majorgeeks.com/files/details/izarc.html",
-          "https://www.softpedia.com/get/Compression-tools/IZArc.shtml"
-        )
-        $success = $false
-        foreach ($url in $urls) {
-          echo "Attempting to download IZArc from $url..."
-          curl -L -o izarc.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
-          if ($LASTEXITCODE -eq 0) {
-            $fileSize = (Get-Item izarc.exe -ErrorAction SilentlyContinue).Length
-            if ($fileSize -gt 3000000) {
-              echo "IZArc download succeeded from $url (size: $fileSize bytes)"
-              $success = $true
-              break
-            } else {
-              Remove-Item -Path izarc.exe -Force -ErrorAction SilentlyContinue
-            }
-          } else {
-            Remove-Item -Path izarc.exe -Force -ErrorAction SilentlyContinue
-          }
-        }
-        if (-not $success) { exit 1 }
-        echo "Installing IZArc silently..."
-        Start-Process -FilePath izarc.exe -ArgumentList "/S" -Wait -NoNewWindow -PassThru | ForEach-Object {
-          $process = $_
-          $timeout = 60
-          $process.WaitForExit($timeout * 1000)
-          if ($process.ExitCode -eq 0) {
-            echo "IZArc installed successfully"
-            $env:Path += ";C:\Program Files\IZArc"
-            echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-            echo "ARCHIVER=IZArc" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            echo "IZArc installation failed, exit code: $($process.ExitCode)"
+      - name: Checkout code
+        uses: actions/checkout@v4
+        run: |
+          echo "Checkout completed"
+          if (-not (Test-Path src/dllmain.cpp)) {
+            echo "Error: src/dllmain.cpp not found in repository"
             exit 1
           }
-        }
-        echo "IZArc setup completed"
+          dir src
 
-    - name: Download DirectX SDK
-      shell: pwsh
-      run: |
-        echo "Starting DirectX SDK download..."
-        $urls = @(
-          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
-          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
-        )
-        $success = $false
-        foreach ($url in $urls) {
-          echo "Attempting to download DirectX SDK from $url..."
-          curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5 -w "%{http_code}\n" -s
-          if ($LASTEXITCODE -eq 0) {
-            $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
-            if ($fileSize -gt 500000000) {
-              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
+      - name: Install Chocolatey
+        shell: pwsh
+        run: |
+          echo "Installing Chocolatey..."
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          $urls = @(
+            "https://chocolatey.org/install.ps1",
+            "https://community.chocolatey.org/install.ps1",
+            "https://raw.githubusercontent.com/chocolatey/choco/master/install.ps1",
+            "https://github.com/chocolatey/choco/raw/master/install.ps1",
+            "https://archive.org/download/chocolatey-install/install.ps1",
+            "https://web.archive.org/web/*/https://chocolatey.org/install.ps1",
+            "https://mirror.clarkson.edu/chocolatey/install.ps1",
+            "https://mirrors.tuna.tsinghua.edu.cn/chocolatey/install.ps1",
+            "https://mirrors.ustc.edu.cn/chocolatey/install.ps1",
+            "https://mirror.gcr.io/chocolatey/install.ps1",
+            "https://cdn.jsdelivr.net/gh/chocolatey/choco@master/install.ps1",
+            "https://objects.githubusercontent.com/chocolatey/install.ps1",
+            "https://choco-mirror.example.com/install.ps1"
+          )
+          $success = $false
+          foreach ($url in $urls) {
+            echo "Trying to download Chocolatey install script from $url..."
+            try {
+              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 5 -ErrorAction Stop
+              if ($response.StatusCode -eq 200) {
+                $scriptContent = $response.Content
+                if ($scriptContent -match "chocolatey") {
+                  echo "Chocolatey install script downloaded from $url"
+                  Set-Content -Path install.ps1 -Value $scriptContent
+                  $success = $true
+                  break
+                } else {
+                  echo "Content does not appear to be Chocolatey install script, retrying..."
+                }
+              }
+            } catch {
+              echo "Failed to download from $url with error: $_"
+            }
+          }
+          if (-not $success) {
+            echo "All attempts to download Chocolatey install script failed"
+            exit 1
+          }
+          iex (Get-Content install.ps1 -Raw)
+          if ($LASTEXITCODE -ne 0) {
+            echo "Chocolatey installation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          echo "Chocolatey installed successfully"
+
+      - name: Install MinGW
+        shell: pwsh
+        run: |
+          echo "Installing MinGW..."
+          $urls = @(
+            "https://community.chocolatey.org/api/v2/package/mingw",
+            "https://packages.chocolatey.org/mingw.nupkg",
+            "https://mirror.clarkson.edu/chocolatey/api/v2/package/mingw",
+            "https://mirrors.tuna.tsinghua.edu.cn/chocolatey/api/v2/package/mingw",
+            "https://mirrors.ustc.edu.cn/chocolatey/api/v2/package/mingw",
+            "https://mirror.gcr.io/chocolatey/api/v2/package/mingw",
+            "https://cdn.jsdelivr.net/chocolatey/api/v2/package/mingw",
+            "https://archive.org/download/chocolatey-mingw/mingw.nupkg",
+            "https://web.archive.org/web/*/https://community.chocolatey.org/api/v2/package/mingw",
+            "https://choco-mirror.example.com/api/v2/package/mingw",
+            "https://github.com/chocolatey/choco-packages/raw/master/mingw.nupkg",
+            "https://objects.githubusercontent.com/chocolatey/mingw.nupkg",
+            "https://alternate-choco-mirror.net/api/v2/package/mingw"
+          )
+          $success = $false
+          foreach ($url in $urls) {
+            echo "Trying to install MinGW from $url..."
+            choco install mingw -y --source $url --no-progress
+            if ($LASTEXITCODE -eq 0) {
+              echo "MinGW installed successfully from $url"
               $success = $true
               break
             } else {
-              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+              echo "Failed to install MinGW from $url, retrying..."
             }
-          } else {
-            Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
           }
-        }
-        if (-not $success) { exit 1 }
-        echo "DirectX SDK download completed"
-
-    - name: Extract DirectX SDK using IZArc
-      shell: pwsh
-      run: |
-        echo "Starting DirectX SDK extraction..."
-        if (Test-Path dxsdk.exe) {
-          mkdir dxsdk
-          echo "Attempting to extract DirectX SDK with IZArc..."
-          Start-Process -FilePath "C:\Program Files\IZArc\IZArc.exe" -ArgumentList "-e dxsdk.exe -o:dxsdk -y" -Wait -NoNewWindow -PassThru | ForEach-Object {
-            $process = $_
-            $timeout = 180
-            $process.WaitForExit($timeout * 1000)
-            if ($process.ExitCode -eq 0) {
-              if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
-                echo "Extraction succeeded, Include folder found"
-              } else {
-                echo "Extraction succeeded, but Include folder not found"
-                exit 1
-              }
-            } else {
-              echo "Extraction failed with exit code: $($process.ExitCode)"
+          if (-not $success) {
+            echo "All attempts to install MinGW failed, falling back to default source..."
+            choco install mingw -y --no-progress
+            if ($LASTEXITCODE -ne 0) {
+              echo "MinGW installation failed with exit code $LASTEXITCODE"
               exit 1
             }
           }
-          dir dxsdk
-          echo "DirectX SDK extraction completed"
-        } else {
-          echo "dxsdk.exe not found"
-          exit 1
-        }
+          $env:Path += ";C:\tools\mingw64\bin"
+          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          g++ --version
+          if ($LASTEXITCODE -ne 0) {
+            echo "g++ not found after MinGW installation"
+            exit 1
+          }
+          echo "MinGW installed successfully"
 
-    - name: Set up DirectX SDK environment
-      shell: pwsh
-      run: |
-        echo "Setting up environment variables..."
-        if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
+      - name: Download DirectX SDK
+        shell: pwsh
+        run: |
+          echo "Downloading DirectX SDK..."
+          $urls = @(
+            "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+            "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+            "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
+            "https://web.archive.org/web/*/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+            "https://software.mirror.ac.uk/sites/microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+            "https://mirror.gcr.io/microsoft/DXSDK_Jun10.exe",
+            "https://cdn.jsdelivr.net/microsoft/DXSDK_Jun10.exe",
+            "https://archive.org/details/dxsdk_jun10/DXSDK_Jun10.exe",
+            "https://archive.org/details/microsoft_directx_sdk_june_2010/DXSDK_Jun10.exe",
+            "https://alternate-mirror.net/microsoft/DXSDK_Jun10.exe",
+            "https://mirror.example.com/microsoft/DXSDK_Jun10.exe",
+            "https://objects.githubusercontent.com/microsoft/DXSDK_Jun10.exe",
+            "https://backup-mirror.net/microsoft/DXSDK_Jun10.exe"
+          )
+          $success = $false
+          foreach ($url in $urls) {
+            echo "Trying $url..."
+            curl -L -o dxsdk.exe $url --retry 15 --retry-delay 5 -w "%{http_code}\n" -s
+            if ($LASTEXITCODE -eq 0) {
+              $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
+              if ($fileSize -gt 500000000) {
+                echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
+                $success = $true
+                break
+              } else {
+                echo "File size too small ($fileSize bytes), retrying..."
+                Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Download failed with status $LASTEXITCODE, retrying..."
+              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (-not $success) {
+            echo "All DirectX SDK download attempts failed"
+            exit 1
+          }
+          echo "DirectX SDK download completed"
+
+      - name: Extract DirectX SDK
+        shell: pwsh
+        run: |
+          echo "Extracting DirectX SDK..."
+          if (-not (Test-Path dxsdk.exe)) {
+            echo "dxsdk.exe not found after download"
+            exit 1
+          }
+          mkdir dxsdk -ErrorAction SilentlyContinue
+          echo "Attempting to extract with Shell.Application..."
+          try {
+            $shell = New-Object -ComObject Shell.Application
+            $zip = $shell.NameSpace($PWD.Path + "\dxsdk.exe")
+            if (-not $zip) {
+              throw "Failed to initialize Shell.Application zip namespace"
+            }
+            $dest = $shell.NameSpace($PWD.Path + "\dxsdk")
+            if (-not $dest) {
+              throw "Failed to initialize Shell.Application destination namespace"
+            }
+            $dest.CopyHere($zip.Items(), 156) # 4 + 8 + 144 for overwrite and no progress UI
+            if (Test-Path dxsdk\Include) {
+              echo "Extraction with Shell.Application succeeded"
+            } else {
+              throw "Include folder not found after Shell.Application extraction"
+            }
+          } catch {
+            echo "Shell.Application extraction failed: $_"
+            echo "Falling back to Expand-Archive..."
+            Expand-Archive -Path dxsdk.exe -DestinationPath dxsdk -Force -ErrorAction Stop
+            if (-not (Test-Path dxsdk\Include)) {
+              echo "Expand-Archive failed, Include folder not found"
+              exit 1
+            }
+            echo "Extraction with Expand-Archive succeeded"
+          }
+          echo "DirectX SDK extracted successfully"
+
+      - name: Set up DirectX SDK environment
+        shell: pwsh
+        run: |
+          echo "Setting up DirectX SDK environment..."
+          if (-not (Test-Path dxsdk\Include)) {
+            echo "DirectX SDK Include folder not found"
+            exit 1
+          }
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "Environment variables set successfully"
-        } else {
-          echo "DirectX SDK Include folder not found"
-          exit 1
-        }
 
-    - name: Verify build environment
-      shell: pwsh
-      run: |
-        echo "Verifying build environment..."
-        g++ --version
-        if (-not (Test-Path "$env:DXSDK_DIR\Include\d3d9.h")) { exit 1 }
-        if (-not (Test-Path "$env:DXSDK_DIR\Lib\x64\d3d9.lib")) { exit 1 }
-        echo "Build environment verified"
+      - name: Verify build environment
+        shell: pwsh
+        run: |
+          echo "Verifying build environment..."
+          g++ --version
+          if ($LASTEXITCODE -ne 0) {
+            echo "g++ not found"
+            exit 1
+          }
+          if (-not (Test-Path "$env:DXSDK_DIR\Include\d3d9.h")) {
+            echo "d3d9.h not found"
+            exit 1
+          }
+          if (-not (Test-Path "$env:DXSDK_DIR\Lib\x64\d3d9.lib")) {
+            echo "d3d9.lib not found"
+            exit 1
+          }
+          echo "Build environment verified"
 
-    - name: Build DLL
-      shell: pwsh
-      run: |
-        echo "Compiling DLL..."
-        if (-not (Test-Path src/dllmain.cpp)) {
-          echo "dllmain.cpp not found in src directory"
-          exit 1
-        }
-        g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        dir DirectXSample.dll
-        echo "DLL compilation completed"
+      - name: Build DLL
+        shell: pwsh
+        run: |
+          echo "Compiling DLL..."
+          g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
+          if ($LASTEXITCODE -ne 0) {
+            echo "DLL compilation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          if (-not (Test-Path DirectXSample.dll)) {
+            echo "DirectXSample.dll not created"
+            exit 1
+          }
+          echo "DLL compilation completed"
 
-    - name: Upload DLL artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: DirectXSample-DLL
-        path: DirectXSample.dll
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DirectXSample-DLL
+          path: DirectXSample.dll
