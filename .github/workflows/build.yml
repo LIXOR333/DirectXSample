@@ -30,71 +30,44 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
 
-    # Download and set up derectx and archivers
-    - name: Download and set up derectx and archivers
+    # Download and set up archivers
+    - name: Download and set up archivers
       run: |
         $archiver = ""
         
-        # Download derectx
-        echo "Downloading derectx..."
-        curl -L -o derectx.zip "https://github.com/emoacht/derectX/releases/download/v1.0.0/derectx-windows-x64.zip" --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
-        if ($LASTEXITCODE -eq 0) {
-          $fileSize = (Get-Item derectx.zip -ErrorAction SilentlyContinue).Length
-          if ($fileSize -gt 1000000) { # ~1 MB
-            echo "derectx download succeeded (size: $fileSize bytes)"
-            Expand-Archive -Path derectx.zip -DestinationPath derectx -Force
-            if ($LASTEXITCODE -eq 0) {
-              echo "Adding derectx to PATH..."
-              echo "Path=$env:GITHUB_WORKSPACE\derectx;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-              dir derectx\derectx.exe
+        # Try PeaZip
+        $urls = @(
+          "https://github.com/peazip/PeaZip/releases/download/9.8.0/peazip_portable-9.8.0.WIN64.zip",
+          "https://sourceforge.net/projects/peazip/files/9.8.0/peazip_portable-9.8.0.WIN64.zip/download",
+          "https://www.softpedia.com/get/Compression-tools/PeaZip.shtml",
+          "https://www.majorgeeks.com/files/details/peazip.html",
+          "https://www.filehorse.com/download-peazip/64/",
+          "https://peazip.github.io/peazip_portable-9.8.0.WIN64.zip"
+        )
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download PeaZip from $url..."
+          curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
+            if ($fileSize -gt 10000000) { # ~10 MB
+              echo "PeaZip download succeeded from $url (size: $fileSize bytes)"
+              $success = $true
+              $archiver = "PeaZip"
+              break
             } else {
-              echo "Failed to extract derectx.zip"
-              Remove-Item -Path derectx.zip -Force -ErrorAction SilentlyContinue
-            }
-          } else {
-            echo "derectx file too small ($fileSize bytes), skipping..."
-            Remove-Item -Path derectx.zip -Force -ErrorAction SilentlyContinue
-          }
-        } else {
-          echo "derectx download failed, skipping..."
-          Remove-Item -Path derectx.zip -Force -ErrorAction SilentlyContinue
-        }
-        
-        # Try PeaZip if derectx failed
-        if (-not (Test-Path derectx\derectx.exe)) {
-          $urls = @(
-            "https://github.com/peazip/PeaZip/releases/download/9.8.0/peazip_portable-9.8.0.WIN64.zip",
-            "https://sourceforge.net/projects/peazip/files/9.8.0/peazip_portable-9.8.0.WIN64.zip/download",
-            "https://www.softpedia.com/get/Compression-tools/PeaZip.shtml",
-            "https://www.majorgeeks.com/files/details/peazip.html",
-            "https://www.filehorse.com/download-peazip/64/",
-            "https://peazip.github.io/peazip_portable-9.8.0.WIN64.zip"
-          )
-          $success = $false
-          foreach ($url in $urls) {
-            echo "Attempting to download PeaZip from $url..."
-            curl -L -o archiver.zip $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
-            $httpStatus = $LASTEXITCODE
-            if ($httpStatus -eq 0) {
-              $fileSize = (Get-Item archiver.zip -ErrorAction SilentlyContinue).Length
-              if ($fileSize -gt 10000000) { # ~10 MB
-                echo "PeaZip download succeeded from $url (size: $fileSize bytes)"
-                $success = $true
-                $archiver = "PeaZip"
-                break
-              } else {
-                echo "File too small ($fileSize bytes), trying next mirror..."
-                Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
-              }
-            } else {
-              echo "Download failed with status $httpStatus, trying next mirror..."
+              echo "File too small ($fileSize bytes), trying next mirror..."
               Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
             }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path archiver.zip -Force -ErrorAction SilentlyContinue
           }
         }
 
         # If PeaZip failed, try Bandizip
-        if (-not $success -and -not (Test-Path derectx\derectx.exe)) {
+        if (-not $success) {
           $urls = @(
             "https://www.bandisoft.com/bandizip/dl.php?portable",
             "https://sourceforge.net/projects/bandizip/files/bandizip_portable_7.32.zip/download",
@@ -126,7 +99,7 @@ jobs:
         }
 
         # If Bandizip failed, fallback to Chocolatey (WinZip or 7-Zip)
-        if (-not $success -and -not (Test-Path derectx\derectx.exe)) {
+        if (-not $success) {
           echo "All download attempts failed, falling back to Chocolatey..."
           choco install 7zip -y
           if ($LASTEXITCODE -eq 0) {
@@ -150,7 +123,7 @@ jobs:
         }
 
         # Extract the downloaded archiver (PeaZip or Bandizip)
-        if (($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") -and -not (Test-Path derectx\derectx.exe)) {
+        if ($archiver -eq "PeaZip" -or $archiver -eq "Bandizip") {
           echo "Extracting $archiver..."
           if (Test-Path archiver.zip) {
             Expand-Archive -Path archiver.zip -DestinationPath archiver -Force
@@ -215,36 +188,16 @@ jobs:
           exit 1
         }
 
-    # Extract DirectX SDK using derectx or archivers
+    # Extract DirectX SDK using archivers
     - name: Extract DirectX SDK
       run: |
         if (Test-Path dxsdk.exe) {
           mkdir dxsdk
           $extractSuccess = $false
           
-          # Try derectx first
-          if (Test-Path derectx\derectx.exe) {
-            echo "Attempting to extract dxsdk.exe with derectx..."
-            Start-Process -FilePath derectx\derectx.exe -ArgumentList "extract dxsdk.exe -o dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
-              $process = $_
-              $timeout = 180 # 3 minutes timeout
-              $process.WaitForExit($timeout * 1000)
-              if ($process.HasExited) {
-                if ($process.ExitCode -eq 0) {
-                  $extractSuccess = $true
-                } else {
-                  echo "Failed to extract dxsdk.exe with derectx, exit code: $($process.ExitCode), skipping to next method..."
-                }
-              } else {
-                echo "derectx extraction timed out after $timeout seconds, skipping to next method..."
-                $process.Kill()
-              }
-            }
-          }
-          
-          # Try PeaZip if derectx failed
-          if (-not $extractSuccess -and $env:ARCHIVER -eq "PeaZip") {
-            echo "Attempting to extract dxsdk.exe with PeaZip..."
+          # Try PeaZip
+          if ($env:ARCHIVER -eq "PeaZip") {
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with PeaZip..."
             Start-Process -FilePath peazip.exe -ArgumentList "-ext2here dxsdk.exe" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -254,7 +207,7 @@ jobs:
                   Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force
                   $extractSuccess = $true
                 } else {
-                  echo "Failed to extract dxsdk.exe with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Failed to extract DirectX SDK with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
                 echo "PeaZip extraction timed out after $timeout seconds, skipping to next method..."
@@ -265,7 +218,7 @@ jobs:
           
           # Try Bandizip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "Bandizip") {
-            echo "Attempting to extract dxsdk.exe with Bandizip..."
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with Bandizip..."
             Start-Process -FilePath bzip.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -274,7 +227,7 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   $extractSuccess = $true
                 } else {
-                  echo "Failed to extract dxsdk.exe with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Failed to extract DirectX SDK with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
                 echo "Bandizip extraction timed out after $timeout seconds, skipping to next method..."
@@ -285,7 +238,7 @@ jobs:
           
           # Try WinZip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "WinZip") {
-            echo "Attempting to extract dxsdk.exe with WinZip..."
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with WinZip..."
             Start-Process -FilePath winzip.exe -ArgumentList "-e dxsdk.exe dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -294,7 +247,7 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   $extractSuccess = $true
                 } else {
-                  echo "Failed to extract dxsdk.exe with WinZip, exit code: $($process.ExitCode), skipping to next method..."
+                  echo "Failed to extract DirectX SDK with WinZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
               } else {
                 echo "WinZip extraction timed out after $timeout seconds, skipping to next method..."
@@ -305,7 +258,7 @@ jobs:
           
           # Try 7-Zip if previous failed
           if (-not $extractSuccess -and $env:ARCHIVER -eq "7-Zip") {
-            echo "Attempting to extract dxsdk.exe with 7-Zip..."
+            echo "Attempting to extract DirectX SDK (dxsdk.exe) with 7-Zip..."
             Start-Process -FilePath 7z.exe -ArgumentList "x dxsdk.exe -o:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
               $process = $_
               $timeout = 180 # 3 minutes timeout
@@ -314,7 +267,7 @@ jobs:
                 if ($process.ExitCode -eq 0) {
                   $extractSuccess = $true
                 } else {
-                  echo "Failed to extract dxsdk.exe with 7-Zip, exit code: $($process.ExitCode)"
+                  echo "Failed to extract DirectX SDK with 7-Zip, exit code: $($process.ExitCode)"
                 }
               } else {
                 echo "7-Zip extraction timed out after $timeout seconds"
@@ -327,7 +280,7 @@ jobs:
           if ($extractSuccess) {
             dir dxsdk
           } else {
-            echo "All attempts to extract dxsdk.exe failed"
+            echo "All attempts to extract DirectX SDK (dxsdk.exe) failed"
             exit 1
           }
         } else {
