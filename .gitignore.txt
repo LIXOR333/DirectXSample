@@ -1,6 +1,0 @@
-*.dll
-*.obj
-*.o
-*.exe
-*.bak
-*.log
