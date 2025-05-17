@@ -22,6 +22,7 @@ jobs:
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+        echo "Chocolatey installed"
 
     # Install MinGW
     - name: Install MinGW
@@ -29,6 +30,7 @@ jobs:
         choco install mingw --version 8.1.0 -y
         if ($LASTEXITCODE -ne 0) { exit 1 }
         g++ --version
+        echo "MinGW installed"
 
     # Download and set up archivers
     - name: Download and set up archivers
@@ -149,6 +151,7 @@ jobs:
 
         # Save the archiver type for later steps
         echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "Archiver setup completed: $archiver"
 
     # Download DirectX SDK with multiple mirrors
     - name: Download DirectX SDK
@@ -187,6 +190,7 @@ jobs:
           echo "All download attempts failed for DirectX SDK"
           exit 1
         }
+        echo "DirectX SDK download completed"
 
     # Extract DirectX SDK using archivers
     - name: Extract DirectX SDK
@@ -205,7 +209,12 @@ jobs:
               if ($process.HasExited) {
                 if ($process.ExitCode -eq 0) {
                   Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
-                  $extractSuccess = $true
+                  if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
+                    $extractSuccess = $true
+                    echo "PeaZip extraction succeeded, Include folder found"
+                  } else {
+                    echo "PeaZip extraction succeeded, but Include folder not found"
+                  }
                 } else {
                   echo "Failed to extract DirectX SDK with PeaZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
@@ -225,7 +234,12 @@ jobs:
               $process.WaitForExit($timeout * 1000)
               if ($process.HasExited) {
                 if ($process.ExitCode -eq 0) {
-                  $extractSuccess = $true
+                  if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
+                    $extractSuccess = $true
+                    echo "Bandizip extraction succeeded, Include folder found"
+                  } else {
+                    echo "Bandizip extraction succeeded, but Include folder not found"
+                  }
                 } else {
                   echo "Failed to extract DirectX SDK with Bandizip, exit code: $($process.ExitCode), skipping to next method..."
                 }
@@ -245,7 +259,12 @@ jobs:
               $process.WaitForExit($timeout * 1000)
               if ($process.HasExited) {
                 if ($process.ExitCode -eq 0) {
-                  $extractSuccess = $true
+                  if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
+                    $extractSuccess = $true
+                    echo "WinZip extraction succeeded, Include folder found"
+                  } else {
+                    echo "WinZip extraction succeeded, but Include folder not found"
+                  }
                 } else {
                   echo "Failed to extract DirectX SDK with WinZip, exit code: $($process.ExitCode), skipping to next method..."
                 }
@@ -265,7 +284,12 @@ jobs:
               $process.WaitForExit($timeout * 1000)
               if ($process.HasExited) {
                 if ($process.ExitCode -eq 0) {
-                  $extractSuccess = $true
+                  if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
+                    $extractSuccess = $true
+                    echo "7-Zip extraction succeeded, Include folder found"
+                  } else {
+                    echo "7-Zip extraction succeeded, but Include folder not found"
+                  }
                 } else {
                   echo "Failed to extract DirectX SDK with 7-Zip, exit code: $($process.ExitCode)"
                 }
@@ -278,12 +302,8 @@ jobs:
           }
           
           if ($extractSuccess) {
-            if (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include") {
-              dir dxsdk
-            } else {
-              echo "DirectX SDK extraction succeeded, but Include folder not found"
-              exit 1
-            }
+            dir dxsdk
+            echo "DirectX SDK extraction completed successfully"
           } else {
             echo "All attempts to extract DirectX SDK (dxsdk.exe) failed"
             exit 1
@@ -307,6 +327,7 @@ jobs:
           echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           dir $env:GITHUB_WORKSPACE\dxsdk\Include
           dir $env:GITHUB_WORKSPACE\dxsdk\Lib\x64
+          echo "Environment variables set successfully"
         } else {
           echo "DirectX SDK Include folder not found, setup failed"
           exit 1
@@ -322,6 +343,7 @@ jobs:
         g++ --version
         dir "%DXSDK_DIR%\Include\d3d9.h"
         dir "%DXSDK_DIR%\Lib\x64\d3d9.lib"
+        echo "Build environment verified"
 
     # Compile the DLL
     - name: Build DLL
@@ -329,6 +351,7 @@ jobs:
         g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++
         if ($LASTEXITCODE -ne 0) { exit 1 }
         dir DirectXSample.dll
+        echo "DLL compilation completed"
 
     # Upload the DLL as an artifact
     - name: Upload DLL artifact
@@ -336,3 +359,4 @@ jobs:
       with:
         name: DirectXSample-DLL
         path: DirectXSample.dll
+        echo "Artifact upload completed"
