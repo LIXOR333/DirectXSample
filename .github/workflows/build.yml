@@ -33,18 +33,30 @@ jobs:
     # Download and set up 7z from the internet
     - name: Download and set up 7z
       run: |
-        echo "Trying to download 7z from official site..."
-        curl -L -o 7z.zip "https://www.7-zip.org/a/7z2301.zip" --retry 3 --retry-delay 5 -w "%{http_code}\n"
-        $httpStatus = $LASTEXITCODE
-        if ($httpStatus -ne 0 -or (Get-Item 7z.zip).Length -lt 1000000) {
-          echo "Official site failed or file too small (size: $(Get-Item 7z.zip).Length bytes), trying SourceForge mirror..."
-          curl -L -o 7z.zip "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301.zip/download" --retry 3 --retry-delay 5 -w "%{http_code}\n"
-          if ($LASTEXITCODE -ne 0 -or (Get-Item 7z.zip).Length -lt 1000000) {
-            echo "All download attempts failed"
-            exit 1
+        $urls = @(
+          "https://www.7-zip.org/a/7z2301.zip",
+          "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301.zip/download",
+          "https://www.softpedia.com/get/Compression-tools/7-Zip.shtml",
+          "https://archive.org/download/7zip-23.01/7z2301.zip",
+          "https://github.com/7zip/7zip/releases/download/v23.01/7z2301.zip"
+        )
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Trying to download 7z from $url..."
+          curl -L -o 7z.zip $url --retry 3 --retry-delay 5 -w "%{http_code}\n"
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0 -and (Get-Item 7z.zip).Length -gt 1000000) {
+            echo "Download succeeded (size: $(Get-Item 7z.zip).Length bytes)"
+            $success = $true
+            break
+          } else {
+            echo "Download failed or file too small (size: $(Get-Item 7z.zip).Length bytes), trying next mirror..."
+            Remove-Item -Path 7z.zip -Force -ErrorAction SilentlyContinue
           }
-        } else {
-          echo "Download from official site succeeded (size: $(Get-Item 7z.zip).Length bytes)"
+        }
+        if (-not $success) {
+          echo "All download attempts failed"
+          exit 1
         }
         echo "Extracting 7z..."
         if (Test-Path 7z.zip) {
