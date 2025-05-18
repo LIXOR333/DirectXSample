@@ -15,64 +15,65 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Полный клон, чтобы не было косяков
+          fetch-depth: 0
 
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Чистим Git от всякого хлама..."
+          echo "Configuring Git safe directory..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
-          git config --local --unset-all http.https://github.com/.extraheader || echo "Чисто!"
-          git config --local --unset-all core.sshCommand || echo "SSH тоже чист!"
-          git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'Чисто'; git config --local --unset-all core.sshCommand || echo 'SSH чист'"
+          git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
+          git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
+          git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'No extraheader'; git config --local --unset-all core.sshCommand || echo 'No SSH config'"
 
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Кидаем Chocolatey, чтобы всё было по кайфу..."
+          echo "Checking for existing Chocolatey installation..."
           $chocoExists = $false
           try {
             choco -v
             if ($LASTEXITCODE -eq 0) {
-              echo "Chocolatey уже стоит, красота!"
+              echo "Chocolatey is already installed"
               $chocoExists = $true
             }
           } catch {
-            echo "Chocolatey нет, ща закинем..."
+            echo "Chocolatey not found, proceeding with installation..."
           }
           if (-not $chocoExists) {
+            echo "Installing Chocolatey..."
             Set-ExecutionPolicy Bypass -Scope Process -Force
             [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
             iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             if ($LASTEXITCODE -ne 0) {
-              echo "Chocolatey не встал, пипец, ошибка $LASTEXITCODE"
+              echo "Chocolatey installation failed with exit code $LASTEXITCODE"
               exit 1
             }
-            echo "Chocolatey готов жарить!"
+            echo "Chocolatey installed successfully"
           }
 
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Ставим MinGW, чтобы компилить как босс..."
+          echo "Installing MinGW..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
-            echo "MinGW не встал, ошибка $LASTEXITCODE"
+            echo "MinGW installation failed with exit code $LASTEXITCODE"
             exit 1
           }
           $env:Path += ";C:\tools\mingw64\bin"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           g++ --version
           if ($LASTEXITCODE -ne 0) {
-            echo "g++ где-то потерялся, беда!"
+            echo "g++ not found after installation"
             exit 1
           }
-          echo "MinGW на месте, погнали дальше!"
+          echo "MinGW installed successfully"
 
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Качаем DirectX SDK, держись..."
+          echo "Downloading DirectX SDK..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -80,111 +81,115 @@ jobs:
           )
           $success = $false
           foreach ($url in $urls) {
-            echo "Грузим с $url..."
+            echo "Attempting to download from $url..."
             curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
             if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
               $fileSize = (Get-Item dxsdk.exe).Length
               if ($fileSize -gt 500000000) {
-                echo "SDK скачан, размер $fileSize байт, всё чётко!"
+                echo "DirectX SDK downloaded successfully, size $fileSize bytes"
                 $success = $true
                 break
               } else {
-                echo "Файл мелкий, $fileSize байт, пробуем следующее зеркало..."
+                echo "Downloaded file too small, size $fileSize bytes, trying next mirror..."
                 Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
               }
             } else {
-              echo "Не скачалось, ошибка $LASTEXITCODE, пробуем следующее зеркало..."
+              echo "Download failed with exit code $LASTEXITCODE, trying next mirror..."
               Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
             }
           }
           if (-not $success) {
-            echo "Все зеркала облажались, пичаль!"
+            echo "All download attempts failed for DirectX SDK"
             exit 1
           }
 
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Распаковываем DirectX SDK..."
+          echo "Extracting DirectX SDK..."
           if (-not (Test-Path dxsdk.exe)) {
-            echo "Где dxsdk.exe? Потерялся!"
+            echo "dxsdk.exe not found"
             exit 1
           }
           choco install 7zip -y --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            echo "7-Zip installation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
           $env:Path += ";C:\Program Files\7-Zip"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           mkdir dxsdk -ErrorAction SilentlyContinue
-          echo "Смотрим, что внутри dxsdk.exe..."
-          7z l dxsdk.exe
+          echo "Checking contents of dxsdk.exe..."
+          7z l dxsdk.exe -r
           if ($LASTEXITCODE -ne 0) {
-            echo "Не удалось посмотреть содержимое dxsdk.exe, ошибка $LASTEXITCODE"
+            echo "Failed to list contents of dxsdk.exe, exit code $LASTEXITCODE"
             exit 1
           }
-          echo "Распаковываем dxsdk.exe в dxsdk..."
+          echo "Extracting dxsdk.exe to dxsdk folder..."
           7z x dxsdk.exe -o"dxsdk" -y
           if ($LASTEXITCODE -ne 0) {
-            echo "7-Zip облажался на dxsdk.exe, ошибка $LASTEXITCODE"
+            echo "Failed to extract dxsdk.exe, exit code $LASTEXITCODE"
             exit 1
           }
-          echo "Что у нас в dxsdk после первой распаковки:"
-          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
-          echo "Ищем большой файл..."
+          echo "Listing all files in dxsdk folder after extraction:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
+          echo "Searching for potential large files..."
           $largeFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
           if ($largeFile) {
-            echo "Нашёл большой файл: $($largeFile.FullName), размер: $($largeFile.Length) байт"
+            echo "Found large file: $($largeFile.FullName), size: $($largeFile.Length) bytes"
             Move-Item -Path $largeFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
-            echo "Распаковываем dxsdk.cab..."
+            echo "Extracting dxsdk.cab..."
             7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
             if ($LASTEXITCODE -ne 0) {
-              echo "CAB не распаковался, ошибка $LASTEXITCODE"
+              echo "Failed to extract dxsdk.cab, exit code $LASTEXITCODE"
               exit 1
             }
-            echo "Перекидываем файлы из extracted в dxsdk..."
+            echo "Moving extracted files to dxsdk folder..."
             Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
             Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
-            echo "Что у нас в dxsdk после распаковки CAB:"
-            Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
+            echo "Listing files in dxsdk folder after CAB extraction:"
+            Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
             if (Test-Path dxsdk\Include) {
-              echo "Всё разложено, Include на месте, погнали!"
+              echo "DirectX SDK extracted successfully"
             } else {
-              echo "Где папка Include? Косяк!"
+              echo "Include folder not found after extraction"
               exit 1
             }
           } else {
-            echo "Не нашёл большой файл с размером > 300MB!"
-            Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "Файл: $($_.FullName), Размер: $($_.Length) байт" }
+            echo "No large file found with size > 300MB"
+            Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "File: $($_.FullName), Size: $($_.Length) bytes" }
             exit 1
           }
 
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Настраиваем среду для DirectX..."
+          echo "Setting up DirectX SDK environment..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;C:\tools\mingw64\bin;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include")) {
-            echo "Include-папка не найдена, пипец!"
+            echo "Include folder not found"
             exit 1
           }
-          echo "Среда готова, можно компилить!"
+          echo "Environment variables set successfully"
 
       - name: Build DLL
         shell: pwsh
         run: |
-          echo "Компилим твой чит..."
+          echo "Compiling DLL..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
-            echo "Компиляция накрылась, ошибка $LASTEXITCODE"
+            echo "DLL compilation failed with exit code $LASTEXITCODE"
             exit 1
           }
           if (-not (Test-Path DirectXSample.dll)) {
-            echo "DLL не появилась, где она?!"
+            echo "DirectXSample.dll not created"
             exit 1
           }
-          echo "DLL готова, ты гений!"
+          echo "DLL compilation completed"
 
       - name: Upload DLL artifact
         uses: actions/upload-artifact@v4
