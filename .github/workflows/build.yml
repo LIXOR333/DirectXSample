@@ -1,1019 +1,1046 @@
-echo "Installing archivers at 15:40 MSK, 18 May 2025..."
-$archivers = @(
-    @{
-        Name = "7-Zip"
-        Urls = @(
-            "https://www.7-zip.org/a/7z2409-x64.exe",
-            "https://sourceforge.net/projects/sevenzip/files/7-Zip/24.09/7z2409-x64.exe/download",
-            "https://github.com/ip7z/7zip/releases/download/24.09/7z2409-x64.exe",
-            "https://web.archive.org/web/20241129000000*/https://www.7-zip.org/a/7z2409-x64.exe",
-            "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
-            "https://www.filehorse.com/download-7-zip-64/",
-            "https://www.softonic.com/download/7-zip/windows",
-            "https://www.fosshub.com/7-Zip.html/7z2409-x64.exe",
-            "https://www.majorgeeks.com/files/details/7_zip.html",
-            "https://www.ninite.com/7zip/",
-            "https://www.getintopc.com/softwares/compression/7-zip-free-download/",
-            "https://www.techspot.com/downloads/15-7-zip.html",
-            "https://www.ghacks.net/7-zip-downloads/",
-            "https://www.portablefreeware.com/?id=7-Zip",
-            "https://www.oldversion.com/windows/7-zip/",
-            "https://www.filecroco.com/download-7-zip/",
-            "https://www.snapfiles.com/get/7zip.html",
-            "https://www.free-codecs.com/download/7-Zip.htm",
-            "https://www.filepuma.com/download/7-zip_24.09-23537/",
-            "https://www.filehippo.com/download_7-zip/",
-            "https://www.updatestar.com/en/directdownload/7-zip/24.09",
-            "https://www.download3k.com/Install-7-Zip.html",
-            "https://www.windows7download.com/free-win7-7-zip/",
-            "https://www.softwareok.com/?seite=Freeware/7-Zip",
-            "https://www.heise.de/download/product/7-zip",
-            "https://www.chip.de/downloads/7-Zip_12998992.html",
-            "https://www.computerbild.de/download/7-Zip-126567.html",
-            "https://www.tucows.com/preview/507683/7-Zip",
-            "https://www.brothersoft.com/7-zip-62567.html",
-            "https://www.soft32.com/download_7-zip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4035.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/7-zip-4035",
-            "https://www.pcmag.com/downloads/7-zip",
-            "https://www.zdnet.com/downloads/7-zip/",
-            "https://www.softonic.fr/telecharger/7-zip/windows"
+name: Build DirectX Sample DLL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15 # Prevent hanging
+
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Install Chocolatey (for MinGW and archiver fallback)
+    - name: Install Chocolatey
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+    # Install MinGW
+    - name: Install MinGW
+      run: |
+        choco install mingw --version 8.1.0 -y
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        g++ --version
+
+    # Download and set up archivers
+    - name: Download and set up archivers
+      shell: pwsh
+      run: |
+        echo "Installing archivers at 15:50 MSK, 18 May 2025..."
+        $archiver = ""
+        $success = $false
+
+        $archivers = @(
+            @{
+                Name = "7-Zip"
+                Urls = @(
+                    "https://www.7-zip.org/a/7z2409-x64.exe",
+                    "https://sourceforge.net/projects/sevenzip/files/7-Zip/24.09/7z2409-x64.exe/download",
+                    "https://github.com/ip7z/7zip/releases/download/24.09/7z2409-x64.exe",
+                    "https://web.archive.org/web/20241129000000*/https://www.7-zip.org/a/7z2409-x64.exe",
+                    "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
+                    "https://www.filehorse.com/download-7-zip-64/",
+                    "https://www.softonic.com/download/7-zip/windows",
+                    "https://www.fosshub.com/7-Zip.html/7z2409-x64.exe",
+                    "https://www.majorgeeks.com/files/details/7_zip.html",
+                    "https://www.ninite.com/7zip/",
+                    "https://www.getintopc.com/softwares/compression/7-zip-free-download/",
+                    "https://www.techspot.com/downloads/15-7-zip.html",
+                    "https://www.ghacks.net/7-zip-downloads/",
+                    "https://www.portablefreeware.com/?id=7-Zip",
+                    "https://www.oldversion.com/windows/7-zip/",
+                    "https://www.filecroco.com/download-7-zip/",
+                    "https://www.snapfiles.com/get/7zip.html",
+                    "https://www.free-codecs.com/download/7-Zip.htm",
+                    "https://www.filepuma.com/download/7-zip_24.09-23537/",
+                    "https://www.filehippo.com/download_7-zip/",
+                    "https://www.updatestar.com/en/directdownload/7-zip/24.09",
+                    "https://www.download3k.com/Install-7-Zip.html",
+                    "https://www.windows7download.com/free-win7-7-zip/",
+                    "https://www.softwareok.com/?seite=Freeware/7-Zip",
+                    "https://www.heise.de/download/product/7-zip",
+                    "https://www.chip.de/downloads/7-Zip_12998992.html",
+                    "https://www.computerbild.de/download/7-Zip-126567.html",
+                    "https://www.tucows.com/preview/507683/7-Zip",
+                    "https://www.brothersoft.com/7-zip-62567.html",
+                    "https://www.soft32.com/download_7-zip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4035.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/7-zip-4035",
+                    "https://www.pcmag.com/downloads/7-zip",
+                    "https://www.zdnet.com/downloads/7-zip/",
+                    "https://www.softonic.fr/telecharger/7-zip/windows"
+                )
+                InstallPath = "C:\Program Files\7-Zip"
+                Command = "7z"
+                InstallArgs = "/S"
+                TestCommand = "7z --help"
+            },
+            @{
+                Name = "WinRAR"
+                Urls = @(
+                    "https://www.rarlab.com/rar/winrar-x64-702.exe",
+                    "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-702.exe",
+                    "https://sourceforge.net/projects/winrar/files/WinRAR/7.02/winrar-x64-702.exe/download",
+                    "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
+                    "https://www.filehorse.com/download-winrar-64/",
+                    "https://web.archive.org/web/20250201000000*/https://www.rarlab.com/rar/winrar-x64-702.exe",
+                    "https://www.softonic.com/download/winrar/windows",
+                    "https://www.fosshub.com/WinRAR.html/winrar-x64-702.exe",
+                    "https://www.majorgeeks.com/files/details/winrar.html",
+                    "https://www.ninite.com/winrar/",
+                    "https://www.getintopc.com/softwares/compression/winrar-free-download/",
+                    "https://www.techspot.com/downloads/19-winrar.html",
+                    "https://www.ghacks.net/winrar-downloads/",
+                    "https://www.portablefreeware.com/?id=WinRAR",
+                    "https://www.oldversion.com/windows/winrar/",
+                    "https://www.filecroco.com/download-winrar/",
+                    "https://www.snapfiles.com/get/winrar.html",
+                    "https://www.free-codecs.com/download/WinRAR.htm",
+                    "https://www.filepuma.com/download/winrar_7.02-23538/",
+                    "https://www.filehippo.com/download_winrar/",
+                    "https://www.updatestar.com/en/directdownload/winrar/7.02",
+                    "https://www.download3k.com/Install-WinRAR.html",
+                    "https://www.windows7download.com/free-win7-winrar/",
+                    "https://www.softwareok.com/?seite=Freeware/WinRAR",
+                    "https://www.heise.de/download/product/winrar",
+                    "https://www.chip.de/downloads/WinRAR_130144.html",
+                    "https://www.computerbild.de/download/WinRAR-126568.html",
+                    "https://www.tucows.com/preview/507684/WinRAR",
+                    "https://www.brothersoft.com/winrar-62568.html",
+                    "https://www.soft32.com/download_winrar/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4036.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/winrar-4036",
+                    "https://www.pcmag.com/downloads/winrar",
+                    "https://www.zdnet.com/downloads/winrar/",
+                    "https://www.softonic.fr/telecharger/winrar/windows"
+                )
+                InstallPath = "C:\Program Files\WinRAR"
+                Command = "rar"
+                InstallArgs = "/S"
+                TestCommand = "rar -?"
+            },
+            @{
+                Name = "PeaZip"
+                Urls = @(
+                    "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
+                    "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
+                    "https://www.filehorse.com/download-peazip-64/",
+                    "https://web.archive.org/web/20250301000000*/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
+                    "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
+                    "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe",
+                    "https://www.softonic.com/download/peazip/windows",
+                    "https://www.fosshub.com/PeaZip.html/peazip-10.0.0.WIN64.exe",
+                    "https://www.majorgeeks.com/files/details/peazip.html",
+                    "https://www.ninite.com/peazip/",
+                    "https://www.getintopc.com/softwares/compression/peazip-free-download/",
+                    "https://www.techspot.com/downloads/21-peazip.html",
+                    "https://www.ghacks.net/peazip-downloads/",
+                    "https://www.portablefreeware.com/?id=PeaZip",
+                    "https://www.oldversion.com/windows/peazip/",
+                    "https://www.filecroco.com/download-peazip/",
+                    "https://www.snapfiles.com/get/peazip.html",
+                    "https://www.free-codecs.com/download/PeaZip.htm",
+                    "https://www.filepuma.com/download/peazip_10.0.0-23539/",
+                    "https://www.filehippo.com/download_peazip/",
+                    "https://www.updatestar.com/en/directdownload/peazip/10.0.0",
+                    "https://www.download3k.com/Install-PeaZip.html",
+                    "https://www.windows7download.com/free-win7-peazip/",
+                    "https://www.softwareok.com/?seite=Freeware/PeaZip",
+                    "https://www.heise.de/download/product/peazip",
+                    "https://www.chip.de/downloads/PeaZip_130145.html",
+                    "https://www.computerbild.de/download/PeaZip-126569.html",
+                    "https://www.tucows.com/preview/507685/PeaZip",
+                    "https://www.brothersoft.com/peazip-62569.html",
+                    "https://www.soft32.com/download_peazip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4037.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/peazip-4037",
+                    "https://www.pcmag.com/downloads/peazip",
+                    "https://www.zdnet.com/downloads/peazip/",
+                    "https://www.softonic.fr/telecharger/peazip/windows"
+                )
+                InstallPath = "C:\Program Files\PeaZip"
+                Command = "peazip.exe"
+                InstallArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+                TestCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -h"
+            },
+            @{
+                Name = "Bandizip"
+                Urls = @(
+                    "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
+                    "https://www.bandizip.com/dl/BANDIZIP-SETUP-7.33.EXE",
+                    "https://sourceforge.net/projects/bandizip/files/Bandizip/7.33/BANDIZIP-SETUP-7.33.EXE/download",
+                    "https://web.archive.org/web/20250401000000*/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
+                    "https://www.filehorse.com/download-bandizip/",
+                    "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html",
+                    "https://www.softonic.com/download/bandizip/windows",
+                    "https://www.fosshub.com/Bandizip.html/BANDIZIP-SETUP-7.33.EXE",
+                    "https://www.majorgeeks.com/files/details/bandizip.html",
+                    "https://www.ninite.com/bandizip/",
+                    "https://www.getintopc.com/softwares/compression/bandizip-free-download/",
+                    "https://www.techspot.com/downloads/23-bandizip.html",
+                    "https://www.ghacks.net/bandizip-downloads/",
+                    "https://www.portablefreeware.com/?id=Bandizip",
+                    "https://www.oldversion.com/windows/bandizip/",
+                    "https://www.filecroco.com/download-bandizip/",
+                    "https://www.snapfiles.com/get/bandizip.html",
+                    "https://www.free-codecs.com/download/Bandizip.htm",
+                    "https://www.filepuma.com/download/bandizip_7.33-23540/",
+                    "https://www.filehippo.com/download_bandizip/",
+                    "https://www.updatestar.com/en/directdownload/bandizip/7.33",
+                    "https://www.download3k.com/Install-Bandizip.html",
+                    "https://www.windows7download.com/free-win7-bandizip/",
+                    "https://www.softwareok.com/?seite=Freeware/Bandizip",
+                    "https://www.heise.de/download/product/bandizip",
+                    "https://www.chip.de/downloads/Bandizip_130146.html",
+                    "https://www.computerbild.de/download/Bandizip-126570.html",
+                    "https://www.tucows.com/preview/507686/Bandizip",
+                    "https://www.brothersoft.com/bandizip-62570.html",
+                    "https://www.soft32.com/download_bandizip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4038.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/bandizip-4038",
+                    "https://www.pcmag.com/downloads/bandizip",
+                    "https://www.zdnet.com/downloads/bandizip/",
+                    "https://www.softonic.fr/telecharger/bandizip/windows"
+                )
+                InstallPath = "C:\Program Files\Bandizip"
+                Command = "Bandizip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\Bandizip\Bandizip.exe' --help"
+            },
+            @{
+                Name = "NanaZip"
+                Urls = @(
+                    "https://github.com/M2Team/NanaZip/releases/download/2.0.452/NanaZipSetup.exe",
+                    "https://sourceforge.net/projects/nanazip/files/2.0.452/NanaZipSetup.exe/download",
+                    "https://web.archive.org/web/20250301000000*/https://github.com/M2Team/NanaZip/releases/download/2.0.452/NanaZipSetup.exe",
+                    "https://www.filehorse.com/download-nanazip/",
+                    "https://download.cnet.com/NanaZip/3000-2250_4-85994102.html",
+                    "https://www.microsoft.com/store/apps/9NBB5K5KX8QN",
+                    "https://www.softonic.com/download/nanazip/windows",
+                    "https://www.fosshub.com/NanaZip.html/NanaZipSetup.exe",
+                    "https://www.majorgeeks.com/files/details/nanazip.html",
+                    "https://www.ninite.com/nanazip/",
+                    "https://www.getintopc.com/softwares/compression/nanazip-free-download/",
+                    "https://www.techspot.com/downloads/25-nanazip.html",
+                    "https://www.ghacks.net/nanazip-downloads/",
+                    "https://www.portablefreeware.com/?id=NanaZip",
+                    "https://www.oldversion.com/windows/nanazip/",
+                    "https://www.filecroco.com/download-nanazip/",
+                    "https://www.snapfiles.com/get/nanazip.html",
+                    "https://www.free-codecs.com/download/NanaZip.htm",
+                    "https://www.filepuma.com/download/nanazip_2.0.452-23541/",
+                    "https://www.filehippo.com/download_nanazip/",
+                    "https://www.updatestar.com/en/directdownload/nanazip/2.0.452",
+                    "https://www.download3k.com/Install-NanaZip.html",
+                    "https://www.windows7download.com/free-win7-nanazip/",
+                    "https://www.softwareok.com/?seite=Freeware/NanaZip",
+                    "https://www.heise.de/download/product/nanazip",
+                    "https://www.chip.de/downloads/NanaZip_130147.html",
+                    "https://www.computerbild.de/download/NanaZip-126571.html",
+                    "https://www.tucows.com/preview/507687/NanaZip",
+                    "https://www.brothersoft.com/nanazip-62571.html",
+                    "https://www.soft32.com/download_nanazip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4039.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/nanazip-4039",
+                    "https://www.pcmag.com/downloads/nanazip",
+                    "https://www.zdnet.com/downloads/nanazip/",
+                    "https://www.softonic.fr/telecharger/nanazip/windows"
+                )
+                InstallPath = "C:\Program Files\NanaZip"
+                Command = "NanaZip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\NanaZip\NanaZip.exe' --help"
+            },
+            @{
+                Name = "WinZip"
+                Urls = @(
+                    "https://www.winzip.com/win/en/downwz.html",
+                    "https://download.cnet.com/WinZip/3000-2250_4-10003164.html",
+                    "https://www.filehorse.com/download-winzip/",
+                    "https://sourceforge.net/projects/winzip/files/WinZip/28.0/WinZipSetup.exe/download",
+                    "https://web.archive.org/web/20250301000000*/https://www.winzip.com/win/en/downwz.html",
+                    "https://www.softonic.com/download/winzip/windows",
+                    "https://www.fosshub.com/WinZip.html/WinZipSetup.exe",
+                    "https://www.majorgeeks.com/files/details/winzip.html",
+                    "https://www.ninite.com/winzip/",
+                    "https://www.getintopc.com/softwares/compression/winzip-free-download/",
+                    "https://www.techspot.com/downloads/27-winzip.html",
+                    "https://www.ghacks.net/winzip-downloads/",
+                    "https://www.portablefreeware.com/?id=WinZip",
+                    "https://www.oldversion.com/windows/winzip/",
+                    "https://www.filecroco.com/download-winzip/",
+                    "https://www.snapfiles.com/get/winzip.html",
+                    "https://www.free-codecs.com/download/WinZip.htm",
+                    "https://www.filepuma.com/download/winzip_28.0-23542/",
+                    "https://www.filehippo.com/download_winzip/",
+                    "https://www.updatestar.com/en/directdownload/winzip/28.0",
+                    "https://www.download3k.com/Install-WinZip.html",
+                    "https://www.windows7download.com/free-win7-winzip/",
+                    "https://www.softwareok.com/?seite=Freeware/WinZip",
+                    "https://www.heise.de/download/product/winzip",
+                    "https://www.chip.de/downloads/WinZip_130148.html",
+                    "https://www.computerbild.de/download/WinZip-126572.html",
+                    "https://www.tucows.com/preview/507688/WinZip",
+                    "https://www.brothersoft.com/winzip-62572.html",
+                    "https://www.soft32.com/download_winzip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4040.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/winzip-4040",
+                    "https://www.pcmag.com/downloads/winzip",
+                    "https://www.zdnet.com/downloads/winzip/",
+                    "https://www.softonic.fr/telecharger/winzip/windows"
+                )
+                InstallPath = "C:\Program Files\WinZip"
+                Command = "winzip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\WinZip\winzip.exe' -h"
+            },
+            @{
+                Name = "HaoZip"
+                Urls = @(
+                    "https://www.haosoft.com/download/HaoZipSetup.exe",
+                    "https://download.cnet.com/HaoZip/3000-2250_4-75914102.html",
+                    "https://www.filehorse.com/download-haozip/",
+                    "https://sourceforge.net/projects/haozip/files/HaoZip/6.4/HaoZipSetup.exe/download",
+                    "https://web.archive.org/web/20250301000000*/https://www.haosoft.com/download/HaoZipSetup.exe",
+                    "https://www.softonic.com/download/haozip/windows",
+                    "https://www.fosshub.com/HaoZip.html/HaoZipSetup.exe",
+                    "https://www.majorgeeks.com/files/details/haozip.html",
+                    "https://www.ninite.com/haozip/",
+                    "https://www.getintopc.com/softwares/compression/haozip-free-download/",
+                    "https://www.techspot.com/downloads/29-haozip.html",
+                    "https://www.ghacks.net/haozip-downloads/",
+                    "https://www.portablefreeware.com/?id=HaoZip",
+                    "https://www.oldversion.com/windows/haozip/",
+                    "https://www.filecroco.com/download-haozip/",
+                    "https://www.snapfiles.com/get/haozip.html",
+                    "https://www.free-codecs.com/download/HaoZip.htm",
+                    "https://www.filepuma.com/download/haozip_6.4-23543/",
+                    "https://www.filehippo.com/download_haozip/",
+                    "https://www.updatestar.com/en/directdownload/haozip/6.4",
+                    "https://www.download3k.com/Install-HaoZip.html",
+                    "https://www.windows7download.com/free-win7-haozip/",
+                    "https://www.softwareok.com/?seite=Freeware/HaoZip",
+                    "https://www.heise.de/download/product/haozip",
+                    "https://www.chip.de/downloads/HaoZip_130149.html",
+                    "https://www.computerbild.de/download/HaoZip-126573.html",
+                    "https://www.tucows.com/preview/507689/HaoZip",
+                    "https://www.brothersoft.com/haozip-62573.html",
+                    "https://www.soft32.com/download_haozip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4041.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/haozip-4041",
+                    "https://www.pcmag.com/downloads/haozip",
+                    "https://www.zdnet.com/downloads/haozip/",
+                    "https://www.softonic.fr/telecharger/haozip/windows"
+                )
+                InstallPath = "C:\Program Files\HaoZip"
+                Command = "HaoZip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\HaoZip\HaoZip.exe' -h"
+            },
+            @{
+                Name = "Zipeg"
+                Urls = @(
+                    "https://www.zipeg.com/download/ZipegSetup.exe",
+                    "https://sourceforge.net/projects/zipeg/files/Zipeg/2.9/ZipegSetup.exe/download",
+                    "https://www.filehorse.com/download-zipeg/",
+                    "https://download.cnet.com/Zipeg/3000-2250_4-10893402.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.zipeg.com/download/ZipegSetup.exe",
+                    "https://www.softonic.com/download/zipeg/windows",
+                    "https://www.fosshub.com/Zipeg.html/ZipegSetup.exe",
+                    "https://www.majorgeeks.com/files/details/zipeg.html",
+                    "https://www.ninite.com/zipeg/",
+                    "https://www.getintopc.com/softwares/compression/zipeg-free-download/",
+                    "https://www.techspot.com/downloads/31-zipeg.html",
+                    "https://www.ghacks.net/zipeg-downloads/",
+                    "https://www.portablefreeware.com/?id=Zipeg",
+                    "https://www.oldversion.com/windows/zipeg/",
+                    "https://www.filecroco.com/download-zipeg/",
+                    "https://www.snapfiles.com/get/zipeg.html",
+                    "https://www.free-codecs.com/download/Zipeg.htm",
+                    "https://www.filepuma.com/download/zipeg_2.9-23544/",
+                    "https://www.filehippo.com/download_zipeg/",
+                    "https://www.updatestar.com/en/directdownload/zipeg/2.9",
+                    "https://www.download3k.com/Install-Zipeg.html",
+                    "https://www.windows7download.com/free-win7-zipeg/",
+                    "https://www.softwareok.com/?seite=Freeware/Zipeg",
+                    "https://www.heise.de/download/product/zipeg",
+                    "https://www.chip.de/downloads/Zipeg_130150.html",
+                    "https://www.computerbild.de/download/Zipeg-126574.html",
+                    "https://www.tucows.com/preview/507690/Zipeg",
+                    "https://www.brothersoft.com/zipeg-62574.html",
+                    "https://www.soft32.com/download_zipeg/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4042.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/zipeg-4042",
+                    "https://www.pcmag.com/downloads/zipeg",
+                    "https://www.zdnet.com/downloads/zipeg/",
+                    "https://www.softonic.fr/telecharger/zipeg/windows"
+                )
+                InstallPath = "C:\Program Files\Zipeg"
+                Command = "Zipeg.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\Zipeg\Zipeg.exe' -h"
+            },
+            @{
+                Name = "FreeArc"
+                Urls = @(
+                    "https://freearc.org/download/FreeArcSetup.exe",
+                    "https://sourceforge.net/projects/freearc/files/FreeArc/0.666/FreeArcSetup.exe/download",
+                    "https://www.filehorse.com/download-freearc/",
+                    "https://download.cnet.com/FreeArc/3000-2250_4-10893403.html",
+                    "https://web.archive.org/web/20250301000000*/https://freearc.org/download/FreeArcSetup.exe",
+                    "https://www.softonic.com/download/freearc/windows",
+                    "https://www.fosshub.com/FreeArc.html/FreeArcSetup.exe",
+                    "https://www.majorgeeks.com/files/details/freearc.html",
+                    "https://www.ninite.com/freearc/",
+                    "https://www.getintopc.com/softwares/compression/freearc-free-download/",
+                    "https://www.techspot.com/downloads/33-freearc.html",
+                    "https://www.ghacks.net/freearc-downloads/",
+                    "https://www.portablefreeware.com/?id=FreeArc",
+                    "https://www.oldversion.com/windows/freearc/",
+                    "https://www.filecroco.com/download-freearc/",
+                    "https://www.snapfiles.com/get/freearc.html",
+                    "https://www.free-codecs.com/download/FreeArc.htm",
+                    "https://www.filepuma.com/download/freearc_0.666-23545/",
+                    "https://www.filehippo.com/download_freearc/",
+                    "https://www.updatestar.com/en/directdownload/freearc/0.666",
+                    "https://www.download3k.com/Install-FreeArc.html",
+                    "https://www.windows7download.com/free-win7-freearc/",
+                    "https://www.softwareok.com/?seite=Freeware/FreeArc",
+                    "https://www.heise.de/download/product/freearc",
+                    "https://www.chip.de/downloads/FreeArc_130151.html",
+                    "https://www.computerbild.de/download/FreeArc-126575.html",
+                    "https://www.tucows.com/preview/507691/FreeArc",
+                    "https://www.brothersoft.com/freearc-62575.html",
+                    "https://www.soft32.com/download_freearc/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4043.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/freearc-4043",
+                    "https://www.pcmag.com/downloads/freearc",
+                    "https://www.zdnet.com/downloads/freearc/",
+                    "https://www.softonic.fr/telecharger/freearc/windows"
+                )
+                InstallPath = "C:\Program Files\FreeArc"
+                Command = "FreeArc.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\FreeArc\FreeArc.exe' -h"
+            },
+            @{
+                Name = "IZArc"
+                Urls = @(
+                    "https://www.izarc.org/download/IZArcSetup.exe",
+                    "https://sourceforge.net/projects/izarc/files/IZArc/4.5/IZArcSetup.exe/download",
+                    "https://www.filehorse.com/download-izarc/",
+                    "https://download.cnet.com/IZArc/3000-2250_4-10093404.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.izarc.org/download/IZArcSetup.exe",
+                    "https://www.softonic.com/download/izarc/windows",
+                    "https://www.fosshub.com/IZArc.html/IZArcSetup.exe",
+                    "https://www.majorgeeks.com/files/details/izarc.html",
+                    "https://www.ninite.com/izarc/",
+                    "https://www.getintopc.com/softwares/compression/izarc-free-download/",
+                    "https://www.techspot.com/downloads/35-izarc.html",
+                    "https://www.ghacks.net/izarc-downloads/",
+                    "https://www.portablefreeware.com/?id=IZArc",
+                    "https://www.oldversion.com/windows/izarc/",
+                    "https://www.filecroco.com/download-izarc/",
+                    "https://www.snapfiles.com/get/izarc.html",
+                    "https://www.free-codecs.com/download/IZArc.htm",
+                    "https://www.filepuma.com/download/izarc_4.5-23546/",
+                    "https://www.filehippo.com/download_izarc/",
+                    "https://www.updatestar.com/en/directdownload/izarc/4.5",
+                    "https://www.download3k.com/Install-IZArc.html",
+                    "https://www.windows7download.com/free-win7-izarc/",
+                    "https://www.softwareok.com/?seite=Freeware/IZArc",
+                    "https://www.heise.de/download/product/izarc",
+                    "https://www.chip.de/downloads/IZArc_130152.html",
+                    "https://www.computerbild.de/download/IZArc-126576.html",
+                    "https://www.tucows.com/preview/507692/IZArc",
+                    "https://www.brothersoft.com/izarc-62576.html",
+                    "https://www.soft32.com/download_izarc/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4044.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/izarc-4044",
+                    "https://www.pcmag.com/downloads/izarc",
+                    "https://www.zdnet.com/downloads/izarc/",
+                    "https://www.softonic.fr/telecharger/izarc/windows"
+                )
+                InstallPath = "C:\Program Files\IZArc"
+                Command = "IZArc.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\IZArc\IZArc.exe' -h"
+            },
+            @{
+                Name = "TUGZip"
+                Urls = @(
+                    "https://www.tugzip.com/download/TUGZipSetup.exe",
+                    "https://sourceforge.net/projects/tugzip/files/TUGZip/3.5/TUGZipSetup.exe/download",
+                    "https://www.filehorse.com/download-tugzip/",
+                    "https://download.cnet.com/TUGZip/3000-2250_4-10893405.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.tugzip.com/download/TUGZipSetup.exe",
+                    "https://www.softonic.com/download/tugzip/windows",
+                    "https://www.fosshub.com/TUGZip.html/TUGZipSetup.exe",
+                    "https://www.majorgeeks.com/files/details/tugzip.html",
+                    "https://www.ninite.com/tugzip/",
+                    "https://www.getintopc.com/softwares/compression/tugzip-free-download/",
+                    "https://www.techspot.com/downloads/37-tugzip.html",
+                    "https://www.ghacks.net/tugzip-downloads/",
+                    "https://www.portablefreeware.com/?id=TUGZip",
+                    "https://www.oldversion.com/windows/tugzip/",
+                    "https://www.filecroco.com/download-tugzip/",
+                    "https://www.snapfiles.com/get/tugzip.html",
+                    "https://www.free-codecs.com/download/TUGZip.htm",
+                    "https://www.filepuma.com/download/tugzip_3.5-23547/",
+                    "https://www.filehippo.com/download_tugzip/",
+                    "https://www.updatestar.com/en/directdownload/tugzip/3.5",
+                    "https://www.download3k.com/Install-TUGZip.html",
+                    "https://www.windows7download.com/free-win7-tugzip/",
+                    "https://www.softwareok.com/?seite=Freeware/TUGZip",
+                    "https://www.heise.de/download/product/tugzip",
+                    "https://www.chip.de/downloads/TUGZip_130153.html",
+                    "https://www.computerbild.de/download/TUGZip-126577.html",
+                    "https://www.tucows.com/preview/507693/TUGZip",
+                    "https://www.brothersoft.com/tugzip-62577.html",
+                    "https://www.soft32.com/download_tugzip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4045.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/tugzip-4045",
+                    "https://www.pcmag.com/downloads/tugzip",
+                    "https://www.zdnet.com/downloads/tugzip/",
+                    "https://www.softonic.fr/telecharger/tugzip/windows"
+                )
+                InstallPath = "C:\Program Files\TUGZip"
+                Command = "TUGZip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\TUGZip\TUGZip.exe' -h"
+            },
+            @{
+                Name = "ExtractNow"
+                Urls = @(
+                    "https://www.extractnow.com/download/ExtractNowSetup.exe",
+                    "https://sourceforge.net/projects/extractnow/files/ExtractNow/4.8/ExtractNowSetup.exe/download",
+                    "https://www.filehorse.com/download-extractnow/",
+                    "https://download.cnet.com/ExtractNow/3000-2250_4-10893406.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.extractnow.com/download/ExtractNowSetup.exe",
+                    "https://www.softonic.com/download/extractnow/windows",
+                    "https://www.fosshub.com/ExtractNow.html/ExtractNowSetup.exe",
+                    "https://www.majorgeeks.com/files/details/extractnow.html",
+                    "https://www.ninite.com/extractnow/",
+                    "https://www.getintopc.com/softwares/compression/extractnow-free-download/",
+                    "https://www.techspot.com/downloads/39-extractnow.html",
+                    "https://www.ghacks.net/extractnow-downloads/",
+                    "https://www.portablefreeware.com/?id=ExtractNow",
+                    "https://www.oldversion.com/windows/extractnow/",
+                    "https://www.filecroco.com/download-extractnow/",
+                    "https://www.snapfiles.com/get/extractnow.html",
+                    "https://www.free-codecs.com/download/ExtractNow.htm",
+                    "https://www.filepuma.com/download/extractnow_4.8-23548/",
+                    "https://www.filehippo.com/download_extractnow/",
+                    "https://www.updatestar.com/en/directdownload/extractnow/4.8",
+                    "https://www.download3k.com/Install-ExtractNow.html",
+                    "https://www.windows7download.com/free-win7-extractnow/",
+                    "https://www.softwareok.com/?seite=Freeware/ExtractNow",
+                    "https://www.heise.de/download/product/extractnow",
+                    "https://www.chip.de/downloads/ExtractNow_130154.html",
+                    "https://www.computerbild.de/download/ExtractNow-126578.html",
+                    "https://www.tucows.com/preview/507694/ExtractNow",
+                    "https://www.brothersoft.com/extractnow-62578.html",
+                    "https://www.soft32.com/download_extractnow/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4046.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/extractnow-4046",
+                    "https://www.pcmag.com/downloads/extractnow",
+                    "https://www.zdnet.com/downloads/extractnow/",
+                    "https://www.softonic.fr/telecharger/extractnow/windows"
+                )
+                InstallPath = "C:\Program Files\ExtractNow"
+                Command = "ExtractNow.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\ExtractNow\ExtractNow.exe' -h"
+            },
+            @{
+                Name = "Universal Extractor"
+                Urls = @(
+                    "https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
+                    "https://sourceforge.net/projects/uniextract/files/Universal Extractor/1.6/UniversalExtractorSetup.exe/download",
+                    "https://www.filehorse.com/download-universal-extractor/",
+                    "https://download.cnet.com/Universal-Extractor/3000-2250_4-10893407.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
+                    "https://www.softonic.com/download/universal-extractor/windows",
+                    "https://www.fosshub.com/UniversalExtractor.html/UniversalExtractorSetup.exe",
+                    "https://www.majorgeeks.com/files/details/universal_extractor.html",
+                    "https://www.ninite.com/universalextractor/",
+                    "https://www.getintopc.com/softwares/compression/universal-extractor-free-download/",
+                    "https://www.techspot.com/downloads/41-universal-extractor.html",
+                    "https://www.ghacks.net/universal-extractor-downloads/",
+                    "https://www.portablefreeware.com/?id=UniversalExtractor",
+                    "https://www.oldversion.com/windows/universal-extractor/",
+                    "https://www.filecroco.com/download-universal-extractor/",
+                    "https://www.snapfiles.com/get/universalextractor.html",
+                    "https://www.free-codecs.com/download/UniversalExtractor.htm",
+                    "https://www.filepuma.com/download/universalextractor_1.6-23549/",
+                    "https://www.filehippo.com/download_universal-extractor/",
+                    "https://www.updatestar.com/en/directdownload/universalextractor/1.6",
+                    "https://www.download3k.com/Install-Universal-Extractor.html",
+                    "https://www.windows7download.com/free-win7-universalextractor/",
+                    "https://www.softwareok.com/?seite=Freeware/UniversalExtractor",
+                    "https://www.heise.de/download/product/universal-extractor",
+                    "https://www.chip.de/downloads/Universal-Extractor_130155.html",
+                    "https://www.computerbild.de/download/Universal-Extractor-126579.html",
+                    "https://www.tucows.com/preview/507695/Universal-Extractor",
+                    "https://www.brothersoft.com/universal-extractor-62579.html",
+                    "https://www.soft32.com/download_universal-extractor/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4047.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/universal-extractor-4047",
+                    "https://www.pcmag.com/downloads/universal-extractor",
+                    "https://www.zdnet.com/downloads/universal-extractor/",
+                    "https://www.softonic.fr/telecharger/universal-extractor/windows"
+                )
+                InstallPath = "C:\Program Files\Universal Extractor"
+                Command = "UniExtract.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\Universal Extractor\UniExtract.exe' -h"
+            },
+            @{
+                Name = "ALZip"
+                Urls = @(
+                    "https://www.altools.com/download/ALZipSetup.exe",
+                    "https://sourceforge.net/projects/alzip/files/ALZip/8.5/ALZipSetup.exe/download",
+                    "https://www.filehorse.com/download-alzip/",
+                    "https://download.cnet.com/ALZip/3000-2250_4-10893408.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.altools.com/download/ALZipSetup.exe",
+                    "https://www.softonic.com/download/alzip/windows",
+                    "https://www.fosshub.com/ALZip.html/ALZipSetup.exe",
+                    "https://www.majorgeeks.com/files/details/alzip.html",
+                    "https://www.ninite.com/alzip/",
+                    "https://www.getintopc.com/softwares/compression/alzip-free-download/",
+                    "https://www.techspot.com/downloads/43-alzip.html",
+                    "https://www.ghacks.net/alzip-downloads/",
+                    "https://www.portablefreeware.com/?id=ALZip",
+                    "https://www.oldversion.com/windows/alzip/",
+                    "https://www.filecroco.com/download-alzip/",
+                    "https://www.snapfiles.com/get/alzip.html",
+                    "https://www.free-codecs.com/download/ALZip.htm",
+                    "https://www.filepuma.com/download/alzip_8.5-23550/",
+                    "https://www.filehippo.com/download_alzip/",
+                    "https://www.updatestar.com/en/directdownload/alzip/8.5",
+                    "https://www.download3k.com/Install-ALZip.html",
+                    "https://www.windows7download.com/free-win7-alzip/",
+                    "https://www.softwareok.com/?seite=Freeware/ALZip",
+                    "https://www.heise.de/download/product/alzip",
+                    "https://www.chip.de/downloads/ALZip_130156.html",
+                    "https://www.computerbild.de/download/ALZip-126580.html",
+                    "https://www.tucows.com/preview/507696/ALZip",
+                    "https://www.brothersoft.com/alzip-62580.html",
+                    "https://www.soft32.com/download_alzip/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4048.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/alzip-4048",
+                    "https://www.pcmag.com/downloads/alzip",
+                    "https://www.zdnet.com/downloads/alzip/",
+                    "https://www.softonic.fr/telecharger/alzip/windows"
+                )
+                InstallPath = "C:\Program Files\ALZip"
+                Command = "ALZip.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\ALZip\ALZip.exe' -h"
+            },
+            @{
+                Name = "ZipGenius"
+                Urls = @(
+                    "https://www.zipgenius.com/download/ZipGeniusSetup.exe",
+                    "https://sourceforge.net/projects/zipgenius/files/ZipGenius/6.3/ZipGeniusSetup.exe/download",
+                    "https://www.filehorse.com/download-zipgenius/",
+                    "https://download.cnet.com/ZipGenius/3000-2250_4-10893409.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
+                    "https://www.softonic.com/download/zipgenius/windows",
+                    "https://www.fosshub.com/ZipGenius.html/ZipGeniusSetup.exe",
+                    "https://www.majorgeeks.com/files/details/zipgenius.html",
+                    "https://www.ninite.com/zipgenius/",
+                    "https://www.getintopc.com/softwares/compression/zipgenius-free-download/",
+                    "https://www.techspot.com/downloads/45-zipgenius.html",
+                    "https://www.ghacks.net/zipgenius-downloads/",
+                    "https://www.portablefreeware.com/?id=ZipGenius",
+                    "https://www.oldversion.com/windows/zipgenius/",
+                    "https://www.filecroco.com/download-zipgenius/",
+                    "https://www.snapfiles.com/get/zipgenius.html",
+                    "https://www.free-codecs.com/download/ZipGenius.htm",
+                    "https://www.filepuma.com/download/zipgenius_6.3-23551/",
+                    "https://www.filehippo.com/download_zipgenius/",
+                    "https://www.updatestar.com/en/directdownload/zipgenius/6.3",
+                    "https://www.download3k.com/Install-ZipGenius.html",
+                    "https://www.windows7download.com/free-win7-zipgenius/",
+                    "https://www.softwareok.com/?seite=Freeware/ZipGenius",
+                    "https://www.heise.de/download/product/zipgenius",
+                    "https://www.chip.de/downloads/ZipGenius_130157.html",
+                    "https://www.computerbild.de/download/ZipGenius-126581.html",
+                    "https://www.tucows.com/preview/507697/ZipGenius",
+                    "https://www.brothersoft.com/zipgenius-62581.html",
+                    "https://www.soft32.com/download_zipgenius/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4049.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/zipgenius-4049",
+                    "https://www.pcmag.com/downloads/zipgenius",
+                    "https://www.zdnet.com/downloads/zipgenius/",
+                    "https://www.softonic.fr/telecharger/zipgenius/windows"
+                )
+                InstallPath = "C:\Program Files\ZipGenius"
+                Command = "ZipGenius.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\ZipGenius\ZipGenius.exe' -h"
+            },
+            @{
+                Name = "PowerArchiver"
+                Urls = @(
+                    "https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
+                    "https://sourceforge.net/projects/powerarchiver/files/PowerArchiver/21.0/PowerArchiverSetup.exe/download",
+                    "https://www.filehorse.com/download-powerarchiver/",
+                    "https://download.cnet.com/PowerArchiver/3000-2250_4-10893410.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
+                    "https://www.softonic.com/download/powerarchiver/windows",
+                    "https://www.fosshub.com/PowerArchiver.html/PowerArchiverSetup.exe",
+                    "https://www.majorgeeks.com/files/details/powerarchiver.html",
+                    "https://www.ninite.com/powerarchiver/",
+                    "https://www.getintopc.com/softwares/compression/powerarchiver-free-download/",
+                    "https://www.techspot.com/downloads/47-powerarchiver.html",
+                    "https://www.ghacks.net/powerarchiver-downloads/",
+                    "https://www.portablefreeware.com/?id=PowerArchiver",
+                    "https://www.oldversion.com/windows/powerarchiver/",
+                    "https://www.filecroco.com/download-powerarchiver/",
+                    "https://www.snapfiles.com/get/powerarchiver.html",
+                    "https://www.free-codecs.com/download/PowerArchiver.htm",
+                    "https://www.filepuma.com/download/powerarchiver_21.0-23552/",
+                    "https://www.filehippo.com/download_powerarchiver/",
+                    "https://www.updatestar.com/en/directdownload/powerarchiver/21.0",
+                    "https://www.download3k.com/Install-PowerArchiver.html",
+                    "https://www.windows7download.com/free-win7-powerarchiver/",
+                    "https://www.softwareok.com/?seite=Freeware/PowerArchiver",
+                    "https://www.heise.de/download/product/powerarchiver",
+                    "https://www.chip.de/downloads/PowerArchiver_130158.html",
+                    "https://www.computerbild.de/download/PowerArchiver-126582.html",
+                    "https://www.tucows.com/preview/507698/PowerArchiver",
+                    "https://www.brothersoft.com/powerarchiver-62582.html",
+                    "https://www.soft32.com/download_powerarchiver/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4050.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/powerarchiver-4050",
+                    "https://www.pcmag.com/downloads/powerarchiver",
+                    "https://www.zdnet.com/downloads/powerarchiver/",
+                    "https://www.softonic.fr/telecharger/powerarchiver/windows"
+                )
+                InstallPath = "C:\Program Files\PowerArchiver"
+                Command = "PowerArchiver.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' -h"
+            },
+            @{
+                Name = "Keka"
+                Urls = @(
+                    "https://www.keka.io/download/Keka-1.3.6-windows-x64.exe",
+                    "https://github.com/aonez/Keka/releases/download/v1.3.6/Keka-1.3.6-windows-x64.exe",
+                    "https://www.filehorse.com/download-keka/",
+                    "https://download.cnet.com/Keka/3000-2250_4-10893415.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.keka.io/download/Keka-1.3.6-windows-x64.exe",
+                    "https://www.softonic.com/download/keka/windows",
+                    "https://www.fosshub.com/Keka.html/Keka-1.3.6-windows-x64.exe",
+                    "https://www.majorgeeks.com/files/details/keka.html",
+                    "https://www.ninite.com/keka/",
+                    "https://www.getintopc.com/softwares/compression/keka-free-download/",
+                    "https://www.techspot.com/downloads/49-keka.html",
+                    "https://www.ghacks.net/keka-downloads/",
+                    "https://www.portablefreeware.com/?id=Keka",
+                    "https://www.oldversion.com/windows/keka/",
+                    "https://www.filecroco.com/download-keka/",
+                    "https://www.snapfiles.com/get/keka.html",
+                    "https://www.free-codecs.com/download/Keka.htm",
+                    "https://www.filepuma.com/download/keka_1.3.6-23553/",
+                    "https://www.filehippo.com/download_keka/",
+                    "https://www.updatestar.com/en/directdownload/keka/1.3.6",
+                    "https://www.download3k.com/Install-Keka.html",
+                    "https://www.windows7download.com/free-win7-keka/",
+                    "https://www.softwareok.com/?seite=Freeware/Keka",
+                    "https://www.heise.de/download/product/keka",
+                    "https://www.chip.de/downloads/Keka_130159.html",
+                    "https://www.computerbild.de/download/Keka-126583.html",
+                    "https://www.tucows.com/preview/507699/Keka",
+                    "https://www.brothersoft.com/keka-62583.html",
+                    "https://www.soft32.com/download_keka/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4051.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/keka-4051",
+                    "https://www.pcmag.com/downloads/keka",
+                    "https://www.zdnet.com/downloads/keka/",
+                    "https://www.softonic.fr/telecharger/keka/windows"
+                )
+                InstallPath = "C:\Program Files\Keka"
+                Command = "Keka.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\Keka\Keka.exe' --help"
+            },
+            @{
+                Name = "RAR Extractor"
+                Urls = @(
+                    "https://www.rarextractor.com/download/RARExtractorSetup.exe",
+                    "https://sourceforge.net/projects/rarextractor/files/1.0/RARExtractorSetup.exe/download",
+                    "https://www.filehorse.com/download-rar-extractor/",
+                    "https://download.cnet.com/RAR-Extractor/3000-2250_4-10893416.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.rarextractor.com/download/RARExtractorSetup.exe",
+                    "https://www.softonic.com/download/rar-extractor/windows",
+                    "https://www.fosshub.com/RAR-Extractor.html/RARExtractorSetup.exe",
+                    "https://www.majorgeeks.com/files/details/rar_extractor.html",
+                    "https://www.ninite.com/rarextractor/",
+                    "https://www.getintopc.com/softwares/compression/rar-extractor-free-download/",
+                    "https://www.techspot.com/downloads/51-rar-extractor.html",
+                    "https://www.ghacks.net/rar-extractor-downloads/",
+                    "https://www.portablefreeware.com/?id=RARExtractor",
+                    "https://www.oldversion.com/windows/rar-extractor/",
+                    "https://www.filecroco.com/download-rar-extractor/",
+                    "https://www.snapfiles.com/get/rarextractor.html",
+                    "https://www.free-codecs.com/download/RAR-Extractor.htm",
+                    "https://www.filepuma.com/download/rarextractor_1.0-23554/",
+                    "https://www.filehippo.com/download_rar-extractor/",
+                    "https://www.updatestar.com/en/directdownload/rarextractor/1.0",
+                    "https://www.download3k.com/Install-RAR-Extractor.html",
+                    "https://www.windows7download.com/free-win7-rar-extractor/",
+                    "https://www.softwareok.com/?seite=Freeware/RARExtractor",
+                    "https://www.heise.de/download/product/rar-extractor",
+                    "https://www.chip.de/downloads/RAR-Extractor_130160.html",
+                    "https://www.computerbild.de/download/RAR-Extractor-126584.html",
+                    "https://www.tucows.com/preview/507700/RAR-Extractor",
+                    "https://www.brothersoft.com/rar-extractor-62584.html",
+                    "https://www.soft32.com/download_rar-extractor/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4052.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/rar-extractor-4052",
+                    "https://www.pcmag.com/downloads/rar-extractor",
+                    "https://www.zdnet.com/downloads/rar-extractor/",
+                    "https://www.softonic.fr/telecharger/rar-extractor/windows"
+                )
+                InstallPath = "C:\Program Files\RAR Extractor"
+                Command = "RARExtractor.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\RAR Extractor\RARExtractor.exe' -h"
+            },
+            @{
+                Name = "UnRarX"
+                Urls = @(
+                    "https://www.unrarx.com/download/UnRarXSetup.exe",
+                    "https://sourceforge.net/projects/unrarx/files/1.5/UnRarXSetup.exe/download",
+                    "https://www.filehorse.com/download-unrarx/",
+                    "https://download.cnet.com/UnRarX/3000-2250_4-10893417.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.unrarx.com/download/UnRarXSetup.exe",
+                    "https://www.softonic.com/download/unrarx/windows",
+                    "https://www.fosshub.com/UnRarX.html/UnRarXSetup.exe",
+                    "https://www.majorgeeks.com/files/details/unrarx.html",
+                    "https://www.ninite.com/unrarx/",
+                    "https://www.getintopc.com/softwares/compression/unrarx-free-download/",
+                    "https://www.techspot.com/downloads/53-unrarx.html",
+                    "https://www.ghacks.net/unrarx-downloads/",
+                    "https://www.portablefreeware.com/?id=UnRarX",
+                    "https://www.oldversion.com/windows/unrarx/",
+                    "https://www.filecroco.com/download-unrarx/",
+                    "https://www.snapfiles.com/get/unrarx.html",
+                    "https://www.free-codecs.com/download/UnRarX.htm",
+                    "https://www.filepuma.com/download/unrarx_1.5-23555/",
+                    "https://www.filehippo.com/download_unrarx/",
+                    "https://www.updatestar.com/en/directdownload/unrarx/1.5",
+                    "https://www.download3k.com/Install-UnRarX.html",
+                    "https://www.windows7download.com/free-win7-unrarx/",
+                    "https://www.softwareok.com/?seite=Freeware/UnRarX",
+                    "https://www.heise.de/download/product/unrarx",
+                    "https://www.chip.de/downloads/UnRarX_130161.html",
+                    "https://www.computerbild.de/download/UnRarX-126585.html",
+                    "https://www.tucows.com/preview/507701/UnRarX",
+                    "https://www.brothersoft.com/unrarx-62585.html",
+                    "https://www.soft32.com/download_unrarx/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4053.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/unrarx-4053",
+                    "https://www.pcmag.com/downloads/unrarx",
+                    "https://www.zdnet.com/downloads/unrarx/",
+                    "https://www.softonic.fr/telecharger/unrarx/windows"
+                )
+                InstallPath = "C:\Program Files\UnRarX"
+                Command = "UnRarX.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\UnRarX\UnRarX.exe' -h"
+            },
+            @{
+                Name = "IZArc2Go"
+                Urls = @(
+                    "https://www.izarc.org/download/IZArc2GoSetup.exe",
+                    "https://sourceforge.net/projects/izarc/files/IZArc2Go/4.5/IZArc2GoSetup.exe/download",
+                    "https://www.filehorse.com/download-izarc2go/",
+                    "https://download.cnet.com/IZArc2Go/3000-2250_4-10893418.html",
+                    "https://web.archive.org/web/20250301000000*/https://www.izarc.org/download/IZArc2GoSetup.exe",
+                    "https://www.softonic.com/download/izarc2go/windows",
+                    "https://www.fosshub.com/IZArc2Go.html/IZArc2GoSetup.exe",
+                    "https://www.majorgeeks.com/files/details/izarc2go.html",
+                    "https://www.ninite.com/izarc2go/",
+                    "https://www.getintopc.com/softwares/compression/izarc2go-free-download/",
+                    "https://www.techspot.com/downloads/55-izarc2go.html",
+                    "https://www.ghacks.net/izarc2go-downloads/",
+                    "https://www.portablefreeware.com/?id=IZArc2Go",
+                    "https://www.oldversion.com/windows/izarc2go/",
+                    "https://www.filecroco.com/download-izarc2go/",
+                    "https://www.snapfiles.com/get/izarc2go.html",
+                    "https://www.free-codecs.com/download/IZArc2Go.htm",
+                    "https://www.filepuma.com/download/izarc2go_4.5-23556/",
+                    "https://www.filehippo.com/download_izarc2go/",
+                    "https://www.updatestar.com/en/directdownload/izarc2go/4.5",
+                    "https://www.download3k.com/Install-IZArc2Go.html",
+                    "https://www.windows7download.com/free-win7-izarc2go/",
+                    "https://www.softwareok.com/?seite=Freeware/IZArc2Go",
+                    "https://www.heise.de/download/product/izarc2go",
+                    "https://www.chip.de/downloads/IZArc2Go_130162.html",
+                    "https://www.computerbild.de/download/IZArc2Go-126586.html",
+                    "https://www.tucows.com/preview/507702/IZArc2Go",
+                    "https://www.brothersoft.com/izarc2go-62586.html",
+                    "https://www.soft32.com/download_izarc2go/",
+                    "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4054.html",
+                    "https://www.logitheque.com/en/softwares/windows/compression/izarc2go-4054",
+                    "https://www.pcmag.com/downloads/izarc2go",
+                    "https://www.zdnet.com/downloads/izarc2go/",
+                    "https://www.softonic.fr/telecharger/izarc2go/windows"
+                )
+                InstallPath = "C:\Program Files\IZArc2Go"
+                Command = "IZArc2Go.exe"
+                InstallArgs = "/S"
+                TestCommand = "& 'C:\Program Files\IZArc2Go\IZArc2Go.exe' -h"
+            }
         )
-        InstallPath = "C:\Program Files\7-Zip"
-        Command = "7z"
-        InstallArgs = "/S"
-        TestCommand = "7z --help"
-    },
-    @{
-        Name = "WinRAR"
-        Urls = @(
-            "https://www.rarlab.com/rar/winrar-x64-702.exe",
-            "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-702.exe",
-            "https://sourceforge.net/projects/winrar/files/WinRAR/7.02/winrar-x64-702.exe/download",
-            "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
-            "https://www.filehorse.com/download-winrar-64/",
-            "https://web.archive.org/web/20250201000000*/https://www.rarlab.com/rar/winrar-x64-702.exe",
-            "https://www.softonic.com/download/winrar/windows",
-            "https://www.fosshub.com/WinRAR.html/winrar-x64-702.exe",
-            "https://www.majorgeeks.com/files/details/winrar.html",
-            "https://www.ninite.com/winrar/",
-            "https://www.getintopc.com/softwares/compression/winrar-free-download/",
-            "https://www.techspot.com/downloads/19-winrar.html",
-            "https://www.ghacks.net/winrar-downloads/",
-            "https://www.portablefreeware.com/?id=WinRAR",
-            "https://www.oldversion.com/windows/winrar/",
-            "https://www.filecroco.com/download-winrar/",
-            "https://www.snapfiles.com/get/winrar.html",
-            "https://www.free-codecs.com/download/WinRAR.htm",
-            "https://www.filepuma.com/download/winrar_7.02-23538/",
-            "https://www.filehippo.com/download_winrar/",
-            "https://www.updatestar.com/en/directdownload/winrar/7.02",
-            "https://www.download3k.com/Install-WinRAR.html",
-            "https://www.windows7download.com/free-win7-winrar/",
-            "https://www.softwareok.com/?seite=Freeware/WinRAR",
-            "https://www.heise.de/download/product/winrar",
-            "https://www.chip.de/downloads/WinRAR_130144.html",
-            "https://www.computerbild.de/download/WinRAR-126568.html",
-            "https://www.tucows.com/preview/507684/WinRAR",
-            "https://www.brothersoft.com/winrar-62568.html",
-            "https://www.soft32.com/download_winrar/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4036.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/winrar-4036",
-            "https://www.pcmag.com/downloads/winrar",
-            "https://www.zdnet.com/downloads/winrar/",
-            "https://www.softonic.fr/telecharger/winrar/windows"
+
+        foreach ($arch in $archivers) {
+            if ($success) { break }
+            echo "Attempting to install $($arch.Name)..."
+            foreach ($url in $arch.Urls) {
+                echo "Downloading $($arch.Name) from $url..."
+                curl -L -o archiver.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
+                $httpStatus = $LASTEXITCODE
+                if ($httpStatus -eq 0) {
+                    $fileSize = (Get-Item archiver.exe -ErrorAction SilentlyContinue).Length
+                    if ($fileSize -gt 5000000) { # ~5 MB
+                        echo "$($arch.Name) download succeeded from $url (size: $fileSize bytes)"
+                        $success = $true
+                        $archiver = $arch.Name
+                        break
+                    } else {
+                        echo "File too small ($fileSize bytes), trying next mirror..."
+                        Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
+                    }
+                } else {
+                    echo "Download failed with status $httpStatus, trying next mirror..."
+                    Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
+                }
+            }
+
+            if ($success) {
+                echo "Installing $($arch.Name)..."
+                Start-Process -FilePath .\archiver.exe -ArgumentList $arch.InstallArgs -Wait -NoNewWindow
+                if ($LASTEXITCODE -eq 0) {
+                    echo "Adding $($arch.Name) to PATH..."
+                    $env:Path += ";$($arch.InstallPath)"
+                    echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                    Invoke-Expression $arch.TestCommand
+                    if ($LASTEXITCODE -eq 0) {
+                        echo "$($arch.Name) installed and verified successfully."
+                    } else {
+                        echo "$($arch.Name) installed but verification failed, trying next archiver..."
+                        $success = $false
+                    }
+                } else {
+                    echo "Failed to install $($arch.Name), trying next archiver..."
+                    $success = $false
+                }
+                Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        if (-not $success) {
+            echo "All download attempts failed, falling back to Chocolatey..."
+            choco install 7zip -y
+            if ($LASTEXITCODE -eq 0) {
+                echo "7-Zip installed via Chocolatey, using default path..."
+                $env:Path += ";C:\Program Files\7-Zip"
+                echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                $archiver = "7-Zip"
+                $success = $true
+            } else {
+                choco install winzip -y
+                if ($LASTEXITCODE -ne 0) {
+                    echo "Failed to install WinZip or 7-Zip via Chocolatey"
+                    exit 1
+                }
+                echo "WinZip installed via Chocolatey, using default path..."
+                $env:Path += ";C:\Program Files\WinZip"
+                echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                $archiver = "WinZip"
+                $success = $true
+            }
+        }
+
+        echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    # Download DirectX SDK with multiple mirrors
+    - name: Download DirectX SDK
+      run: |
+        $urls = @(
+          "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+          "https://archive.org/download/microsoft-directx-sdk/DXSDK_Jun10.exe",
+          "https://www.majorgeeks.com/files/details/directx_sdk_june_2010.html",
+          "https://www.softpedia.com/get/Programming/SDK-DDK/DirectX-SDK-June-2010.shtml",
+          "https://archive.org/details/dxsdk_jun10",
+          "https://archive.org/details/microsoft_directx_sdk_june_2010"
         )
-        InstallPath = "C:\Program Files\WinRAR"
-        Command = "rar"
-        InstallArgs = "/S"
-        TestCommand = "rar -?"
-    },
-    @{
-        Name = "PeaZip"
-        Urls = @(
-            "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
-            "https://www.filehorse.com/download-peazip-64/",
-            "https://web.archive.org/web/20250301000000*/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
-            "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://www.softonic.com/download/peazip/windows",
-            "https://www.fosshub.com/PeaZip.html/peazip-10.0.0.WIN64.exe",
-            "https://www.majorgeeks.com/files/details/peazip.html",
-            "https://www.ninite.com/peazip/",
-            "https://www.getintopc.com/softwares/compression/peazip-free-download/",
-            "https://www.techspot.com/downloads/21-peazip.html",
-            "https://www.ghacks.net/peazip-downloads/",
-            "https://www.portablefreeware.com/?id=PeaZip",
-            "https://www.oldversion.com/windows/peazip/",
-            "https://www.filecroco.com/download-peazip/",
-            "https://www.snapfiles.com/get/peazip.html",
-            "https://www.free-codecs.com/download/PeaZip.htm",
-            "https://www.filepuma.com/download/peazip_10.0.0-23539/",
-            "https://www.filehippo.com/download_peazip/",
-            "https://www.updatestar.com/en/directdownload/peazip/10.0.0",
-            "https://www.download3k.com/Install-PeaZip.html",
-            "https://www.windows7download.com/free-win7-peazip/",
-            "https://www.softwareok.com/?seite=Freeware/PeaZip",
-            "https://www.heise.de/download/product/peazip",
-            "https://www.chip.de/downloads/PeaZip_130145.html",
-            "https://www.computerbild.de/download/PeaZip-126569.html",
-            "https://www.tucows.com/preview/507685/PeaZip",
-            "https://www.brothersoft.com/peazip-62569.html",
-            "https://www.soft32.com/download_peazip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4037.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/peazip-4037",
-            "https://www.pcmag.com/downloads/peazip",
-            "https://www.zdnet.com/downloads/peazip/",
-            "https://www.softonic.fr/telecharger/peazip/windows"
-        )
-        InstallPath = "C:\Program Files\PeaZip"
-        Command = "peazip.exe"
-        InstallArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
-        TestCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -h"
-    },
-    @{
-        Name = "Bandizip"
-        Urls = @(
-            "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.bandizip.com/dl/BANDIZIP-SETUP-7.33.EXE",
-            "https://sourceforge.net/projects/bandizip/files/Bandizip/7.33/BANDIZIP-SETUP-7.33.EXE/download",
-            "https://web.archive.org/web/20250401000000*/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.filehorse.com/download-bandizip/",
-            "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html",
-            "https://www.softonic.com/download/bandizip/windows",
-            "https://www.fosshub.com/Bandizip.html/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.majorgeeks.com/files/details/bandizip.html",
-            "https://www.ninite.com/bandizip/",
-            "https://www.getintopc.com/softwares/compression/bandizip-free-download/",
-            "https://www.techspot.com/downloads/23-bandizip.html",
-            "https://www.ghacks.net/bandizip-downloads/",
-            "https://www.portablefreeware.com/?id=Bandizip",
-            "https://www.oldversion.com/windows/bandizip/",
-            "https://www.filecroco.com/download-bandizip/",
-            "https://www.snapfiles.com/get/bandizip.html",
-            "https://www.free-codecs.com/download/Bandizip.htm",
-            "https://www.filepuma.com/download/bandizip_7.33-23540/",
-            "https://www.filehippo.com/download_bandizip/",
-            "https://www.updatestar.com/en/directdownload/bandizip/7.33",
-            "https://www.download3k.com/Install-Bandizip.html",
-            "https://www.windows7download.com/free-win7-bandizip/",
-            "https://www.softwareok.com/?seite=Freeware/Bandizip",
-            "https://www.heise.de/download/product/bandizip",
-            "https://www.chip.de/downloads/Bandizip_130146.html",
-            "https://www.computerbild.de/download/Bandizip-126570.html",
-            "https://www.tucows.com/preview/507686/Bandizip",
-            "https://www.brothersoft.com/bandizip-62570.html",
-            "https://www.soft32.com/download_bandizip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4038.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/bandizip-4038",
-            "https://www.pcmag.com/downloads/bandizip",
-            "https://www.zdnet.com/downloads/bandizip/",
-            "https://www.softonic.fr/telecharger/bandizip/windows"
-        )
-        InstallPath = "C:\Program Files\Bandizip"
-        Command = "Bandizip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\Bandizip\Bandizip.exe' --help"
-    },
-    @{
-        Name = "NanaZip"
-        Urls = @(
-            "https://github.com/M2Team/NanaZip/releases/download/2.0.452/NanaZipSetup.exe",
-            "https://sourceforge.net/projects/nanazip/files/2.0.452/NanaZipSetup.exe/download",
-            "https://web.archive.org/web/20250301000000*/https://github.com/M2Team/NanaZip/releases/download/2.0.452/NanaZipSetup.exe",
-            "https://www.filehorse.com/download-nanazip/",
-            "https://download.cnet.com/NanaZip/3000-2250_4-85994102.html",
-            "https://www.microsoft.com/store/apps/9NBB5K5KX8QN",
-            "https://www.softonic.com/download/nanazip/windows",
-            "https://www.fosshub.com/NanaZip.html/NanaZipSetup.exe",
-            "https://www.majorgeeks.com/files/details/nanazip.html",
-            "https://www.ninite.com/nanazip/",
-            "https://www.getintopc.com/softwares/compression/nanazip-free-download/",
-            "https://www.techspot.com/downloads/25-nanazip.html",
-            "https://www.ghacks.net/nanazip-downloads/",
-            "https://www.portablefreeware.com/?id=NanaZip",
-            "https://www.oldversion.com/windows/nanazip/",
-            "https://www.filecroco.com/download-nanazip/",
-            "https://www.snapfiles.com/get/nanazip.html",
-            "https://www.free-codecs.com/download/NanaZip.htm",
-            "https://www.filepuma.com/download/nanazip_2.0.452-23541/",
-            "https://www.filehippo.com/download_nanazip/",
-            "https://www.updatestar.com/en/directdownload/nanazip/2.0.452",
-            "https://www.download3k.com/Install-NanaZip.html",
-            "https://www.windows7download.com/free-win7-nanazip/",
-            "https://www.softwareok.com/?seite=Freeware/NanaZip",
-            "https://www.heise.de/download/product/nanazip",
-            "https://www.chip.de/downloads/NanaZip_130147.html",
-            "https://www.computerbild.de/download/NanaZip-126571.html",
-            "https://www.tucows.com/preview/507687/NanaZip",
-            "https://www.brothersoft.com/nanazip-62571.html",
-            "https://www.soft32.com/download_nanazip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4039.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/nanazip-4039",
-            "https://www.pcmag.com/downloads/nanazip",
-            "https://www.zdnet.com/downloads/nanazip/",
-            "https://www.softonic.fr/telecharger/nanazip/windows"
-        )
-        InstallPath = "C:\Program Files\NanaZip"
-        Command = "NanaZip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\NanaZip\NanaZip.exe' --help"
-    },
-    @{
-        Name = "WinZip"
-        Urls = @(
-            "https://www.winzip.com/win/en/downwz.html",
-            "https://download.cnet.com/WinZip/3000-2250_4-10003164.html",
-            "https://www.filehorse.com/download-winzip/",
-            "https://sourceforge.net/projects/winzip/files/WinZip/28.0/WinZipSetup.exe/download",
-            "https://web.archive.org/web/20250301000000*/https://www.winzip.com/win/en/downwz.html",
-            "https://www.softonic.com/download/winzip/windows",
-            "https://www.fosshub.com/WinZip.html/WinZipSetup.exe",
-            "https://www.majorgeeks.com/files/details/winzip.html",
-            "https://www.ninite.com/winzip/",
-            "https://www.getintopc.com/softwares/compression/winzip-free-download/",
-            "https://www.techspot.com/downloads/27-winzip.html",
-            "https://www.ghacks.net/winzip-downloads/",
-            "https://www.portablefreeware.com/?id=WinZip",
-            "https://www.oldversion.com/windows/winzip/",
-            "https://www.filecroco.com/download-winzip/",
-            "https://www.snapfiles.com/get/winzip.html",
-            "https://www.free-codecs.com/download/WinZip.htm",
-            "https://www.filepuma.com/download/winzip_28.0-23542/",
-            "https://www.filehippo.com/download_winzip/",
-            "https://www.updatestar.com/en/directdownload/winzip/28.0",
-            "https://www.download3k.com/Install-WinZip.html",
-            "https://www.windows7download.com/free-win7-winzip/",
-            "https://www.softwareok.com/?seite=Freeware/WinZip",
-            "https://www.heise.de/download/product/winzip",
-            "https://www.chip.de/downloads/WinZip_130148.html",
-            "https://www.computerbild.de/download/WinZip-126572.html",
-            "https://www.tucows.com/preview/507688/WinZip",
-            "https://www.brothersoft.com/winzip-62572.html",
-            "https://www.soft32.com/download_winzip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4040.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/winzip-4040",
-            "https://www.pcmag.com/downloads/winzip",
-            "https://www.zdnet.com/downloads/winzip/",
-            "https://www.softonic.fr/telecharger/winzip/windows"
-        )
-        InstallPath = "C:\Program Files\WinZip"
-        Command = "winzip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\WinZip\winzip.exe' -h"
-    },
-    @{
-        Name = "HaoZip"
-        Urls = @(
-            "https://www.haosoft.com/download/HaoZipSetup.exe",
-            "https://download.cnet.com/HaoZip/3000-2250_4-75914102.html",
-            "https://www.filehorse.com/download-haozip/",
-            "https://sourceforge.net/projects/haozip/files/HaoZip/6.4/HaoZipSetup.exe/download",
-            "https://web.archive.org/web/20250301000000*/https://www.haosoft.com/download/HaoZipSetup.exe",
-            "https://www.softonic.com/download/haozip/windows",
-            "https://www.fosshub.com/HaoZip.html/HaoZipSetup.exe",
-            "https://www.majorgeeks.com/files/details/haozip.html",
-            "https://www.ninite.com/haozip/",
-            "https://www.getintopc.com/softwares/compression/haozip-free-download/",
-            "https://www.techspot.com/downloads/29-haozip.html",
-            "https://www.ghacks.net/haozip-downloads/",
-            "https://www.portablefreeware.com/?id=HaoZip",
-            "https://www.oldversion.com/windows/haozip/",
-            "https://www.filecroco.com/download-haozip/",
-            "https://www.snapfiles.com/get/haozip.html",
-            "https://www.free-codecs.com/download/HaoZip.htm",
-            "https://www.filepuma.com/download/haozip_6.4-23543/",
-            "https://www.filehippo.com/download_haozip/",
-            "https://www.updatestar.com/en/directdownload/haozip/6.4",
-            "https://www.download3k.com/Install-HaoZip.html",
-            "https://www.windows7download.com/free-win7-haozip/",
-            "https://www.softwareok.com/?seite=Freeware/HaoZip",
-            "https://www.heise.de/download/product/haozip",
-            "https://www.chip.de/downloads/HaoZip_130149.html",
-            "https://www.computerbild.de/download/HaoZip-126573.html",
-            "https://www.tucows.com/preview/507689/HaoZip",
-            "https://www.brothersoft.com/haozip-62573.html",
-            "https://www.soft32.com/download_haozip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4041.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/haozip-4041",
-            "https://www.pcmag.com/downloads/haozip",
-            "https://www.zdnet.com/downloads/haozip/",
-            "https://www.softonic.fr/telecharger/haozip/windows"
-        )
-        InstallPath = "C:\Program Files\HaoZip"
-        Command = "HaoZip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\HaoZip\HaoZip.exe' -h"
-    },
-    @{
-        Name = "Zipeg"
-        Urls = @(
-            "https://www.zipeg.com/download/ZipegSetup.exe",
-            "https://sourceforge.net/projects/zipeg/files/Zipeg/2.9/ZipegSetup.exe/download",
-            "https://www.filehorse.com/download-zipeg/",
-            "https://download.cnet.com/Zipeg/3000-2250_4-10893402.html",
-            "https://web.archive.org/web/20250301000000*/https://www.zipeg.com/download/ZipegSetup.exe",
-            "https://www.softonic.com/download/zipeg/windows",
-            "https://www.fosshub.com/Zipeg.html/ZipegSetup.exe",
-            "https://www.majorgeeks.com/files/details/zipeg.html",
-            "https://www.ninite.com/zipeg/",
-            "https://www.getintopc.com/softwares/compression/zipeg-free-download/",
-            "https://www.techspot.com/downloads/31-zipeg.html",
-            "https://www.ghacks.net/zipeg-downloads/",
-            "https://www.portablefreeware.com/?id=Zipeg",
-            "https://www.oldversion.com/windows/zipeg/",
-            "https://www.filecroco.com/download-zipeg/",
-            "https://www.snapfiles.com/get/zipeg.html",
-            "https://www.free-codecs.com/download/Zipeg.htm",
-            "https://www.filepuma.com/download/zipeg_2.9-23544/",
-            "https://www.filehippo.com/download_zipeg/",
-            "https://www.updatestar.com/en/directdownload/zipeg/2.9",
-            "https://www.download3k.com/Install-Zipeg.html",
-            "https://www.windows7download.com/free-win7-zipeg/",
-            "https://www.softwareok.com/?seite=Freeware/Zipeg",
-            "https://www.heise.de/download/product/zipeg",
-            "https://www.chip.de/downloads/Zipeg_130150.html",
-            "https://www.computerbild.de/download/Zipeg-126574.html",
-            "https://www.tucows.com/preview/507690/Zipeg",
-            "https://www.brothersoft.com/zipeg-62574.html",
-            "https://www.soft32.com/download_zipeg/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4042.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/zipeg-4042",
-            "https://www.pcmag.com/downloads/zipeg",
-            "https://www.zdnet.com/downloads/zipeg/",
-            "https://www.softonic.fr/telecharger/zipeg/windows"
-        )
-        InstallPath = "C:\Program Files\Zipeg"
-        Command = "Zipeg.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\Zipeg\Zipeg.exe' -h"
-    },
-    @{
-        Name = "FreeArc"
-        Urls = @(
-            "https://freearc.org/download/FreeArcSetup.exe",
-            "https://sourceforge.net/projects/freearc/files/FreeArc/0.666/FreeArcSetup.exe/download",
-            "https://www.filehorse.com/download-freearc/",
-            "https://download.cnet.com/FreeArc/3000-2250_4-10893403.html",
-            "https://web.archive.org/web/20250301000000*/https://freearc.org/download/FreeArcSetup.exe",
-            "https://www.softonic.com/download/freearc/windows",
-            "https://www.fosshub.com/FreeArc.html/FreeArcSetup.exe",
-            "https://www.majorgeeks.com/files/details/freearc.html",
-            "https://www.ninite.com/freearc/",
-            "https://www.getintopc.com/softwares/compression/freearc-free-download/",
-            "https://www.techspot.com/downloads/33-freearc.html",
-            "https://www.ghacks.net/freearc-downloads/",
-            "https://www.portablefreeware.com/?id=FreeArc",
-            "https://www.oldversion.com/windows/freearc/",
-            "https://www.filecroco.com/download-freearc/",
-            "https://www.snapfiles.com/get/freearc.html",
-            "https://www.free-codecs.com/download/FreeArc.htm",
-            "https://www.filepuma.com/download/freearc_0.666-23545/",
-            "https://www.filehippo.com/download_freearc/",
-            "https://www.updatestar.com/en/directdownload/freearc/0.666",
-            "https://www.download3k.com/Install-FreeArc.html",
-            "https://www.windows7download.com/free-win7-freearc/",
-            "https://www.softwareok.com/?seite=Freeware/FreeArc",
-            "https://www.heise.de/download/product/freearc",
-            "https://www.chip.de/downloads/FreeArc_130151.html",
-            "https://www.computerbild.de/download/FreeArc-126575.html",
-            "https://www.tucows.com/preview/507691/FreeArc",
-            "https://www.brothersoft.com/freearc-62575.html",
-            "https://www.soft32.com/download_freearc/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4043.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/freearc-4043",
-            "https://www.pcmag.com/downloads/freearc",
-            "https://www.zdnet.com/downloads/freearc/",
-            "https://www.softonic.fr/telecharger/freearc/windows"
-        )
-        InstallPath = "C:\Program Files\FreeArc"
-        Command = "FreeArc.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\FreeArc\FreeArc.exe' -h"
-    },
-    @{
-        Name = "IZArc"
-        Urls = @(
-            "https://www.izarc.org/download/IZArcSetup.exe",
-            "https://sourceforge.net/projects/izarc/files/IZArc/4.5/IZArcSetup.exe/download",
-            "https://www.filehorse.com/download-izarc/",
-            "https://download.cnet.com/IZArc/3000-2250_4-10093404.html",
-            "https://web.archive.org/web/20250301000000*/https://www.izarc.org/download/IZArcSetup.exe",
-            "https://www.softonic.com/download/izarc/windows",
-            "https://www.fosshub.com/IZArc.html/IZArcSetup.exe",
-            "https://www.majorgeeks.com/files/details/izarc.html",
-            "https://www.ninite.com/izarc/",
-            "https://www.getintopc.com/softwares/compression/izarc-free-download/",
-            "https://www.techspot.com/downloads/35-izarc.html",
-            "https://www.ghacks.net/izarc-downloads/",
-            "https://www.portablefreeware.com/?id=IZArc",
-            "https://www.oldversion.com/windows/izarc/",
-            "https://www.filecroco.com/download-izarc/",
-            "https://www.snapfiles.com/get/izarc.html",
-            "https://www.free-codecs.com/download/IZArc.htm",
-            "https://www.filepuma.com/download/izarc_4.5-23546/",
-            "https://www.filehippo.com/download_izarc/",
-            "https://www.updatestar.com/en/directdownload/izarc/4.5",
-            "https://www.download3k.com/Install-IZArc.html",
-            "https://www.windows7download.com/free-win7-izarc/",
-            "https://www.softwareok.com/?seite=Freeware/IZArc",
-            "https://www.heise.de/download/product/izarc",
-            "https://www.chip.de/downloads/IZArc_130152.html",
-            "https://www.computerbild.de/download/IZArc-126576.html",
-            "https://www.tucows.com/preview/507692/IZArc",
-            "https://www.brothersoft.com/izarc-62576.html",
-            "https://www.soft32.com/download_izarc/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4044.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/izarc-4044",
-            "https://www.pcmag.com/downloads/izarc",
-            "https://www.zdnet.com/downloads/izarc/",
-            "https://www.softonic.fr/telecharger/izarc/windows"
-        )
-        InstallPath = "C:\Program Files\IZArc"
-        Command = "IZArc.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\IZArc\IZArc.exe' -h"
-    },
-    @{
-        Name = "TUGZip"
-        Urls = @(
-            "https://www.tugzip.com/download/TUGZipSetup.exe",
-            "https://sourceforge.net/projects/tugzip/files/TUGZip/3.5/TUGZipSetup.exe/download",
-            "https://www.filehorse.com/download-tugzip/",
-            "https://download.cnet.com/TUGZip/3000-2250_4-10893405.html",
-            "https://web.archive.org/web/20250301000000*/https://www.tugzip.com/download/TUGZipSetup.exe",
-            "https://www.softonic.com/download/tugzip/windows",
-            "https://www.fosshub.com/TUGZip.html/TUGZipSetup.exe",
-            "https://www.majorgeeks.com/files/details/tugzip.html",
-            "https://www.ninite.com/tugzip/",
-            "https://www.getintopc.com/softwares/compression/tugzip-free-download/",
-            "https://www.techspot.com/downloads/37-tugzip.html",
-            "https://www.ghacks.net/tugzip-downloads/",
-            "https://www.portablefreeware.com/?id=TUGZip",
-            "https://www.oldversion.com/windows/tugzip/",
-            "https://www.filecroco.com/download-tugzip/",
-            "https://www.snapfiles.com/get/tugzip.html",
-            "https://www.free-codecs.com/download/TUGZip.htm",
-            "https://www.filepuma.com/download/tugzip_3.5-23547/",
-            "https://www.filehippo.com/download_tugzip/",
-            "https://www.updatestar.com/en/directdownload/tugzip/3.5",
-            "https://www.download3k.com/Install-TUGZip.html",
-            "https://www.windows7download.com/free-win7-tugzip/",
-            "https://www.softwareok.com/?seite=Freeware/TUGZip",
-            "https://www.heise.de/download/product/tugzip",
-            "https://www.chip.de/downloads/TUGZip_130153.html",
-            "https://www.computerbild.de/download/TUGZip-126577.html",
-            "https://www.tucows.com/preview/507693/TUGZip",
-            "https://www.brothersoft.com/tugzip-62577.html",
-            "https://www.soft32.com/download_tugzip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4045.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/tugzip-4045",
-            "https://www.pcmag.com/downloads/tugzip",
-            "https://www.zdnet.com/downloads/tugzip/",
-            "https://www.softonic.fr/telecharger/tugzip/windows"
-        )
-        InstallPath = "C:\Program Files\TUGZip"
-        Command = "TUGZip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\TUGZip\TUGZip.exe' -h"
-    },
-    @{
-        Name = "ExtractNow"
-        Urls = @(
-            "https://www.extractnow.com/download/ExtractNowSetup.exe",
-            "https://sourceforge.net/projects/extractnow/files/ExtractNow/4.8/ExtractNowSetup.exe/download",
-            "https://www.filehorse.com/download-extractnow/",
-            "https://download.cnet.com/ExtractNow/3000-2250_4-10893406.html",
-            "https://web.archive.org/web/20250301000000*/https://www.extractnow.com/download/ExtractNowSetup.exe",
-            "https://www.softonic.com/download/extractnow/windows",
-            "https://www.fosshub.com/ExtractNow.html/ExtractNowSetup.exe",
-            "https://www.majorgeeks.com/files/details/extractnow.html",
-            "https://www.ninite.com/extractnow/",
-            "https://www.getintopc.com/softwares/compression/extractnow-free-download/",
-            "https://www.techspot.com/downloads/39-extractnow.html",
-            "https://www.ghacks.net/extractnow-downloads/",
-            "https://www.portablefreeware.com/?id=ExtractNow",
-            "https://www.oldversion.com/windows/extractnow/",
-            "https://www.filecroco.com/download-extractnow/",
-            "https://www.snapfiles.com/get/extractnow.html",
-            "https://www.free-codecs.com/download/ExtractNow.htm",
-            "https://www.filepuma.com/download/extractnow_4.8-23548/",
-            "https://www.filehippo.com/download_extractnow/",
-            "https://www.updatestar.com/en/directdownload/extractnow/4.8",
-            "https://www.download3k.com/Install-ExtractNow.html",
-            "https://www.windows7download.com/free-win7-extractnow/",
-            "https://www.softwareok.com/?seite=Freeware/ExtractNow",
-            "https://www.heise.de/download/product/extractnow",
-            "https://www.chip.de/downloads/ExtractNow_130154.html",
-            "https://www.computerbild.de/download/ExtractNow-126578.html",
-            "https://www.tucows.com/preview/507694/ExtractNow",
-            "https://www.brothersoft.com/extractnow-62578.html",
-            "https://www.soft32.com/download_extractnow/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4046.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/extractnow-4046",
-            "https://www.pcmag.com/downloads/extractnow",
-            "https://www.zdnet.com/downloads/extractnow/",
-            "https://www.softonic.fr/telecharger/extractnow/windows"
-        )
-        InstallPath = "C:\Program Files\ExtractNow"
-        Command = "ExtractNow.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\ExtractNow\ExtractNow.exe' -h"
-    },
-    @{
-        Name = "Universal Extractor"
-        Urls = @(
-            "https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
-            "https://sourceforge.net/projects/uniextract/files/Universal Extractor/1.6/UniversalExtractorSetup.exe/download",
-            "https://www.filehorse.com/download-universal-extractor/",
-            "https://download.cnet.com/Universal-Extractor/3000-2250_4-10893407.html",
-            "https://web.archive.org/web/20250301000000*/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
-            "https://www.softonic.com/download/universal-extractor/windows",
-            "https://www.fosshub.com/UniversalExtractor.html/UniversalExtractorSetup.exe",
-            "https://www.majorgeeks.com/files/details/universal_extractor.html",
-            "https://www.ninite.com/universalextractor/",
-            "https://www.getintopc.com/softwares/compression/universal-extractor-free-download/",
-            "https://www.techspot.com/downloads/41-universal-extractor.html",
-            "https://www.ghacks.net/universal-extractor-downloads/",
-            "https://www.portablefreeware.com/?id=UniversalExtractor",
-            "https://www.oldversion.com/windows/universal-extractor/",
-            "https://www.filecroco.com/download-universal-extractor/",
-            "https://www.snapfiles.com/get/universalextractor.html",
-            "https://www.free-codecs.com/download/UniversalExtractor.htm",
-            "https://www.filepuma.com/download/universalextractor_1.6-23549/",
-            "https://www.filehippo.com/download_universal-extractor/",
-            "https://www.updatestar.com/en/directdownload/universalextractor/1.6",
-            "https://www.download3k.com/Install-Universal-Extractor.html",
-            "https://www.windows7download.com/free-win7-universalextractor/",
-            "https://www.softwareok.com/?seite=Freeware/UniversalExtractor",
-            "https://www.heise.de/download/product/universal-extractor",
-            "https://www.chip.de/downloads/Universal-Extractor_130155.html",
-            "https://www.computerbild.de/download/Universal-Extractor-126579.html",
-            "https://www.tucows.com/preview/507695/Universal-Extractor",
-            "https://www.brothersoft.com/universal-extractor-62579.html",
-            "https://www.soft32.com/download_universal-extractor/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4047.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/universal-extractor-4047",
-            "https://www.pcmag.com/downloads/universal-extractor",
-            "https://www.zdnet.com/downloads/universal-extractor/",
-            "https://www.softonic.fr/telecharger/universal-extractor/windows"
-        )
-        InstallPath = "C:\Program Files\Universal Extractor"
-        Command = "UniExtract.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\Universal Extractor\UniExtract.exe' -h"
-    },
-    @{
-        Name = "ALZip"
-        Urls = @(
-            "https://www.altools.com/download/ALZipSetup.exe",
-            "https://sourceforge.net/projects/alzip/files/ALZip/8.5/ALZipSetup.exe/download",
-            "https://www.filehorse.com/download-alzip/",
-            "https://download.cnet.com/ALZip/3000-2250_4-10893408.html",
-            "https://web.archive.org/web/20250301000000*/https://www.altools.com/download/ALZipSetup.exe",
-            "https://www.softonic.com/download/alzip/windows",
-            "https://www.fosshub.com/ALZip.html/ALZipSetup.exe",
-            "https://www.majorgeeks.com/files/details/alzip.html",
-            "https://www.ninite.com/alzip/",
-            "https://www.getintopc.com/softwares/compression/alzip-free-download/",
-            "https://www.techspot.com/downloads/43-alzip.html",
-            "https://www.ghacks.net/alzip-downloads/",
-            "https://www.portablefreeware.com/?id=ALZip",
-            "https://www.oldversion.com/windows/alzip/",
-            "https://www.filecroco.com/download-alzip/",
-            "https://www.snapfiles.com/get/alzip.html",
-            "https://www.free-codecs.com/download/ALZip.htm",
-            "https://www.filepuma.com/download/alzip_8.5-23550/",
-            "https://www.filehippo.com/download_alzip/",
-            "https://www.updatestar.com/en/directdownload/alzip/8.5",
-            "https://www.download3k.com/Install-ALZip.html",
-            "https://www.windows7download.com/free-win7-alzip/",
-            "https://www.softwareok.com/?seite=Freeware/ALZip",
-            "https://www.heise.de/download/product/alzip",
-            "https://www.chip.de/downloads/ALZip_130156.html",
-            "https://www.computerbild.de/download/ALZip-126580.html",
-            "https://www.tucows.com/preview/507696/ALZip",
-            "https://www.brothersoft.com/alzip-62580.html",
-            "https://www.soft32.com/download_alzip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4048.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/alzip-4048",
-            "https://www.pcmag.com/downloads/alzip",
-            "https://www.zdnet.com/downloads/alzip/",
-            "https://www.softonic.fr/telecharger/alzip/windows"
-        )
-        InstallPath = "C:\Program Files\ALZip"
-        Command = "ALZip.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\ALZip\ALZip.exe' -h"
-    },
-    @{
-        Name = "ZipGenius"
-        Urls = @(
-            "https://www.zipgenius.com/download/ZipGeniusSetup.exe",
-            "https://sourceforge.net/projects/zipgenius/files/ZipGenius/6.3/ZipGeniusSetup.exe/download",
-            "https://www.filehorse.com/download-zipgenius/",
-            "https://download.cnet.com/ZipGenius/3000-2250_4-10893409.html",
-            "https://web.archive.org/web/20250301000000*/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
-            "https://www.softonic.com/download/zipgenius/windows",
-            "https://www.fosshub.com/ZipGenius.html/ZipGeniusSetup.exe",
-            "https://www.majorgeeks.com/files/details/zipgenius.html",
-            "https://www.ninite.com/zipgenius/",
-            "https://www.getintopc.com/softwares/compression/zipgenius-free-download/",
-            "https://www.techspot.com/downloads/45-zipgenius.html",
-            "https://www.ghacks.net/zipgenius-downloads/",
-            "https://www.portablefreeware.com/?id=ZipGenius",
-            "https://www.oldversion.com/windows/zipgenius/",
-            "https://www.filecroco.com/download-zipgenius/",
-            "https://www.snapfiles.com/get/zipgenius.html",
-            "https://www.free-codecs.com/download/ZipGenius.htm",
-            "https://www.filepuma.com/download/zipgenius_6.3-23551/",
-            "https://www.filehippo.com/download_zipgenius/",
-            "https://www.updatestar.com/en/directdownload/zipgenius/6.3",
-            "https://www.download3k.com/Install-ZipGenius.html",
-            "https://www.windows7download.com/free-win7-zipgenius/",
-            "https://www.softwareok.com/?seite=Freeware/ZipGenius",
-            "https://www.heise.de/download/product/zipgenius",
-            "https://www.chip.de/downloads/ZipGenius_130157.html",
-            "https://www.computerbild.de/download/ZipGenius-126581.html",
-            "https://www.tucows.com/preview/507697/ZipGenius",
-            "https://www.brothersoft.com/zipgenius-62581.html",
-            "https://www.soft32.com/download_zipgenius/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4049.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/zipgenius-4049",
-            "https://www.pcmag.com/downloads/zipgenius",
-            "https://www.zdnet.com/downloads/zipgenius/",
-            "https://www.softonic.fr/telecharger/zipgenius/windows"
-        )
-        InstallPath = "C:\Program Files\ZipGenius"
-        Command = "ZipGenius.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\ZipGenius\ZipGenius.exe' -h"
-    },
-    @{
-        Name = "PowerArchiver"
-        Urls = @(
-            "https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
-            "https://sourceforge.net/projects/powerarchiver/files/PowerArchiver/21.0/PowerArchiverSetup.exe/download",
-            "https://www.filehorse.com/download-powerarchiver/",
-            "https://download.cnet.com/PowerArchiver/3000-2250_4-10893410.html",
-            "https://web.archive.org/web/20250301000000*/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
-            "https://www.softonic.com/download/powerarchiver/windows",
-            "https://www.fosshub.com/PowerArchiver.html/PowerArchiverSetup.exe",
-            "https://www.majorgeeks.com/files/details/powerarchiver.html",
-            "https://www.ninite.com/powerarchiver/",
-            "https://www.getintopc.com/softwares/compression/powerarchiver-free-download/",
-            "https://www.techspot.com/downloads/47-powerarchiver.html",
-            "https://www.ghacks.net/powerarchiver-downloads/",
-            "https://www.portablefreeware.com/?id=PowerArchiver",
-            "https://www.oldversion.com/windows/powerarchiver/",
-            "https://www.filecroco.com/download-powerarchiver/",
-            "https://www.snapfiles.com/get/powerarchiver.html",
-            "https://www.free-codecs.com/download/PowerArchiver.htm",
-            "https://www.filepuma.com/download/powerarchiver_21.0-23552/",
-            "https://www.filehippo.com/download_powerarchiver/",
-            "https://www.updatestar.com/en/directdownload/powerarchiver/21.0",
-            "https://www.download3k.com/Install-PowerArchiver.html",
-            "https://www.windows7download.com/free-win7-powerarchiver/",
-            "https://www.softwareok.com/?seite=Freeware/PowerArchiver",
-            "https://www.heise.de/download/product/powerarchiver",
-            "https://www.chip.de/downloads/PowerArchiver_130158.html",
-            "https://www.computerbild.de/download/PowerArchiver-126582.html",
-            "https://www.tucows.com/preview/507698/PowerArchiver",
-            "https://www.brothersoft.com/powerarchiver-62582.html",
-            "https://www.soft32.com/download_powerarchiver/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4050.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/powerarchiver-4050",
-            "https://www.pcmag.com/downloads/powerarchiver",
-            "https://www.zdnet.com/downloads/powerarchiver/",
-            "https://www.softonic.fr/telecharger/powerarchiver/windows"
-        )
-        InstallPath = "C:\Program Files\PowerArchiver"
-        Command = "PowerArchiver.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' -h"
-    },
-    @{
-        Name = "Keka"
-        Urls = @(
-            "https://www.keka.io/download/Keka-1.3.6-windows-x64.exe",
-            "https://github.com/aonez/Keka/releases/download/v1.3.6/Keka-1.3.6-windows-x64.exe",
-            "https://www.filehorse.com/download-keka/",
-            "https://download.cnet.com/Keka/3000-2250_4-10893415.html",
-            "https://web.archive.org/web/20250301000000*/https://www.keka.io/download/Keka-1.3.6-windows-x64.exe",
-            "https://www.softonic.com/download/keka/windows",
-            "https://www.fosshub.com/Keka.html/Keka-1.3.6-windows-x64.exe",
-            "https://www.majorgeeks.com/files/details/keka.html",
-            "https://www.ninite.com/keka/",
-            "https://www.getintopc.com/softwares/compression/keka-free-download/",
-            "https://www.techspot.com/downloads/49-keka.html",
-            "https://www.ghacks.net/keka-downloads/",
-            "https://www.portablefreeware.com/?id=Keka",
-            "https://www.oldversion.com/windows/keka/",
-            "https://www.filecroco.com/download-keka/",
-            "https://www.snapfiles.com/get/keka.html",
-            "https://www.free-codecs.com/download/Keka.htm",
-            "https://www.filepuma.com/download/keka_1.3.6-23553/",
-            "https://www.filehippo.com/download_keka/",
-            "https://www.updatestar.com/en/directdownload/keka/1.3.6",
-            "https://www.download3k.com/Install-Keka.html",
-            "https://www.windows7download.com/free-win7-keka/",
-            "https://www.softwareok.com/?seite=Freeware/Keka",
-            "https://www.heise.de/download/product/keka",
-            "https://www.chip.de/downloads/Keka_130159.html",
-            "https://www.computerbild.de/download/Keka-126583.html",
-            "https://www.tucows.com/preview/507699/Keka",
-            "https://www.brothersoft.com/keka-62583.html",
-            "https://www.soft32.com/download_keka/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4051.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/keka-4051",
-            "https://www.pcmag.com/downloads/keka",
-            "https://www.zdnet.com/downloads/keka/",
-            "https://www.softonic.fr/telecharger/keka/windows"
-        )
-        InstallPath = "C:\Program Files\Keka"
-        Command = "Keka.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\Keka\Keka.exe' --help"
-    },
-    @{
-        Name = "RAR Extractor"
-        Urls = @(
-            "https://www.rarextractor.com/download/RARExtractorSetup.exe",
-            "https://sourceforge.net/projects/rarextractor/files/1.0/RARExtractorSetup.exe/download",
-            "https://www.filehorse.com/download-rar-extractor/",
-            "https://download.cnet.com/RAR-Extractor/3000-2250_4-10893416.html",
-            "https://web.archive.org/web/20250301000000*/https://www.rarextractor.com/download/RARExtractorSetup.exe",
-            "https://www.softonic.com/download/rar-extractor/windows",
-            "https://www.fosshub.com/RAR-Extractor.html/RARExtractorSetup.exe",
-            "https://www.majorgeeks.com/files/details/rar_extractor.html",
-            "https://www.ninite.com/rarextractor/",
-            "https://www.getintopc.com/softwares/compression/rar-extractor-free-download/",
-            "https://www.techspot.com/downloads/51-rar-extractor.html",
-            "https://www.ghacks.net/rar-extractor-downloads/",
-            "https://www.portablefreeware.com/?id=RARExtractor",
-            "https://www.oldversion.com/windows/rar-extractor/",
-            "https://www.filecroco.com/download-rar-extractor/",
-            "https://www.snapfiles.com/get/rarextractor.html",
-            "https://www.free-codecs.com/download/RAR-Extractor.htm",
-            "https://www.filepuma.com/download/rarextractor_1.0-23554/",
-            "https://www.filehippo.com/download_rar-extractor/",
-            "https://www.updatestar.com/en/directdownload/rarextractor/1.0",
-            "https://www.download3k.com/Install-RAR-Extractor.html",
-            "https://www.windows7download.com/free-win7-rar-extractor/",
-            "https://www.softwareok.com/?seite=Freeware/RARExtractor",
-            "https://www.heise.de/download/product/rar-extractor",
-            "https://www.chip.de/downloads/RAR-Extractor_130160.html",
-            "https://www.computerbild.de/download/RAR-Extractor-126584.html",
-            "https://www.tucows.com/preview/507700/RAR-Extractor",
-            "https://www.brothersoft.com/rar-extractor-62584.html",
-            "https://www.soft32.com/download_rar-extractor/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4052.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/rar-extractor-4052",
-            "https://www.pcmag.com/downloads/rar-extractor",
-            "https://www.zdnet.com/downloads/rar-extractor/",
-            "https://www.softonic.fr/telecharger/rar-extractor/windows"
-        )
-        InstallPath = "C:\Program Files\RAR Extractor"
-        Command = "RARExtractor.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\RAR Extractor\RARExtractor.exe' -h"
-    },
-    @{
-        Name = "UnRarX"
-        Urls = @(
-            "https://www.unrarx.com/download/UnRarXSetup.exe",
-            "https://sourceforge.net/projects/unrarx/files/1.5/UnRarXSetup.exe/download",
-            "https://www.filehorse.com/download-unrarx/",
-            "https://download.cnet.com/UnRarX/3000-2250_4-10893417.html",
-            "https://web.archive.org/web/20250301000000*/https://www.unrarx.com/download/UnRarXSetup.exe",
-            "https://www.softonic.com/download/unrarx/windows",
-            "https://www.fosshub.com/UnRarX.html/UnRarXSetup.exe",
-            "https://www.majorgeeks.com/files/details/unrarx.html",
-            "https://www.ninite.com/unrarx/",
-            "https://www.getintopc.com/softwares/compression/unrarx-free-download/",
-            "https://www.techspot.com/downloads/53-unrarx.html",
-            "https://www.ghacks.net/unrarx-downloads/",
-            "https://www.portablefreeware.com/?id=UnRarX",
-            "https://www.oldversion.com/windows/unrarx/",
-            "https://www.filecroco.com/download-unrarx/",
-            "https://www.snapfiles.com/get/unrarx.html",
-            "https://www.free-codecs.com/download/UnRarX.htm",
-            "https://www.filepuma.com/download/unrarx_1.5-23555/",
-            "https://www.filehippo.com/download_unrarx/",
-            "https://www.updatestar.com/en/directdownload/unrarx/1.5",
-            "https://www.download3k.com/Install-UnRarX.html",
-            "https://www.windows7download.com/free-win7-unrarx/",
-            "https://www.softwareok.com/?seite=Freeware/UnRarX",
-            "https://www.heise.de/download/product/unrarx",
-            "https://www.chip.de/downloads/UnRarX_130161.html",
-            "https://www.computerbild.de/download/UnRarX-126585.html",
-            "https://www.tucows.com/preview/507701/UnRarX",
-            "https://www.brothersoft.com/unrarx-62585.html",
-            "https://www.soft32.com/download_unrarx/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4053.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/unrarx-4053",
-            "https://www.pcmag.com/downloads/unrarx",
-            "https://www.zdnet.com/downloads/unrarx/",
-            "https://www.softonic.fr/telecharger/unrarx/windows"
-        )
-        InstallPath = "C:\Program Files\UnRarX"
-        Command = "UnRarX.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\UnRarX\UnRarX.exe' -h"
-    },
-    @{
-        Name = "IZArc2Go"
-        Urls = @(
-            "https://www.izarc.org/download/IZArc2GoSetup.exe",
-            "https://sourceforge.net/projects/izarc/files/IZArc2Go/4.5/IZArc2GoSetup.exe/download",
-            "https://www.filehorse.com/download-izarc2go/",
-            "https://download.cnet.com/IZArc2Go/3000-2250_4-10893418.html",
-            "https://web.archive.org/web/20250301000000*/https://www.izarc.org/download/IZArc2GoSetup.exe",
-            "https://www.softonic.com/download/izarc2go/windows",
-            "https://www.fosshub.com/IZArc2Go.html/IZArc2GoSetup.exe",
-            "https://www.majorgeeks.com/files/details/izarc2go.html",
-            "https://www.ninite.com/izarc2go/",
-            "https://www.getintopc.com/softwares/compression/izarc2go-free-download/",
-            "https://www.techspot.com/downloads/55-izarc2go.html",
-            "https://www.ghacks.net/izarc2go-downloads/",
-            "https://www.portablefreeware.com/?id=IZArc2Go",
-            "https://www.oldversion.com/windows/izarc2go/",
-            "https://www.filecroco.com/download-izarc2go/",
-            "https://www.snapfiles.com/get/izarc2go.html",
-            "https://www.free-codecs.com/download/IZArc2Go.htm",
-            "https://www.filepuma.com/download/izarc2go_4.5-23556/",
-            "https://www.filehippo.com/download_izarc2go/",
-            "https://www.updatestar.com/en/directdownload/izarc2go/4.5",
-            "https://www.download3k.com/Install-IZArc2Go.html",
-            "https://www.windows7download.com/free-win7-izarc2go/",
-            "https://www.softwareok.com/?seite=Freeware/IZArc2Go",
-            "https://www.heise.de/download/product/izarc2go",
-            "https://www.chip.de/downloads/IZArc2Go_130162.html",
-            "https://www.computerbild.de/download/IZArc2Go-126586.html",
-            "https://www.tucows.com/preview/507702/IZArc2Go",
-            "https://www.brothersoft.com/izarc2go-62586.html",
-            "https://www.soft32.com/download_izarc2go/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4054.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/izarc2go-4054",
-            "https://www.pcmag.com/downloads/izarc2go",
-            "https://www.zdnet.com/downloads/izarc2go/",
-            "https://www.softonic.fr/telecharger/izarc2go/windows"
-        )
-        InstallPath = "C:\Program Files\IZArc2Go"
-        Command = "IZArc2Go.exe"
-        InstallArgs = "/S"
-        TestCommand = "& 'C:\Program Files\IZArc2Go\IZArc2Go.exe' -h"
-    },
-    @{
-        Name = "DirectX SDK Extractor (7-Zip)"
-        Urls = @(
-            "https://www.7-zip.org/a/7z2409-x64.exe",
-            "https://sourceforge.net/projects/sevenzip/files/7-Zip/24.09/7z2409-x64.exe/download",
-            "https://github.com/ip7z/7zip/releases/download/24.09/7z2409-x64.exe",
-            "https://web.archive.org/web/20241129000000*/https://www.7-zip.org/a/7z2409-x64.exe",
-            "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
-            "https://www.filehorse.com/download-7-zip-64/",
-            "https://www.softonic.com/download/7-zip/windows",
-            "https://www.fosshub.com/7-Zip.html/7z2409-x64.exe",
-            "https://www.majorgeeks.com/files/details/7_zip.html",
-            "https://www.ninite.com/7zip/",
-            "https://www.getintopc.com/softwares/compression/7-zip-free-download/",
-            "https://www.techspot.com/downloads/15-7-zip.html",
-            "https://www.ghacks.net/7-zip-downloads/",
-            "https://www.portablefreeware.com/?id=7-Zip",
-            "https://www.oldversion.com/windows/7-zip/",
-            "https://www.filecroco.com/download-7-zip/",
-            "https://www.snapfiles.com/get/7zip.html",
-            "https://www.free-codecs.com/download/7-Zip.htm",
-            "https://www.filepuma.com/download/7-zip_24.09-23537/",
-            "https://www.filehippo.com/download_7-zip/",
-            "https://www.updatestar.com/en/directdownload/7-zip/24.09",
-            "https://www.download3k.com/Install-7-Zip.html",
-            "https://www.windows7download.com/free-win7-7-zip/",
-            "https://www.softwareok.com/?seite=Freeware/7-Zip",
-            "https://www.heise.de/download/product/7-zip",
-            "https://www.chip.de/downloads/7-Zip_12998992.html",
-            "https://www.computerbild.de/download/7-Zip-126567.html",
-            "https://www.tucows.com/preview/507683/7-Zip",
-            "https://www.brothersoft.com/7-zip-62567.html",
-            "https://www.soft32.com/download_7-zip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4035.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/7-zip-4035",
-            "https://www.pcmag.com/downloads/7-zip",
-            "https://www.zdnet.com/downloads/7-zip/",
-            "https://www.softonic.fr/telecharger/7-zip/windows"
-        )
-        InstallPath = "C:\Program Files\7-Zip"
-        Command = "7z"
-        InstallArgs = "/S"
-        TestCommand = "7z --help"
-        SdkTarget = "DirectX SDK"
-    },
-    @{
-        Name = "DirectX SDK Extractor (WinRAR)"
-        Urls = @(
-            "https://www.rarlab.com/rar/winrar-x64-702.exe",
-            "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-702.exe",
-            "https://sourceforge.net/projects/winrar/files/WinRAR/7.02/winrar-x64-702.exe/download",
-            "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
-            "https://www.filehorse.com/download-winrar-64/",
-            "https://web.archive.org/web/20250201000000*/https://www.rarlab.com/rar/winrar-x64-702.exe",
-            "https://www.softonic.com/download/winrar/windows",
-            "https://www.fosshub.com/WinRAR.html/winrar-x64-702.exe",
-            "https://www.majorgeeks.com/files/details/winrar.html",
-            "https://www.ninite.com/winrar/",
-            "https://www.getintopc.com/softwares/compression/winrar-free-download/",
-            "https://www.techspot.com/downloads/19-winrar.html",
-            "https://www.ghacks.net/winrar-downloads/",
-            "https://www.portablefreeware.com/?id=WinRAR",
-            "https://www.oldversion.com/windows/winrar/",
-            "https://www.filecroco.com/download-winrar/",
-            "https://www.snapfiles.com/get/winrar.html",
-            "https://www.free-codecs.com/download/WinRAR.htm",
-            "https://www.filepuma.com/download/winrar_7.02-23538/",
-            "https://www.filehippo.com/download_winrar/",
-            "https://www.updatestar.com/en/directdownload/winrar/7.02",
-            "https://www.download3k.com/Install-WinRAR.html",
-            "https://www.windows7download.com/free-win7-winrar/",
-            "https://www.softwareok.com/?seite=Freeware/WinRAR",
-            "https://www.heise.de/download/product/winrar",
-            "https://www.chip.de/downloads/WinRAR_130144.html",
-            "https://www.computerbild.de/download/WinRAR-126568.html",
-            "https://www.tucows.com/preview/507684/WinRAR",
-            "https://www.brothersoft.com/winrar-62568.html",
-            "https://www.soft32.com/download_winrar/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4036.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/winrar-4036",
-            "https://www.pcmag.com/downloads/winrar",
-            "https://www.zdnet.com/downloads/winrar/",
-            "https://www.softonic.fr/telecharger/winrar/windows"
-        )
-        InstallPath = "C:\Program Files\WinRAR"
-        Command = "rar"
-        InstallArgs = "/S"
-        TestCommand = "rar -?"
-        SdkTarget = "DirectX SDK"
-    },
-    @{
-        Name = "DirectX SDK Extractor (PeaZip)"
-        Urls = @(
-            "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
-            "https://www.filehorse.com/download-peazip-64/",
-            "https://web.archive.org/web/20250301000000*/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
-            "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe",
-            "https://www.softonic.com/download/peazip/windows",
-            "https://www.fosshub.com/PeaZip.html/peazip-10.0.0.WIN64.exe",
-            "https://www.majorgeeks.com/files/details/peazip.html",
-            "https://www.ninite.com/peazip/",
-            "https://www.getintopc.com/softwares/compression/peazip-free-download/",
-            "https://www.techspot.com/downloads/21-peazip.html",
-            "https://www.ghacks.net/peazip-downloads/",
-            "https://www.portablefreeware.com/?id=PeaZip",
-            "https://www.oldversion.com/windows/peazip/",
-            "https://www.filecroco.com/download-peazip/",
-            "https://www.snapfiles.com/get/peazip.html",
-            "https://www.free-codecs.com/download/PeaZip.htm",
-            "https://www.filepuma.com/download/peazip_10.0.0-23539/",
-            "https://www.filehippo.com/download_peazip/",
-            "https://www.updatestar.com/en/directdownload/peazip/10.0.0",
-            "https://www.download3k.com/Install-PeaZip.html",
-            "https://www.windows7download.com/free-win7-peazip/",
-            "https://www.softwareok.com/?seite=Freeware/PeaZip",
-            "https://www.heise.de/download/product/peazip",
-            "https://www.chip.de/downloads/PeaZip_130145.html",
-            "https://www.computerbild.de/download/PeaZip-126569.html",
-            "https://www.tucows.com/preview/507685/PeaZip",
-            "https://www.brothersoft.com/peazip-62569.html",
-            "https://www.soft32.com/download_peazip/",
-            "https://www.01net.com/telecharger/windows/Utilitaire/compression_decompression/fiches/4037.html",
-            "https://www.logitheque.com/en/softwares/windows/compression/peazip-4037",
-            "https://www.pcmag.com/downloads/peazip",
-            "https://www.zdnet.com/downloads/peazip/",
-            "https://www.softonic.fr/telecharger/peazip/windows"
-        )
-        InstallPath = "C:\Program Files\PeaZip"
-        Command = "peazip.exe"
-        InstallArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
-        TestCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -h"
-        SdkTarget = "DirectX SDK"
-    },
-    @{
-        Name = "DirectX SDK Extractor (Bandizip)"
-        Urls = @(
-            "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.bandizip.com/dl/BANDIZIP-SETUP-7.33.EXE",
-            "https://sourceforge.net/projects/bandizip/files/Bandizip/7.33/BANDIZIP-SETUP-7.33.EXE/download",
-            "https://web.archive.org/web/20250401000000*/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.filehorse.com/download-bandizip/",
-            "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html",
-            "https://www.softonic.com/download/bandizip/windows",
-            "https://www.fosshub.com/Bandizip.html/BANDIZIP-SETUP-7.33.EXE",
-            "https://www.majorgeeks.com/files/details/bandizip.html",
-            "https://www.ninite.com/bandizip/",
-            "https://www.getintopc.com/softwares/compression/bandizip-free-download/",
-            "https://www.techspot.com/downloads/23-bandizip.html",
-            "https://www.ghacks.net/bandizip-downloads/",
-            "https://www.portablefreeware.com/?id=Bandizip",
+        $success = $false
+        foreach ($url in $urls) {
+          echo "Attempting to download DirectX SDK from $url..."
+          curl -L -o dxsdk.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
+          $httpStatus = $LASTEXITCODE
+          if ($httpStatus -eq 0) {
+            $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
+            if ($fileSize -gt 500000000) {
+              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
+              $success = $true
+              break
+            } else {
+              echo "File too small ($fileSize bytes), trying next mirror..."
+              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+            }
+          } else {
+            echo "Download failed with status $httpStatus, trying next mirror..."
+            Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+          }
+        }
+        if (-not $success) {
+          echo "All download attempts failed for DirectX SDK"
+          exit 1
+        }
+
+    # Extract DirectX SDK using archivers
+    - name: Extract DirectX SDK
+      shell: pwsh
+      run: |
+        if (Test-Path dxsdk.exe) {
+          mkdir dxsdk
+          $extractSuccess = $false
+          
+          $archivers = @(
+              @{ Name = "7-Zip"; Command = "7z x dxsdk.exe -odxsdk"; InstallPath = "C:\Program Files\7-Zip" },
+              @{ Name = "WinRAR"; Command = "rar x dxsdk.exe dxsdk\"; InstallPath = "C:\Program Files\WinRAR" },
+              @{ Name = "PeaZip"; Command = "& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; InstallPath = "C:\Program Files\PeaZip" },
+              @{ Name = "Bandizip"; Command = "& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o:dxsdk"; InstallPath = "C:\Program Files\Bandizip" },
+              @{ Name = "NanaZip"; Command = "& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o:dxsdk"; InstallPath = "C:\Program Files\NanaZip" },
+              @{ Name = "WinZip"; Command = "& 'C:\Program Files\WinZip\winzip.exe' -e dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\WinZip" },
+              @{ Name = "HaoZip"; Command = "& 'C:\Program Files\HaoZip\HaoZip.exe' x dxsdk.exe -o dxsdk"; InstallPath = "C:\Program Files\HaoZip" },
+              @{ Name = "Zipeg"; Command = "& 'C:\Program Files\Zipeg\Zipeg.exe' dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\Zipeg" },
+              @{ Name = "FreeArc"; Command = "& 'C:\Program Files\FreeArc\FreeArc.exe' x dxsdk.exe -o dxsdk"; InstallPath = "C:\Program Files\FreeArc" },
+              @{ Name = "IZArc"; Command = "& 'C:\Program Files\IZArc\IZArc.exe' -e dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\IZArc" },
+              @{ Name = "TUGZip"; Command = "& 'C:\Program Files\TUGZip\TUGZip.exe' -x dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\TUGZip" },
+              @{ Name = "ExtractNow"; Command = "& 'C:\Program Files\ExtractNow\ExtractNow.exe' dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\ExtractNow" },
+              @{ Name = "Universal Extractor"; Command = "& 'C:\Program Files\Universal Extractor\UniExtract.exe' dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\Universal Extractor" },
+              @{ Name = "ALZip"; Command = "& 'C:\Program Files\ALZip\ALZip.exe' -x dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\ALZip" },
+              @{ Name = "ZipGenius"; Command = "& 'C:\Program Files\ZipGenius\ZipGenius.exe' -e dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\ZipGenius" },
+              @{ Name = "PowerArchiver"; Command = "& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' -extract dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\PowerArchiver" },
+              @{ Name = "Keka"; Command = "& 'C:\Program Files\Keka\Keka.exe' -extract dxsdk.exe -o dxsdk"; InstallPath = "C:\Program Files\Keka" },
+              @{ Name = "RAR Extractor"; Command = "& 'C:\Program Files\RAR Extractor\RARExtractor.exe' dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\RAR Extractor" },
+              @{ Name = "UnRarX"; Command = "& 'C:\Program Files\UnRarX\UnRarX.exe' -x dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\UnRarX" },
+              @{
