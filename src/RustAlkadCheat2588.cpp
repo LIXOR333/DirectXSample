@@ -8,7 +8,6 @@
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 #include <MinHook.h>
-#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <thread>
@@ -34,9 +33,8 @@ static IDXGISwapChain* g_pSwapChain = nullptr;
 static ID3D11RenderTargetView* g_pRenderTargetView = nullptr;
 static HANDLE g_hProcess = GetCurrentProcess();
 static DWORD64 g_baseAddr = 0x7FF60000;
-static bool g_internetEnabled = false;
 static bool g_menuOpen = true;
-static std::string g_updateStatus = "Idle";
+static std::string g_updateStatus = "Offline mode (no updates)";
 static json g_config;
 
 // Feature toggles (100+ features)
@@ -47,7 +45,7 @@ struct Features {
     bool infinite_ammo = false, fast_reload = false, godmode = false;
     bool no_spread = false, bullet_tracer = false, auto_farm = false;
     bool wallhack = false, chams = false, radar = false;
-    bool auto_update = true, auto_dump = true;
+    bool auto_update = false, auto_dump = true;
     float aim_fov = 90.0f, aim_speed = 0.2f;
     float silent_fov = 90.0f, silent_speed = 0.2f;
     float speed_multiplier = 1.0f;
@@ -168,102 +166,6 @@ void AutoDumpOffsets() {
         validFile.close();
     }
     lastDump = time(nullptr);
-}
-
-// Auto-updater with offset fetching
-void AutoUpdate() {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        g_updateStatus = "CURL init failed, fuck it!";
-        return;
-    }
-    std::string response;
-    curl_easy_setopt(curl, CURLOPT_URL, "https://raw.githubusercontent.com/yourusername/rust-alkad-cheat/main/update.json");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        g_updateStatus = "Update failed: " + std::string(curl_easy_strerror(res));
-        curl_easy_cleanup(curl);
-        return;
-    }
-    curl_easy_cleanup(curl);
-    try {
-        json update = json::parse(response);
-        if (update["version"] > "1.0.0") {
-            g_updateStatus = "Updating to " + update["version"].get<std::string>();
-            // Update offsets from JSON
-            if (update.contains("offsets")) {
-                std::ofstream updateFile("offsets_update.txt", std::ios::app);
-                updateFile << "Offsets updated from server at " << std::ctime(&time(nullptr)) << "\n";
-                for (auto& offset : g_offsets) {
-                    if (update["offsets"].contains(offset.name)) {
-                        DWORD64 newOffset = update["offsets"][offset.name].get<DWORD64>();
-                        if (newOffset != offset.value) {
-                            updateFile << "Updated " << offset.name << ": 0x" << std::hex << newOffset 
-                                       << " (was 0x" << offset.value << ")\n";
-                            offset.value = newOffset;
-                        }
-                    }
-                }
-                updateFile.close();
-            }
-            // Simulate DLL update
-            std::ofstream newFile("new_cheat.dll", std::ios::binary);
-            newFile << "Updated content";
-            newFile.close();
-            g_updateStatus = "Update complete, ready to fuck shit up!";
-        }
-    } catch (...) {
-        g_updateStatus = "Parse error, what a fucking mess!";
-    }
-}
-
-// Download libraries
-void DownloadLibraries() {
-    std::vector<std::pair<std::string, std::vector<std::string>>> libs = {
-        {"imgui.zip", {
-            "https://github.com/ocornut/imgui/archive/refs/heads/master.zip",
-            "https://mirror.ghproxy.com/https://github.com/ocornut/imgui/archive/refs/heads/master.zip"
-        }},
-        {"minhook.zip", {
-            "https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip",
-            "https://mirror.ghproxy.com/https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip"
-        }},
-        {"curl.zip", {
-            "https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip",
-            "https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip"
-        }},
-        {"zlib.zip", {
-            "https://zlib.net/zlib1218.zip",
-            "https://github.com/madler/zlib/releases/download/v1.2.13/zlib1213.zip"
-        }},
-        {"json.zip", {
-            "https://github.com/nlohmann/json/archive/refs/heads/develop.zip",
-            "https://mirror.ghproxy.com/https://github.com/nlohmann/json/archive/refs/heads/develop.zip"
-        }}
-    };
-    for (const auto& lib : libs) {
-        bool success = false;
-        for (const auto& url : lib.second) {
-            CURL* curl = curl_easy_init();
-            if (curl) {
-                std::ofstream out(lib.first, std::ios::binary);
-                curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-                curl_easy_setopt(curl, CURLOPT_WRITEDATA, &out);
-                if (curl_easy_perform(curl) == CURLE_OK) {
-                    success = true;
-                }
-                curl_easy_cleanup(curl);
-                out.close();
-                if (success) break;
-            }
-        }
-        if (success) {
-            std::system(("unzip " + lib.first).c_str());
-        }
-    }
 }
 
 // Initialize DirectX11
@@ -440,7 +342,6 @@ void RenderLoop() {
     ImGui::NewFrame();
 
     if (g_features.auto_dump) AutoDumpOffsets();
-    if (g_features.auto_update && g_internetEnabled) AutoUpdate();
 
     DWORD64 inputAddr;
     if (!ReadMemory(g_baseAddr + DecryptOffset(g_offsets[0].value) + DecryptOffset(g_offsets[3].value), &inputAddr, sizeof(DWORD64)) || !inputAddr) {
@@ -500,9 +401,6 @@ void MainThread() {
         return;
     }
 
-    DownloadLibraries();
-    curl_global_init(CURL_GLOBAL_ALL);
-
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
     while (msg.message != WM_QUIT) {
@@ -510,15 +408,13 @@ void MainThread() {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        if (GetAsyncKeyState(VK_F9) & 1) std::thread(AutoUpdate).detach();
-        if (GetAsyncKeyState(VK_F10) & 1) g_internetEnabled = !g_internetEnabled;
+        if (GetAsyncKeyState(VK_F9) & 1) MessageBoxA(NULL, "Updates disabled (offline mode)", "Info", MB_OK);
         if (GetAsyncKeyState(VK_INSERT) & 1) g_menuOpen = !g_menuOpen;
         RenderLoop();
         Sleep(1);
     }
 
     CleanupD3D11();
-    curl_global_cleanup();
     DestroyWindow(g_hwnd);
     CloseHandle(g_hProcess);
 }
@@ -530,10 +426,4 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         std::thread(MainThread).detach();
     }
     return TRUE;
-}
-
-// Write callback for CURL
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    ((std::string*)userp)->append((char*)contents, size * nmemb);
-    return size * nmemb;
 }
