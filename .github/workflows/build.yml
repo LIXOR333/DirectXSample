@@ -34,7 +34,7 @@ jobs:
     - name: Download and set up archivers
       shell: pwsh
       run: |
-        echo "Installing archivers at 15:56 MSK, 18 May 2025..."
+        echo "Installing archivers at 04:06 PM MSK, 18 May 2025..."
         $archiver = ""
         $success = $false
 
@@ -1048,4 +1048,5 @@ jobs:
 
           foreach ($arch in $archivers) {
               if ($extractSuccess) { break }
-              if ($env:ARCHIVER
+              if ($env:ARCHIVER -eq $arch.Name) {
+                  echo "Extracting with $($
