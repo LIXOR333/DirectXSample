@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45  # Увеличил таймаут для повторных попыток
 
     steps:
       - name: Checkout code
@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 14:59 MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 15:06 MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 14:59 MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 15:06 MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 14:59 MSK, 18 May 2025..."
+          echo "Installing MinGW at 15:06 MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -73,7 +73,7 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 14:59 MSK, 18 May 2025..."
+          echo "Downloading DirectX SDK at 15:06 MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -81,33 +81,40 @@ jobs:
             "https://web.archive.org/web/20160330101053/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
           )
           $success = $false
+          $maxAttempts = 5
           foreach ($url in $urls) {
             echo "Attempting to download from $url..."
-            curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
-            if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
-              $fileSize = (Get-Item dxsdk.exe).Length
-              if ($fileSize -gt 500000000) {
-                echo "DirectX SDK downloaded successfully, size $fileSize bytes"
-                $success = $true
-                break
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
+              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
+                $fileSize = (Get-Item dxsdk.exe).Length
+                echo "Downloaded file size: $fileSize bytes"
+                if ($fileSize -gt 500000000) {
+                  echo "DirectX SDK downloaded successfully, size $fileSize bytes"
+                  $success = $true
+                  break
+                } else {
+                  echo "Downloaded file too small ($fileSize bytes), retrying attempt $attempt of $maxAttempts..."
+                  Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+                }
               } else {
-                echo "Downloaded file too small, size $fileSize bytes, trying next mirror..."
+                echo "Download failed with exit code $LASTEXITCODE, retrying attempt $attempt of $maxAttempts..."
                 Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
               }
-            } else {
-              echo "Download failed with exit code $LASTEXITCODE, trying next mirror..."
-              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 2
             }
+            if ($success) { break }
+            echo "Failed to download from $url after $maxAttempts attempts, trying next mirror..."
           }
           if (-not $success) {
-            echo "All download attempts failed for DirectX SDK"
+            echo "All download attempts failed for DirectX SDK after exhausting all mirrors and attempts"
             exit 1
           }
 
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 14:59 MSK, 18 May 2025..."
+          echo "Extracting DirectX SDK at 15:06 MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
@@ -132,21 +139,45 @@ jobs:
 
           # Проверяем содержимое dxsdk.exe
           echo "Checking contents of dxsdk.exe with 7-Zip..."
-          7z l dxsdk.exe -r
+          $checkResult = 7z l dxsdk.exe -r 2>&1
           if ($LASTEXITCODE -ne 0) {
-            echo "Failed to list contents of dxsdk.exe with 7-Zip, exit code $LASTEXITCODE"
+            echo "Failed to list contents of dxsdk.exe with 7-Zip, output: $checkResult"
             exit 1
           }
+          echo "Contents check succeeded, sample output: $checkResult"
 
           # Пробуем распаковать dxsdk.exe с помощью 7-Zip
           echo "Attempting to extract dxsdk.exe with 7-Zip..."
-          7z x dxsdk.exe -o"dxsdk" -y
+          $maxExtractAttempts = 3
+          for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+            7z x dxsdk.exe -o"dxsdk" -y
+            if ($LASTEXITCODE -eq 0) {
+              echo "7-Zip extracted dxsdk.exe successfully on attempt $attempt"
+              break
+            } else {
+              echo "7-Zip failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+              if ($attempt -eq $maxExtractAttempts) {
+                echo "7-Zip failed after $maxExtractAttempts attempts"
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+          }
           if ($LASTEXITCODE -ne 0) {
-            echo "7-Zip failed to extract dxsdk.exe, trying WinRAR..."
-            rar x dxsdk.exe dxsdk\ -y
-            if ($LASTEXITCODE -ne 0) {
-              echo "WinRAR also failed to extract dxsdk.exe, exit code $LASTEXITCODE"
-              exit 1
+            echo "Trying WinRAR to extract dxsdk.exe..."
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              rar x dxsdk.exe dxsdk\ -y
+              if ($LASTEXITCODE -eq 0) {
+                echo "WinRAR extracted dxsdk.exe successfully on attempt $attempt"
+                break
+              } else {
+                echo "WinRAR failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                if ($attempt -eq $maxExtractAttempts) {
+                  echo "WinRAR failed after $maxExtractAttempts attempts"
+                  exit 1
+                }
+                Start-Sleep -Seconds 2
+              }
             }
           }
 
@@ -175,13 +206,35 @@ jobs:
 
           # Распаковываем CAB-файл
           echo "Extracting dxsdk.cab with 7-Zip..."
-          7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
+          for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+            7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
+            if ($LASTEXITCODE -eq 0) {
+              echo "7-Zip extracted dxsdk.cab successfully on attempt $attempt"
+              break
+            } else {
+              echo "7-Zip failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+              if ($attempt -eq $maxExtractAttempts) {
+                echo "7-Zip failed after $maxExtractAttempts attempts"
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+          }
           if ($LASTEXITCODE -ne 0) {
-            echo "7-Zip failed to extract dxsdk.cab, trying WinRAR..."
-            rar x dxsdk\dxsdk.cab dxsdk\extracted\ -y
-            if ($LASTEXITCODE -ne 0) {
-              echo "WinRAR also failed to extract dxsdk.cab, exit code $LASTEXITCODE"
-              exit 1
+            echo "Trying WinRAR to extract dxsdk.cab..."
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              rar x dxsdk\dxsdk.cab dxsdk\extracted\ -y
+              if ($LASTEXITCODE -eq 0) {
+                echo "WinRAR extracted dxsdk.cab successfully on attempt $attempt"
+                break
+              } else {
+                echo "WinRAR failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                if ($attempt -eq $maxExtractAttempts) {
+                  echo "WinRAR failed after $maxExtractAttempts attempts"
+                  exit 1
+                }
+                Start-Sleep -Seconds 2
+              }
             }
           }
 
@@ -199,27 +252,38 @@ jobs:
           } else {
             echo "Include folder not found after extraction. Attempting alternative extraction..."
             echo "Running dxsdk.exe as installer..."
-            Start-Process -FilePath "dxsdk.exe" -ArgumentList "/S /D=dxsdk_install" -Wait -NoNewWindow
-            if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk_install)) {
-              echo "Installer ran successfully, moving files to dxsdk..."
-              Move-Item -Path dxsdk_install\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
-              Remove-Item -Path dxsdk_install -Recurse -Force -ErrorAction SilentlyContinue
-              if (Test-Path dxsdk\Include) {
-                echo "DirectX SDK extracted successfully via installer!"
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              Start-Process -FilePath "dxsdk.exe" -ArgumentList "/S /D=dxsdk_install" -Wait -NoNewWindow
+              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk_install)) {
+                echo "Installer ran successfully on attempt $attempt, moving files to dxsdk..."
+                Move-Item -Path dxsdk_install\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path dxsdk_install -Recurse -Force -ErrorAction SilentlyContinue
+                if (Test-Path dxsdk\Include) {
+                  echo "DirectX SDK extracted successfully via installer on attempt $attempt!"
+                  break
+                } else {
+                  echo "Include folder still not found after installer on attempt $attempt, retrying..."
+                  if ($attempt -eq $maxExtractAttempts) {
+                    echo "Installer failed to create Include folder after $maxExtractAttempts attempts"
+                    exit 1
+                  }
+                  Start-Sleep -Seconds 2
+                }
               } else {
-                echo "Include folder still not found after installer extraction"
-                exit 1
+                echo "Installer failed on attempt $attempt with exit code $LASTEXITCODE, retrying..."
+                if ($attempt -eq $maxExtractAttempts) {
+                  echo "Installer failed after $maxExtractAttempts attempts"
+                  exit 1
+                }
+                Start-Sleep -Seconds 2
               }
-            } else {
-              echo "Installer failed or did not create expected folder, exit code $LASTEXITCODE"
-              exit 1
             }
           }
 
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 14:59 MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 15:06 MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -233,7 +297,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 14:59 MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 15:06 MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
