@@ -1,4 +1,4 @@
-name: Build RustAlkadecheat2588 Cheat DLL
+name: Build Rust Alkad 2588 Cheat DLL
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           imgui-master
           minhook-master
           curl
-          zlib
+          zlib-1.3.1
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('build.yml') }}
 
@@ -36,14 +36,17 @@ jobs:
     - name: Download ImGui
       run: |
         echo Downloading ImGui... >> logs/build.log
-        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from primary >> logs/build.log || (
-          echo Primary ImGui download failed, trying mirror... >> logs/build.log
-          curl -L -o imgui.zip https://mirror.ghproxy.com/https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from mirror >> logs/build.log || (
-            echo ImGui download failed from all sources >> logs/build.log
-            exit 1
+        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from primary (GitHub) >> logs/build.log || (
+          echo Primary ImGui download failed, trying mirror 1... >> logs/build.log
+          curl -L -o imgui.zip https://mirror.ghproxy.com/https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from mirror 1 (ghproxy) >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o imgui.zip https://raw.githubusercontent.com/ocornut/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 2 (raw GitHub) >> logs/build.log || (
+              echo ImGui download failed from all sources >> logs/build.log
+              exit 1
+            )
           )
         )
-        unzip imgui.zip
+        unzip -o imgui.zip
         echo ImGui unzipped >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
@@ -51,14 +54,17 @@ jobs:
     - name: Download MinHook
       run: |
         echo Downloading MinHook... >> logs/build.log
-        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from primary >> logs/build.log || (
-          echo Primary MinHook download failed, trying mirror... >> logs/build.log
-          curl -L -o minhook.zip https://mirror.ghproxy.com/https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from mirror >> logs/build.log || (
-            echo MinHook download failed from all sources >> logs/build.log
-            exit 1
+        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from primary (GitHub) >> logs/build.log || (
+          echo Primary MinHook download failed, trying mirror 1... >> logs/build.log
+          curl -L -o minhook.zip https://mirror.ghproxy.com/https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from mirror 1 (ghproxy) >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o minhook.zip https://codeload.github.com/TsudaKageyu/minhook/zip/refs/heads/master && echo MinHook downloaded from mirror 2 (codeload) >> logs/build.log || (
+              echo MinHook download failed from all sources >> logs/build.log
+              exit 1
+            )
           )
         )
-        unzip minhook.zip
+        unzip -o minhook.zip
         echo MinHook unzipped >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
@@ -66,14 +72,17 @@ jobs:
     - name: Download libcurl
       run: |
         echo Downloading libcurl... >> logs/build.log
-        curl -L -o curl.zip https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from primary >> logs/build.log || (
-          echo Primary libcurl download failed, trying mirror... >> logs/build.log
-          curl -L -o curl.zip https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror >> logs/build.log || (
-            echo libcurl download failed from all sources >> logs/build.log
-            exit 1
+        curl -L -o curl.zip https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from primary (curl.se) >> logs/build.log || (
+          echo Primary libcurl download failed, trying mirror 1... >> logs/build.log
+          curl -L -o curl.zip https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 1 (haxx.se) >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o curl.zip https://bintray.com/artifact/download/curl/downloads/curl-8.10.1-win64.zip && echo libcurl downloaded from mirror 2 (bintray) >> logs/build.log || (
+              echo libcurl download failed from all sources >> logs/build.log
+              exit 1
+            )
           )
         )
-        unzip curl.zip
+        unzip -o curl.zip
         echo libcurl unzipped >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
@@ -81,29 +90,36 @@ jobs:
     - name: Download zlib
       run: |
         echo Downloading zlib... >> logs/build.log
-        curl -L -o zlib.zip https://zlib.net/zlib13.zip && echo zlib downloaded from primary >> logs/build.log || (
-          echo Primary zlib download failed, trying mirror... >> logs/build.log
-          curl -L -o zlib.zip https://github.com/madler/zlib/releases/download/v1.3/zlib13.zip && echo zlib downloaded from mirror >> logs/build.log || (
-            echo zlib download failed from all sources >> logs/build.log
-            exit 1
+        curl -L -o zlib.zip https://zlib.net/zlib-1.3.1.tar.gz && echo zlib downloaded from primary (zlib.net) >> logs/build.log || (
+          echo Primary zlib download failed, trying mirror 1... >> logs/build.log
+          curl -L -o zlib.zip https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 1 (GitHub) >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o zlib.zip https://sourceforge.net/projects/libpng/files/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 2 (SourceForge) >> logs/build.log || (
+              echo zlib download failed from all sources >> logs/build.log
+              exit 1
+            )
           )
         )
-        unzip zlib.zip
-        echo zlib unzipped >> logs/build.log
+        tar -xzf zlib.zip
+        ren zlib-1.3.1 zlib
+        echo zlib unzipped and renamed >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download nlohmann/json
       run: |
         echo Downloading nlohmann/json... >> logs/build.log
-        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from primary >> logs/build.log || (
-          echo Primary nlohmann/json download failed, trying mirror... >> logs/build.log
-          curl -L -o json.zip https://mirror.ghproxy.com/https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from mirror >> logs/build.log || (
-            echo nlohmann/json download failed from all sources >> logs/build.log
-            exit 1
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from primary (GitHub) >> logs/build.log || (
+          echo Primary nlohmann/json download failed, trying mirror 1... >> logs/build.log
+          curl -L -o json.zip https://mirror.ghproxy.com/https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from mirror 1 (ghproxy) >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o json.zip https://codeload.github.com/nlohmann/json/zip/refs/heads/develop && echo nlohmann/json downloaded from mirror 2 (codeload) >> logs/build.log || (
+              echo nlohmann/json download failed from all sources >> logs/build.log
+              exit 1
+            )
           )
         )
-        unzip json.zip
+        unzip -o json.zip
         echo nlohmann/json unzipped >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
