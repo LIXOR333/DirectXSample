@@ -1,4 +1,4 @@
-name: Build Rust Alkad 2588 Cheat DLL
+name: Build RustAlkadecheat2588 Cheat DLL
 
 on:
   push:
@@ -81,9 +81,9 @@ jobs:
     - name: Download zlib
       run: |
         echo Downloading zlib... >> logs/build.log
-        curl -L -o zlib.zip https://zlib.net/zlib1218.zip && echo zlib downloaded from primary >> logs/build.log || (
+        curl -L -o zlib.zip https://zlib.net/zlib13.zip && echo zlib downloaded from primary >> logs/build.log || (
           echo Primary zlib download failed, trying mirror... >> logs/build.log
-          curl -L -o zlib.zip https://github.com/madler/zlib/releases/download/v1.2.13/zlib1213.zip && echo zlib downloaded from mirror >> logs/build.log || (
+          curl -L -o zlib.zip https://github.com/madler/zlib/releases/download/v1.3/zlib13.zip && echo zlib downloaded from mirror >> logs/build.log || (
             echo zlib download failed from all sources >> logs/build.log
             exit 1
           )
