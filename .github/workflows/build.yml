@@ -18,15 +18,30 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Installing Chocolatey..."
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-          if ($LASTEXITCODE -ne 0) {
-            echo "Chocolatey installation failed with exit code $LASTEXITCODE"
-            exit 1
+          echo "Checking for existing Chocolatey installation..."
+          $chocoExists = $false
+          try {
+            choco -v
+            if ($LASTEXITCODE -eq 0) {
+              echo "Chocolatey is already installed"
+              $chocoExists = $true
+            }
+          } catch {
+            echo "Chocolatey not found, proceeding with installation..."
           }
-          echo "Chocolatey installed successfully"
+          if (-not $chocoExists) {
+            echo "Installing Chocolatey..."
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+            if ($LASTEXITCODE -ne 0) {
+              echo "Chocolatey installation failed with exit code $LASTEXITCODE"
+              exit 1
+            }
+            echo "Chocolatey installed successfully"
+          } else {
+            echo "Skipping Chocolatey installation as it already exists"
+          }
 
       - name: Install MinGW
         shell: pwsh
