@@ -20,60 +20,60 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 05:55 PM MSK, 18 May 2025..."
+          echo "Настройка безопасной директории Git в 06:05 PM MSK, 18 мая 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
-          git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
-          git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
-          git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'No extraheader'; git config --local --unset-all core.sshCommand || echo 'No SSH config'"
+          git config --local --unset-all http.https://github.com/.extraheader || echo "Нет extraheader для удаления"
+          git config --local --unset-all core.sshCommand || echo "Нет SSH конфигурации для удаления"
+          git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'Нет extraheader'; git config --local --unset-all core.sshCommand || echo 'Нет SSH конфигурации'"
 
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 05:55 PM MSK, 18 May 2025..."
+          echo "Проверка наличия установленного Chocolatey в 06:05 PM MSK, 18 мая 2025..."
           $chocoExists = $false
           try {
             choco -v
             if ($LASTEXITCODE -eq 0) {
-              echo "Chocolatey is already installed"
+              echo "Chocolatey уже установлен"
               $chocoExists = $true
             }
           } catch {
-            echo "Chocolatey not found, proceeding with installation..."
+            echo "Chocolatey не найден, приступаю к установке..."
           }
           if (-not $chocoExists) {
-            echo "Installing Chocolatey..."
+            echo "Установка Chocolatey..."
             Set-ExecutionPolicy Bypass -Scope Process -Force
             [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
             iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             if ($LASTEXITCODE -ne 0) {
-              echo "Chocolatey installation failed with exit code $LASTEXITCODE"
+              echo "Установка Chocolatey завершилась с ошибкой, код выхода $LASTEXITCODE"
               exit 1
             }
-            echo "Chocolatey installed successfully"
+            echo "Chocolatey успешно установлен"
           }
 
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 05:55 PM MSK, 18 May 2025..."
+          echo "Установка MinGW в 06:05 PM MSK, 18 мая 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
-            echo "MinGW installation failed with exit code $LASTEXITCODE"
+            echo "Установка MinGW завершилась с ошибкой, код выхода $LASTEXITCODE"
             exit 1
           }
           $env:Path += ";C:\tools\mingw64\bin"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           g++ --version
           if ($LASTEXITCODE -ne 0) {
-            echo "MinGW verification failed"
+            echo "Проверка MinGW завершилась с ошибкой"
             exit 1
           }
-          echo "MinGW installed successfully"
+          echo "MinGW успешно установлен"
 
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 05:55 PM MSK, 18 May 2025..."
+          echo "Загрузка DirectX SDK в 06:05 PM MSK, 18 мая 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -83,12 +83,12 @@ jobs:
           $success = $false
           $maxAttempts = 5
           foreach ($url in $urls) {
-            echo "Attempting to download from $url..."
+            echo "Попытка загрузки с $url..."
             for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
               curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
               if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
                 $fileSize = (Get-Item dxsdk.exe).Length
-                echo "Downloaded file size: $fileSize bytes"
+                echo "Размер загруженного файла: $fileSize байт"
                 if ($fileSize -gt 500000000) {
                   $checkResult = $null
                   if (Get-Command "7z" -ErrorAction SilentlyContinue) {
@@ -97,35 +97,35 @@ jobs:
                     $checkResult = rar lt dxsdk.exe 2>&1
                   }
                   if ($checkResult -and $checkResult -match "Include" -and $checkResult -match "Lib") {
-                    echo "DirectX SDK content verified, size $fileSize bytes"
+                    echo "Содержимое DirectX SDK проверено, размер $fileSize байт"
                     $success = $true
                     break
                   } else {
-                    echo "Downloaded file does not contain expected DirectX SDK structure, size $fileSize bytes"
+                    echo "Загруженный файл не содержит ожидаемой структуры DirectX SDK, размер $fileSize байт"
                     Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
                   }
                 } else {
-                  echo "Downloaded file too small ($fileSize bytes), retrying attempt $attempt of $maxAttempts..."
+                  echo "Загруженный файл слишком мал ($fileSize байт), повторная попытка $attempt из $maxAttempts..."
                   Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
                 }
               } else {
-                echo "Download failed with exit code $LASTEXITCODE, retrying attempt $attempt of $maxAttempts..."
+                echo "Загрузка завершилась с ошибкой, код выхода $LASTEXITCODE, повторная попытка $attempt из $maxAttempts..."
                 Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
               }
               Start-Sleep -Seconds 5
             }
             if ($success) { break }
-            echo "Failed to download from $url after $maxAttempts attempts, trying next mirror..."
+            echo "Не удалось загрузить с $url после $maxAttempts попыток, пробую следующий источник..."
           }
           if (-not $success) {
-            echo "All download attempts failed for DirectX SDK after exhausting all mirrors and attempts"
+            echo "Все попытки загрузки DirectX SDK завершились неудачей после исчерпания всех источников и попыток"
             exit 1
           }
 
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 05:55 PM MSK, 18 May 2025..."
+          echo "Установка архиваторов в 06:05 PM MSK, 18 мая 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -197,11 +197,11 @@ jobs:
           foreach ($archiver in $archivers) {
             $success = $false
             foreach ($url in $archiver.Urls) {
-              echo "Attempting to download $($archiver.Name) from $url..."
+              echo "Попытка загрузки $($archiver.Name) с $url..."
               curl -L -o "$($archiver.Name).exe" $url --retry 5 --retry-delay 5
               if ($LASTEXITCODE -eq 0 -and (Test-Path "$($archiver.Name).exe")) {
                 $fileSize = (Get-Item "$($archiver.Name).exe").Length
-                echo "Downloaded file size: $fileSize bytes"
+                echo "Размер загруженного файла: $fileSize байт"
                 if ($fileSize -gt 1MB) {
                   Start-Process -FilePath "$($archiver.Name).exe" -ArgumentList $archiver.InstallArgs -Wait -NoNewWindow
                   if ($LASTEXITCODE -eq 0) {
@@ -209,39 +209,39 @@ jobs:
                     echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
                     $testResult = Invoke-Expression $archiver.TestCommand 2>&1
                     if ($LASTEXITCODE -eq 0) {
-                      echo "$($archiver.Name) installed successfully"
+                      echo "$($archiver.Name) успешно установлен"
                       $success = $true
                       $installedArchivers += $archiver
                       break
                     } else {
-                      echo "$($archiver.Name) test failed: $testResult"
+                      echo "Тест $($archiver.Name) завершился с ошибкой: $testResult"
                     }
                   }
                 } else {
-                  echo "File size too small ($fileSize bytes), likely corrupted. Skipping to next URL..."
+                  echo "Размер файла слишком мал ($fileSize байт), возможно, файл повреждён. Перехожу к следующему URL..."
                 }
                 Remove-Item -Path "$($archiver.Name).exe" -Force -ErrorAction SilentlyContinue
               }
-              echo "Failed to install $($archiver.Name) from $url, trying next source..."
+              echo "Не удалось установить $($archiver.Name) с $url, пробую следующий источник..."
             }
             if (-not $success) {
-              echo "Warning: $($archiver.Name) installation failed, proceeding with other archivers..."
+              echo "Предупреждение: Установка $($archiver.Name) завершилась с ошибкой, продолжаю с другими архиваторами..."
             }
           }
 
           if ($installedArchivers.Count -eq 0) {
-            echo "Error: No archivers were installed successfully"
+            echo "Ошибка: Ни один архиватор не был установлен успешно"
             exit 1
           }
 
-          echo "Successfully installed archivers: $($installedArchivers.Name -join ', ')"
+          echo "Успешно установленные архиваторы: $($installedArchivers.Name -join ', ')"
 
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 05:55 PM MSK, 18 May 2025..."
+          echo "Извлечение DirectX SDK в 06:05 PM MSK, 18 мая 2025..."
           if (-not (Test-Path dxsdk.exe)) {
-            echo "dxsdk.exe not found"
+            echo "dxsdk.exe не найден"
             exit 1
           }
 
@@ -259,51 +259,58 @@ jobs:
           )
 
           # Проверяем содержимое dxsdk.exe перед распаковкой
-          echo "Checking contents of dxsdk.exe..."
+          echo "Проверка содержимого dxsdk.exe..."
           $checkSuccess = $false
           foreach ($archiver in $installedArchivers) {
             if ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue)) {
-              echo "Checking with $($archiver.Name)..."
+              echo "Проверка с помощью $($archiver.Name)..."
               $checkResult = Invoke-Expression $archiver.CheckCommand 2>&1
               if ($LASTEXITCODE -eq 0 -and $checkResult -match "Include" -and $checkResult -match "Lib") {
-                echo "Contents check succeeded with $($archiver.Name), sample output: $checkResult"
+                echo "Проверка содержимого успешно выполнена с $($archiver.Name), пример вывода: $checkResult"
                 $checkSuccess = $true
                 break
               } else {
-                echo "Failed to list contents with $($archiver.Name), output: $checkResult"
+                echo "Не удалось проверить содержимое с $($archiver.Name), вывод: $checkResult"
               }
             }
           }
           if (-not $checkSuccess) {
-            echo "Error: Unable to check contents with any archiver"
+            echo "Ошибка: Не удалось проверить содержимое ни одним архиватором"
             exit 1
           }
 
           # Извлекаем CAB-файл из dxsdk.exe как отдельный файл
-          echo "Attempting to extract CAB file from dxsdk.exe with 7-Zip..."
+          echo "Попытка извлечь CAB-файл из dxsdk.exe с помощью 7-Zip..."
           for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
             7z e -tpe dxsdk.exe -odxsdk -y
             if ($LASTEXITCODE -eq 0) {
               $cabFile = Get-ChildItem -Path dxsdk -File | Where-Object { $_.Length -gt 500000000 -and $_.Extension -eq "" } | Select-Object -First 1
               if ($cabFile) {
-                echo "Found potential CAB file: $($cabFile.FullName), size: $($cabFile.Length) bytes"
-                Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+                echo "Найден потенциальный CAB-файл: $($cabFile.FullName), размер: $($cabFile.Length) байт"
+                try {
+                  Move-Item -LiteralPath $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force -ErrorAction Stop
+                  echo "Успешно перемещён $($cabFile.FullName) в dxsdk\dxsdk.cab"
+                } catch {
+                  echo "Не удалось переместить $($cabFile.FullName) в dxsdk\dxsdk.cab. Ошибка: $_"
+                  Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+                  continue
+                }
                 break
               } else {
-                echo "CAB file not found on attempt $attempt, listing files in dxsdk:"
-                Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-                echo "Retrying..."
+                echo "CAB-файл не найден на попытке $attempt, вывод списка файлов в dxsdk:"
+                Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
+                echo "Повторная попытка..."
                 Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
               }
             } else {
-              echo "Failed to extract CAB on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+              echo "Не удалось извлечь CAB на попытке $attempt, код выхода $LASTEXITCODE, повторная попытка..."
               Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
             }
             Start-Sleep -Seconds 5
           }
 
           if (-not (Test-Path "dxsdk\dxsdk.cab")) {
-            echo "Error: Failed to extract CAB file from dxsdk.exe after $maxExtractAttempts attempts"
+            echo "Ошибка: Не удалось извлечь CAB-файл из dxsdk.exe после $maxExtractAttempts попыток"
             exit 1
           }
 
@@ -311,11 +318,11 @@ jobs:
           $cabExtractSuccess = $false
           foreach ($archiver in $installedArchivers) {
             if (-not ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
-              echo "Skipping $($archiver.Name) - not installed or not found"
+              echo "Пропускаю $($archiver.Name) - не установлен или не найден"
               continue
             }
 
-            echo "Attempting to extract dxsdk.cab with $($archiver.Name)..."
+            echo "Попытка извлечь dxsdk.cab с помощью $($archiver.Name)..."
             for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
               $cabExtractCommand = $archiver.ExtractCommand -replace "dxsdk.exe", "dxsdk\dxsdk.cab" -replace "-o dxsdk", "-o dxsdk\extracted"
               if ($archiver.Name -eq "7-Zip") {
@@ -337,99 +344,99 @@ jobs:
                 if (Test-Path dxsdk\extracted) {
                   # Проверяем наличие папок Include и Lib
                   if ((Test-Path dxsdk\extracted\Include) -and (Test-Path dxsdk\extracted\Lib)) {
-                    echo "$($archiver.Name) extracted dxsdk.cab successfully on attempt $attempt"
+                    echo "$($archiver.Name) успешно извлёк dxsdk.cab на попытке $attempt"
                     $cabExtractSuccess = $true
                     break
                   } else {
-                    echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, listing extracted files:"
-                    Get-ChildItem -Path dxsdk\extracted -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-                    echo "Retrying..."
+                    echo "$($archiver.Name) извлёк, но необходимые папки (Include/Lib) не найдены на попытке $attempt, вывод списка извлечённых файлов:"
+                    Get-ChildItem -Path dxsdk\extracted -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
+                    echo "Повторная попытка..."
                     Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
                   }
                 } else {
-                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying..."
+                  echo "$($archiver.Name) извлёк, но папка extracted не найдена на попытке $attempt, повторная попытка..."
                   Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
                 }
               } else {
-                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                echo "$($archiver.Name) не удалось извлечь dxsdk.cab на попытке $attempt, код выхода $LASTEXITCODE, повторная попытка..."
                 Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
               }
               Start-Sleep -Seconds 5
             }
             if ($cabExtractSuccess) { break }
-            echo "$($archiver.Name) failed to extract dxsdk.cab after $maxExtractAttempts attempts, trying next archiver..."
+            echo "$($archiver.Name) не удалось извлечь dxsdk.cab после $maxExtractAttempts попыток, пробую следующий архиватор..."
           }
 
           if (-not $cabExtractSuccess) {
-            echo "Error: Failed to extract dxsdk.cab with all available archivers"
+            echo "Ошибка: Не удалось извлечь dxsdk.cab ни одним из доступных архиваторов"
             exit 1
           }
 
           # Перемещаем файлы из extracted в dxsdk
-          echo "Moving extracted files to dxsdk folder..."
+          echo "Перемещение извлечённых файлов в папку dxsdk..."
           Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
           Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
 
           # Проверяем наличие папки Include
-          echo "Listing files in dxsdk folder after CAB extraction:"
-          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
+          echo "Вывод списка файлов в папке dxsdk после извлечения CAB:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
           if (-not (Test-Path dxsdk\Include)) {
-            echo "Include folder not found after extraction. Attempting alternative extraction..."
-            echo "Running dxsdk.exe as installer..."
+            echo "Папка Include не найдена после извлечения. Пробую альтернативное извлечение..."
+            echo "Запуск dxsdk.exe как установщика..."
             for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
               Start-Process -FilePath "dxsdk.exe" -ArgumentList "/S /D=dxsdk_install" -Wait -NoNewWindow
               if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk_install)) {
-                echo "Installer ran successfully on attempt $attempt, moving files to dxsdk..."
+                echo "Установщик успешно выполнен на попытке $attempt, перемещаю файлы в dxsdk..."
                 Move-Item -Path dxsdk_install\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
                 Remove-Item -Path dxsdk_install -Recurse -Force -ErrorAction SilentlyContinue
                 if (Test-Path dxsdk\Include) {
-                  echo "DirectX SDK extracted successfully via installer on attempt $attempt!"
+                  echo "DirectX SDK успешно извлечён через установщик на попытке $attempt!"
                   break
                 } else {
-                  echo "Include folder still not found after installer on attempt $attempt, retrying..."
+                  echo "Папка Include всё ещё не найдена после установщика на попытке $attempt, повторная попытка..."
                   if ($attempt -eq $maxExtractAttempts) {
-                    echo "Installer failed to create Include folder after $maxExtractAttempts attempts"
+                    echo "Установщик не смог создать папку Include после $maxExtractAttempts попыток"
                     exit 1
                   }
                   Start-Sleep -Seconds 5
                 }
               } else {
-                echo "Installer failed on attempt $attempt with exit code $LASTEXITCODE, retrying..."
+                echo "Установщик завершился с ошибкой на попытке $attempt с кодом выхода $LASTEXITCODE, повторная попытка..."
                 if ($attempt -eq $maxExtractAttempts) {
-                  echo "Installer failed after $maxExtractAttempts attempts"
+                  echo "Установщик завершился с ошибкой после $maxExtractAttempts попыток"
                   exit 1
                 }
                 Start-Sleep -Seconds 5
               }
             }
           } else {
-            echo "DirectX SDK extracted successfully, Include folder found!"
+            echo "DirectX SDK успешно извлечён, папка Include найдена!"
           }
 
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 05:55 PM MSK, 18 May 2025..."
+          echo "Настройка окружения DirectX SDK в 06:05 PM MSK, 18 мая 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;C:\tools\mingw64\bin;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include")) {
-            echo "Include folder not found"
+            echo "Папка Include не найдена"
             exit 1
           }
-          echo "Environment variables set successfully"
+          echo "Переменные окружения успешно установлены"
 
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 05:55 PM MSK, 18 May 2025..."
+          echo "Компиляция DirectXSample DLL в 06:05 PM MSK, 18 мая 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -eq 0 -and (Test-Path DirectXSample.dll)) {
-            echo "DirectXSample DLL compilation completed"
+            echo "Компиляция DirectXSample DLL завершена"
           } else {
-            echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE or DLL not created"
+            echo "Компиляция DirectXSample DLL завершилась с ошибкой, код выхода $LASTEXITCODE или DLL не создана"
             exit 1
           }
 
