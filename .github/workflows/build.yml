@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 04:40 PM MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 05:02 PM MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 04:40 PM MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 05:02 PM MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 04:40 PM MSK, 18 May 2025..."
+          echo "Installing MinGW at 05:02 PM MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -70,62 +70,78 @@ jobs:
           }
           echo "MinGW installed successfully"
 
-      - name: Download DirectX SDK
+      - name: Setup DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 04:40 PM MSK, 18 May 2025..."
-          $urls = @(
-            "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-            "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
-            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
-            "https://web.archive.org/web/20160330101053/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
-          )
-          $success = $false
-          $maxAttempts = 5
-          foreach ($url in $urls) {
-            echo "Attempting to download from $url..."
-            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-              curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
-              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
-                $fileSize = (Get-Item dxsdk.exe).Length
-                echo "Downloaded file size: $fileSize bytes"
-                if ($fileSize -gt 500000000) {
-                  $checkResult = $null
-                  if (Get-Command "7z" -ErrorAction SilentlyContinue) {
-                    $checkResult = 7z l dxsdk.exe -r 2>&1
-                  } elseif (Get-Command "rar" -ErrorAction SilentlyContinue) {
-                    $checkResult = rar lt dxsdk.exe 2>&1
-                  }
-                  if ($checkResult -and $checkResult -match "Include" -and $checkResult -match "Lib") {
-                    echo "DirectX SDK content verified, size $fileSize bytes"
-                    $success = $true
-                    break
+          echo "Setting up DirectX SDK at 05:02 PM MSK, 18 May 2025..."
+          $localPath = "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)"
+          if (Test-Path $localPath -and (Test-Path "$localPath\Include" -and Test-Path "$localPath\Lib")) {
+            echo "Found local DirectX SDK at $localPath, copying to working directory..."
+            mkdir dxsdk -ErrorAction SilentlyContinue
+            Copy-Item -Path "$localPath\*" -Destination dxsdk -Recurse -Force
+            if (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib) {
+              echo "Local DirectX SDK copied successfully"
+            } else {
+              echo "Local DirectX SDK copy failed, falling back to download..."
+              Remove-Item -Path dxsdk -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          if (-not (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib)) {
+            echo "Downloading DirectX SDK as local copy not usable..."
+            $urls = @(
+              "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+              "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+              "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+              "https://web.archive.org/web/20160330101053/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
+            )
+            $success = $false
+            $maxAttempts = 5
+            foreach ($url in $urls) {
+              echo "Attempting to download from $url..."
+              for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
+                if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
+                  $fileSize = (Get-Item dxsdk.exe).Length
+                  echo "Downloaded file size: $fileSize bytes"
+                  if ($fileSize -gt 500000000) {
+                    $checkResult = $null
+                    if (Get-Command "7z" -ErrorAction SilentlyContinue) {
+                      $checkResult = 7z l dxsdk.exe -r 2>&1
+                    } elseif (Get-Command "rar" -ErrorAction SilentlyContinue) {
+                      $checkResult = rar lt dxsdk.exe 2>&1
+                    }
+                    if ($checkResult -and $checkResult -match "Include" -and $checkResult -match "Lib") {
+                      echo "DirectX SDK content verified, size $fileSize bytes"
+                      $success = $true
+                      break
+                    } else {
+                      echo "Downloaded file does not contain expected DirectX SDK structure, size $fileSize bytes"
+                      Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+                    }
                   } else {
-                    echo "Downloaded file does not contain expected DirectX SDK structure, size $fileSize bytes"
+                    echo "Downloaded file too small ($fileSize bytes), retrying attempt $attempt of $maxAttempts..."
                     Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
                   }
                 } else {
-                  echo "Downloaded file too small ($fileSize bytes), retrying attempt $attempt of $maxAttempts..."
+                  echo "Download failed with exit code $LASTEXITCODE, retrying attempt $attempt of $maxAttempts..."
                   Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
                 }
-              } else {
-                echo "Download failed with exit code $LASTEXITCODE, retrying attempt $attempt of $maxAttempts..."
-                Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 5
               }
-              Start-Sleep -Seconds 5
+              if ($success) { break }
+              echo "Failed to download from $url after $maxAttempts attempts, trying next mirror..."
             }
-            if ($success) { break }
-            echo "Failed to download from $url after $maxAttempts attempts, trying next mirror..."
-          }
-          if (-not $success) {
-            echo "All download attempts failed for DirectX SDK after exhausting all mirrors and attempts"
-            exit 1
+            if (-not $success) {
+              echo "All download attempts failed for DirectX SDK after exhausting all mirrors and attempts"
+              exit 1
+            }
           }
 
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 04:40 PM MSK, 18 May 2025..."
+          echo "Installing archivers at 05:02 PM MSK, 18 May 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -522,100 +538,98 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 04:40 PM MSK, 18 May 2025..."
-          if (-not (Test-Path dxsdk.exe)) {
-            echo "dxsdk.exe not found"
-            exit 1
-          }
+          echo "Extracting DirectX SDK at 05:02 PM MSK, 18 May 2025..."
+          if (-not (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib)) {
+            echo "DirectX SDK not fully set up, attempting extraction..."
+            mkdir dxsdk -ErrorAction SilentlyContinue
+            $extractSuccess = $false
+            $maxExtractAttempts = 5
 
-          mkdir dxsdk -ErrorAction SilentlyContinue
-          $extractSuccess = $false
-          $maxExtractAttempts = 5
+            # Список установленных архиваторов из предыдущего шага
+            $installedArchivers = @(
+              @{Name="7-Zip"; Command="7z"; ExtractCommand="7z x dxsdk.exe -o`"`"dxsdk`"`" -y"; CheckCommand="7z l dxsdk.exe -r"},
+              @{Name="WinRAR"; Command="rar"; ExtractCommand="rar x dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
+              @{Name="PeaZip"; Command="peazip.exe"; ExtractCommand="& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; CheckCommand="& 'C:\Program Files\PeaZip\peazip.exe' -l dxsdk.exe"; PostExtract="Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue"},
+              @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
+              @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"},
+              @{Name="WinZip"; Command="winzip.exe"; ExtractCommand="& 'C:\Program Files\WinZip\winzip.exe' -e dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\WinZip\winzip.exe' -l dxsdk.exe"},
+              @{Name="HaoZip"; Command="HaoZip.exe"; ExtractCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' l dxsdk.exe"},
+              @{Name="Zipeg"; Command="Zipeg.exe"; ExtractCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' l dxsdk.exe"},
+              @{Name="FreeArc"; Command="FreeArc.exe"; ExtractCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' l dxsdk.exe"},
+              @{Name="IZArc"; Command="IZArc.exe"; ExtractCommand="& 'C:\Program Files\IZArc\IZArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\IZArc\IZArc.exe' l dxsdk.exe"},
+              @{Name="TUGZip"; Command="TUGZip.exe"; ExtractCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' l dxsdk.exe"},
+              @{Name="ExtractNow"; Command="ExtractNow.exe"; ExtractCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' l dxsdk.exe"},
+              @{Name="Universal Extractor"; Command="UniExtract.exe"; ExtractCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' l dxsdk.exe"},
+              @{Name="ALZip"; Command="ALZip.exe"; ExtractCommand="& 'C:\Program Files\ALZip\ALZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ALZip\ALZip.exe' l dxsdk.exe"},
+              @{Name="ZipGenius"; Command="ZipGenius.exe"; ExtractCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' l dxsdk.exe"},
+              @{Name="PowerArchiver"; Command="PowerArchiver.exe"; ExtractCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' l dxsdk.exe"},
+              @{Name="B1 Free Archiver"; Command="B1Archiver.exe"; ExtractCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' l dxsdk.exe"},
+              @{Name="Ashampoo ZIP Free"; Command="AshampooZIP.exe"; ExtractCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' l dxsdk.exe"},
+              @{Name="Hamster ZIP Archiver"; Command="HamsterZIP.exe"; ExtractCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' l dxsdk.exe"},
+              @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"},
+              @{Name="Keka"; Command="keka.exe"; ExtractCommand="& 'C:\Program Files\Keka\keka.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Keka\keka.exe' l dxsdk.exe"},
+              @{Name="QuickZip"; Command="QuickZip.exe"; ExtractCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' l dxsdk.exe"},
+              @{Name="ZipZag"; Command="ZipZag.exe"; ExtractCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' l dxsdk.exe"}
+            )
 
-          # Список установленных архиваторов из предыдущего шага
-          $installedArchivers = @(
-            @{Name="7-Zip"; Command="7z"; ExtractCommand="7z x dxsdk.exe -o`"`"dxsdk`"`" -y"; CheckCommand="7z l dxsdk.exe -r"},
-            @{Name="WinRAR"; Command="rar"; ExtractCommand="rar x dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
-            @{Name="PeaZip"; Command="peazip.exe"; ExtractCommand="& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; CheckCommand="& 'C:\Program Files\PeaZip\peazip.exe' -l dxsdk.exe"; PostExtract="Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue"},
-            @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
-            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"},
-            @{Name="WinZip"; Command="winzip.exe"; ExtractCommand="& 'C:\Program Files\WinZip\winzip.exe' -e dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\WinZip\winzip.exe' -l dxsdk.exe"},
-            @{Name="HaoZip"; Command="HaoZip.exe"; ExtractCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' l dxsdk.exe"},
-            @{Name="Zipeg"; Command="Zipeg.exe"; ExtractCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' l dxsdk.exe"},
-            @{Name="FreeArc"; Command="FreeArc.exe"; ExtractCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' l dxsdk.exe"},
-            @{Name="IZArc"; Command="IZArc.exe"; ExtractCommand="& 'C:\Program Files\IZArc\IZArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\IZArc\IZArc.exe' l dxsdk.exe"},
-            @{Name="TUGZip"; Command="TUGZip.exe"; ExtractCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' l dxsdk.exe"},
-            @{Name="ExtractNow"; Command="ExtractNow.exe"; ExtractCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' l dxsdk.exe"},
-            @{Name="Universal Extractor"; Command="UniExtract.exe"; ExtractCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' l dxsdk.exe"},
-            @{Name="ALZip"; Command="ALZip.exe"; ExtractCommand="& 'C:\Program Files\ALZip\ALZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ALZip\ALZip.exe' l dxsdk.exe"},
-            @{Name="ZipGenius"; Command="ZipGenius.exe"; ExtractCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' l dxsdk.exe"},
-            @{Name="PowerArchiver"; Command="PowerArchiver.exe"; ExtractCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' l dxsdk.exe"},
-            @{Name="B1 Free Archiver"; Command="B1Archiver.exe"; ExtractCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' l dxsdk.exe"},
-            @{Name="Ashampoo ZIP Free"; Command="AshampooZIP.exe"; ExtractCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' l dxsdk.exe"},
-            @{Name="Hamster ZIP Archiver"; Command="HamsterZIP.exe"; ExtractCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' l dxsdk.exe"},
-            @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"},
-            @{Name="Keka"; Command="keka.exe"; ExtractCommand="& 'C:\Program Files\Keka\keka.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Keka\keka.exe' l dxsdk.exe"},
-            @{Name="QuickZip"; Command="QuickZip.exe"; ExtractCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' l dxsdk.exe"},
-            @{Name="ZipZag"; Command="ZipZag.exe"; ExtractCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' l dxsdk.exe"}
-          )
-
-          # Проверяем содержимое dxsdk.exe перед распаковкой
-          echo "Checking contents of dxsdk.exe..."
-          $checkSuccess = $false
-          foreach ($archiver in $installedArchivers) {
-            if (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)")) {
-              echo "Checking with $($archiver.Name)..."
-              $checkResult = Invoke-Expression $archiver.CheckCommand 2>&1
-              if ($LASTEXITCODE -eq 0 -and $checkResult -match "Include" -and $checkResult -match "Lib") {
-                echo "Contents check succeeded with $($archiver.Name), sample output: $checkResult"
-                $checkSuccess = $true
-                break
-              } else {
-                echo "Failed to list contents with $($archiver.Name), output: $checkResult"
-              }
-            }
-          }
-          if (-not $checkSuccess) {
-            echo "Error: Unable to check contents with any archiver"
-            exit 1
-          }
-
-          # Пробуем распаковать dxsdk.exe каждым архиватором по очереди
-          foreach ($archiver in $installedArchivers) {
-            if (-not (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)"))) {
-              echo "Skipping $($archiver.Name) - not installed or not found"
-              continue
-            }
-
-            echo "Attempting to extract dxsdk.exe with $($archiver.Name)..."
-            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
-              Invoke-Expression $archiver.ExtractCommand
-              if ($LASTEXITCODE -eq 0) {
-                if ($archiver.PostExtract) {
-                  Invoke-Expression $archiver.PostExtract
-                }
-                # Проверяем наличие папок Include и Lib
-                if (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib) {
-                  echo "$($archiver.Name) extracted dxsdk.exe successfully on attempt $attempt"
-                  $extractSuccess = $true
+            # Проверяем содержимое dxsdk.exe перед распаковкой
+            echo "Checking contents of dxsdk.exe..."
+            $checkSuccess = $false
+            foreach ($archiver in $installedArchivers) {
+              if (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue)) {
+                echo "Checking with $($archiver.Name)..."
+                $checkResult = Invoke-Expression $archiver.CheckCommand 2>&1
+                if ($LASTEXITCODE -eq 0 -and $checkResult -match "Include" -and $checkResult -match "Lib") {
+                  echo "Contents check succeeded with $($archiver.Name), sample output: $checkResult"
+                  $checkSuccess = $true
                   break
                 } else {
-                  echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying with next archiver..."
+                  echo "Failed to list contents with $($archiver.Name), output: $checkResult"
+                }
+              }
+            }
+            if (-not $checkSuccess) {
+              echo "Error: Unable to check contents with any archiver"
+              exit 1
+            }
+
+            # Пробуем распаковать dxsdk.exe каждым архиватором по очереди
+            foreach ($archiver in $installedArchivers) {
+              if (-not (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
+                echo "Skipping $($archiver.Name) - not installed or not found"
+                continue
+              }
+
+              echo "Attempting to extract dxsdk.exe with $($archiver.Name)..."
+              for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+                Invoke-Expression $archiver.ExtractCommand
+                if ($LASTEXITCODE -eq 0) {
+                  if ($archiver.PostExtract) {
+                    Invoke-Expression $archiver.PostExtract
+                  }
+                  # Проверяем наличие папок Include и Lib
+                  if (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib) {
+                    echo "$($archiver.Name) extracted dxsdk.exe successfully on attempt $attempt"
+                    $extractSuccess = $true
+                    break
+                  } else {
+                    echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying with next archiver..."
+                    Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+                  }
+                } else {
+                  echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
                   Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
                 }
-              } else {
-                echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
-                Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 5
               }
-              Start-Sleep -Seconds 5
+              if ($extractSuccess) { break }
+              echo "$($archiver.Name) failed after $maxExtractAttempts attempts, trying next archiver..."
             }
-            if ($extractSuccess) { break }
-            echo "$($archiver.Name) failed after $maxExtractAttempts attempts, trying next archiver..."
-          }
 
-          if (-not $extractSuccess) {
-            echo "Error: Failed to extract dxsdk.exe with all available archivers"
-            exit 1
+            if (-not $extractSuccess) {
+              echo "Error: Failed to extract dxsdk.exe with all available archivers"
+              exit 1
+            }
           }
 
           # Логируем файлы после первой распаковки
@@ -644,7 +658,7 @@ jobs:
           # Распаковываем CAB-файл с помощью доступных архиваторов
           $cabExtractSuccess = $false
           foreach ($archiver in $installedArchivers) {
-            if (-not (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)"))) {
+            if (-not (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
               echo "Skipping $($archiver.Name) for CAB extraction - not installed or not found"
               continue
             }
@@ -730,7 +744,7 @@ jobs:
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 04:40 PM MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 05:02 PM MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -744,7 +758,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 04:40 PM MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 05:02 PM MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
