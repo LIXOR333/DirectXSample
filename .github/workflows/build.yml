@@ -73,19 +73,32 @@ jobs:
         shell: pwsh
         run: |
           echo "Качаем DirectX SDK, держись..."
-          $url = "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
-          echo "Грузим с $url..."
-          curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
-          if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
-            $fileSize = (Get-Item dxsdk.exe).Length
-            if ($fileSize -gt 500000000) {
-              echo "SDK скачан, размер $fileSize байт, всё чётко!"
+          $urls = @(
+            "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+            "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
+          )
+          $success = $false
+          foreach ($url in $urls) {
+            echo "Грузим с $url..."
+            curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
+            if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
+              $fileSize = (Get-Item dxsdk.exe).Length
+              if ($fileSize -gt 500000000) {
+                echo "SDK скачан, размер $fileSize байт, всё чётко!"
+                $success = $true
+                break
+              } else {
+                echo "Файл мелкий, $fileSize байт, пробуем следующее зеркало..."
+                Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+              }
             } else {
-              echo "Файл мелкий, $fileSize байт, не катит!"
-              exit 1
+              echo "Не скачалось, ошибка $LASTEXITCODE, пробуем следующее зеркало..."
+              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
             }
-          } else {
-            echo "Не скачалось, ошибка $LASTEXITCODE, пичаль..."
+          }
+          if (-not $success) {
+            echo "Все зеркала облажались, пичаль!"
             exit 1
           }
 
@@ -101,6 +114,12 @@ jobs:
           $env:Path += ";C:\Program Files\7-Zip"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           mkdir dxsdk -ErrorAction SilentlyContinue
+          echo "Смотрим, что внутри dxsdk.exe..."
+          7z l dxsdk.exe
+          if ($LASTEXITCODE -ne 0) {
+            echo "Не удалось посмотреть содержимое dxsdk.exe, ошибка $LASTEXITCODE"
+            exit 1
+          }
           echo "Распаковываем dxsdk.exe в dxsdk..."
           7z x dxsdk.exe -o"dxsdk" -y
           if ($LASTEXITCODE -ne 0) {
@@ -109,11 +128,11 @@ jobs:
           }
           echo "Что у нас в dxsdk после первой распаковки:"
           Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
-          echo "Ищем CAB или что-то похожее..."
-          $cabFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
-          if ($cabFile) {
-            echo "Нашёл файл: $($cabFile.FullName), размер: $($cabFile.Length) байт"
-            Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+          echo "Ищем большой файл..."
+          $largeFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
+          if ($largeFile) {
+            echo "Нашёл большой файл: $($largeFile.FullName), размер: $($largeFile.Length) байт"
+            Move-Item -Path $largeFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
             echo "Распаковываем dxsdk.cab..."
             7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
             if ($LASTEXITCODE -ne 0) {
@@ -133,7 +152,7 @@ jobs:
               exit 1
             }
           } else {
-            echo "Не нашёл CAB или что-то похожее с размером > 300MB!"
+            echo "Не нашёл большой файл с размером > 300MB!"
             Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "Файл: $($_.FullName), Размер: $($_.Length) байт" }
             exit 1
           }
