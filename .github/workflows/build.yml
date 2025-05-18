@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Полный клон, чтобы не было сюрпризов
+          fetch-depth: 0  # Полный клон, чтобы не было косяков
 
       - name: Fix Git Config
         shell: pwsh
@@ -107,11 +107,12 @@ jobs:
             echo "7-Zip облажался на dxsdk.exe, ошибка $LASTEXITCODE"
             exit 1
           }
-          echo "Что у нас в dxsdk:"
+          echo "Что у нас в dxsdk после первой распаковки:"
           Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
-          $cabFile = Get-ChildItem -Path dxsdk -Recurse -File -Include "*.cab" | Where-Object { $_.Length -gt 400000000 } | Select-Object -First 1
+          echo "Ищем CAB или что-то похожее..."
+          $cabFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
           if ($cabFile) {
-            echo "Нашёл CAB: $($cabFile.FullName), размер: $($cabFile.Length) байт"
+            echo "Нашёл файл: $($cabFile.FullName), размер: $($cabFile.Length) байт"
             Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
             echo "Распаковываем dxsdk.cab..."
             7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
@@ -123,6 +124,8 @@ jobs:
             Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
             Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
+            echo "Что у нас в dxsdk после распаковки CAB:"
+            Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
             if (Test-Path dxsdk\Include) {
               echo "Всё разложено, Include на месте, погнали!"
             } else {
@@ -130,7 +133,7 @@ jobs:
               exit 1
             }
           } else {
-            echo "CAB-файл не нашёл, беда! Вот что есть:"
+            echo "Не нашёл CAB или что-то похожее с размером > 300MB!"
             Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "Файл: $($_.FullName), Размер: $($_.Length) байт" }
             exit 1
           }
