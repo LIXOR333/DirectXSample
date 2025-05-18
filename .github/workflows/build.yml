@@ -57,8 +57,11 @@ jobs:
                           curl -L -o imgui.zip https://gitee.com/mirror-imgui/imgui/repository/archive/master.zip && echo ImGui downloaded from mirror 9 (Gitee) >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
                             curl -L -o imgui.zip https://codeberg.org/imgui-mirror/imgui/archive/master.zip && echo ImGui downloaded from mirror 10 (Codeberg) >> logs/build.log || (
-                              echo ImGui download failed from all sources >> logs/build.log
-                              exit 1
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o imgui.zip https://git.savannah.gnu.org/cgit/imgui.git/snapshot/imgui-master.tar.gz && echo ImGui downloaded from mirror 11 (Savannah) >> logs/build.log || (
+                                echo ImGui download failed from all sources >> logs/build.log
+                                exit 1
+                              )
                             )
                           )
                         )
@@ -99,8 +102,11 @@ jobs:
                           curl -L -o minhook.zip https://gitee.com/mirror-minhook/minhook/repository/archive/master.zip && echo MinHook downloaded from mirror 9 (Gitee) >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
                             curl -L -o minhook.zip https://codeberg.org/minhook-mirror/minhook/archive/master.zip && echo MinHook downloaded from mirror 10 (Codeberg) >> logs/build.log || (
-                              echo MinHook download failed from all sources >> logs/build.log
-                              exit 1
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o minhook.zip https://git.savannah.gnu.org/cgit/minhook.git/snapshot/minhook-master.tar.gz && echo MinHook downloaded from mirror 11 (Savannah) >> logs/build.log || (
+                                echo MinHook download failed from all sources >> logs/build.log
+                                exit 1
+                              )
                             )
                           )
                         )
@@ -120,29 +126,35 @@ jobs:
     - name: Download libcurl
       run: |
         echo Downloading libcurl... >> logs/build.log
-        curl -L -o curl.zip https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from primary (curl.se) >> logs/build.log || (
-          echo Primary libcurl download failed, trying mirror 1... >> logs/build.log
-          curl -L -o curl.zip https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 1 (haxx.se) >> logs/build.log || (
+        curl -L -o curl.zip https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from primary (curl.se) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
+          echo Primary libcurl download or validation failed, trying mirror 1... >> logs/build.log
+          curl -L -o curl.zip https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 1 (haxx.se) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
             echo Mirror 1 failed, trying mirror 2... >> logs/build.log
-            curl -L -o curl.zip https://bintray.com/artifact/download/curl/downloads/curl-8.10.1-win64.zip && echo libcurl downloaded from mirror 2 (bintray) >> logs/build.log || (
+            curl -L -o curl.zip https://bintray.com/artifact/download/curl/downloads/curl-8.10.1-win64.zip && echo libcurl downloaded from mirror 2 (bintray) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
               echo Mirror 2 failed, trying mirror 3... >> logs/build.log
-              curl -L -o curl.zip https://web.archive.org/web/20250518000000/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 3 (archive.org) >> logs/build.log || (
+              curl -L -o curl.zip https://web.archive.org/web/20250518000000/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 3 (archive.org) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                 echo Mirror 3 failed, trying mirror 4... >> logs/build.log
-                curl -L -o curl.zip https://sourceforge.net/projects/curl/files/libcurl/8.10.1/libcurl-x64.zip && echo libcurl downloaded from mirror 4 (SourceForge) >> logs/build.log || (
+                curl -L -o curl.zip https://sourceforge.net/projects/curl/files/libcurl/8.10.1/libcurl-x64.zip && echo libcurl downloaded from mirror 4 (SourceForge) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                   echo Mirror 4 failed, trying mirror 5... >> logs/build.log
-                  curl -L -o curl.zip https://curl.tuxfamily.org/dl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 5 (tuxfamily) >> logs/build.log || (
+                  curl -L -o curl.zip https://curl.tuxfamily.org/dl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 5 (tuxfamily) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                     echo Mirror 5 failed, trying mirror 6... >> logs/build.log
-                    curl -L -o curl.zip https://github.com/curl/curl/releases/download/curl-8_10_1/libcurl-x64.zip && echo libcurl downloaded from mirror 6 (GitHub) >> logs/build.log || (
+                    curl -L -o curl.zip https://github.com/curl/curl/releases/download/curl-8_10_1/libcurl-x64.zip && echo libcurl downloaded from mirror 6 (GitHub) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                       echo Mirror 6 failed, trying mirror 7... >> logs/build.log
-                      curl -L -o curl.zip https://mirror.ghproxy.com/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 7 (ghproxy) >> logs/build.log || (
+                      curl -L -o curl.zip https://mirror.ghproxy.com/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 7 (ghproxy) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                         echo Mirror 7 failed, trying mirror 8... >> logs/build.log
-                        curl -L -o curl.zip https://gitee.com/mirror-curl/curl/repository/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 8 (Gitee) >> logs/build.log || (
+                        curl -L -o curl.zip https://gitee.com/mirror-curl/curl/repository/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 8 (Gitee) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                           echo Mirror 8 failed, trying mirror 9... >> logs/build.log
-                          curl -L -o curl.zip https://codeberg.org/curl-mirror/curl/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 9 (Codeberg) >> logs/build.log || (
+                          curl -L -o curl.zip https://codeberg.org/curl-mirror/curl/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 9 (Codeberg) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
-                            curl -L -o curl.zip https://bitbucket.org/curl-mirror/curl/get/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 10 (Bitbucket) >> logs/build.log || (
-                              echo libcurl download failed from all sources >> logs/build.log
-                              exit 1
+                            curl -L -o curl.zip https://bitbucket.org/curl-mirror/curl/get/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 10 (Bitbucket) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o curl.zip https://git.savannah.gnu.org/cgit/curl.git/snapshot/curl-libcurl-x64-8.10.1.tar.gz && echo libcurl downloaded from mirror 11 (Savannah) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
+                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
+                                curl -L -o curl.zip https://curl.askapache.com/windows/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 12 (askapache) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
+                                  echo libcurl download or validation failed from all sources >> logs/build.log
+                                  exit 1
+                                )
+                              )
                             )
                           )
                         )
@@ -183,8 +195,11 @@ jobs:
                           curl -L -o zlib.tar.gz https://gitee.com/mirror-zlib/zlib/repository/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 9 (Gitee) >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
                             curl -L -o zlib.tar.gz https://codeberg.org/zlib-mirror/zlib/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 10 (Codeberg) >> logs/build.log || (
-                              echo zlib download failed from all sources >> logs/build.log
-                              exit 1
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o zlib.tar.gz https://git.savannah.gnu.org/cgit/zlib.git/snapshot/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 11 (Savannah) >> logs/build.log || (
+                                echo zlib download failed from all sources >> logs/build.log
+                                exit 1
+                              )
                             )
                           )
                         )
@@ -226,8 +241,11 @@ jobs:
                           curl -L -o json.zip https://gitee.com/mirror-nlohmann-json/json/repository/archive/develop.zip && echo nlohmann/json downloaded from mirror 9 (Gitee) >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
                             curl -L -o json.zip https://codeberg.org/nlohmann-json-mirror/json/archive/develop.zip && echo nlohmann/json downloaded from mirror 10 (Codeberg) >> logs/build.log || (
-                              echo nlohmann/json download failed from all sources >> logs/build.log
-                              exit 1
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o json.zip https://git.savannah.gnu.org/cgit/json.git/snapshot/json-develop.tar.gz && echo nlohmann/json downloaded from mirror 11 (Savannah) >> logs/build.log || (
+                                echo nlohmann/json download failed from all sources >> logs/build.log
+                                exit 1
+                              )
                             )
                           )
                         )
