@@ -1,4 +1,4 @@
-name: Build DirectX Sample DLL
+name: Build DirectX Sample DLL with Maximum Reliability
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory..."
+          echo "Configuring Git safe directory at 14:59 MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation..."
+          echo "Checking for existing Chocolatey installation at 14:59 MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW..."
+          echo "Installing MinGW at 14:59 MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -65,7 +65,7 @@ jobs:
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           g++ --version
           if ($LASTEXITCODE -ne 0) {
-            echo "g++ not found after installation"
+            echo "MinGW verification failed"
             exit 1
           }
           echo "MinGW installed successfully"
@@ -73,11 +73,12 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK..."
+          echo "Downloading DirectX SDK at 14:59 MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
-            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
+            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+            "https://web.archive.org/web/20160330101053/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
           )
           $success = $false
           foreach ($url in $urls) {
@@ -106,66 +107,119 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK..."
+          echo "Extracting DirectX SDK at 14:59 MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
           }
+          
+          # Устанавливаем 7-Zip и WinRAR
           choco install 7zip -y --no-progress
           if ($LASTEXITCODE -ne 0) {
             echo "7-Zip installation failed with exit code $LASTEXITCODE"
             exit 1
           }
-          $env:Path += ";C:\Program Files\7-Zip"
+          choco install winrar -y --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            echo "WinRAR installation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          $env:Path += ";C:\Program Files\7-Zip;C:\Program Files\WinRAR"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          # Создаём папку для распаковки
           mkdir dxsdk -ErrorAction SilentlyContinue
-          echo "Checking contents of dxsdk.exe..."
+
+          # Проверяем содержимое dxsdk.exe
+          echo "Checking contents of dxsdk.exe with 7-Zip..."
           7z l dxsdk.exe -r
           if ($LASTEXITCODE -ne 0) {
-            echo "Failed to list contents of dxsdk.exe, exit code $LASTEXITCODE"
+            echo "Failed to list contents of dxsdk.exe with 7-Zip, exit code $LASTEXITCODE"
             exit 1
           }
-          echo "Extracting dxsdk.exe to dxsdk folder..."
+
+          # Пробуем распаковать dxsdk.exe с помощью 7-Zip
+          echo "Attempting to extract dxsdk.exe with 7-Zip..."
           7z x dxsdk.exe -o"dxsdk" -y
           if ($LASTEXITCODE -ne 0) {
-            echo "Failed to extract dxsdk.exe, exit code $LASTEXITCODE"
-            exit 1
+            echo "7-Zip failed to extract dxsdk.exe, trying WinRAR..."
+            rar x dxsdk.exe dxsdk\ -y
+            if ($LASTEXITCODE -ne 0) {
+              echo "WinRAR also failed to extract dxsdk.exe, exit code $LASTEXITCODE"
+              exit 1
+            }
           }
-          echo "Listing all files in dxsdk folder after extraction:"
+
+          # Логируем файлы после первой распаковки
+          echo "Listing all files in dxsdk folder after initial extraction:"
           Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-          echo "Searching for potential large files..."
+
+          # Ищем большой файл (CAB или другой архив)
+          echo "Searching for potential large files (>300MB)..."
           $largeFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
           if ($largeFile) {
             echo "Found large file: $($largeFile.FullName), size: $($largeFile.Length) bytes"
             Move-Item -Path $largeFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
-            echo "Extracting dxsdk.cab..."
-            7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
-            if ($LASTEXITCODE -ne 0) {
-              echo "Failed to extract dxsdk.cab, exit code $LASTEXITCODE"
-              exit 1
-            }
-            echo "Moving extracted files to dxsdk folder..."
-            Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
-            echo "Listing files in dxsdk folder after CAB extraction:"
-            Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-            if (Test-Path dxsdk\Include) {
-              echo "DirectX SDK extracted successfully"
-            } else {
-              echo "Include folder not found after extraction"
-              exit 1
-            }
           } else {
-            echo "No large file found with size > 300MB"
-            Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "File: $($_.FullName), Size: $($_.Length) bytes" }
-            exit 1
+            echo "No large file found with size > 300MB. Trying alternative extraction method..."
+            $potentialCabs = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Extension -match "\.cab|\.msi|\.zip" -and $_.Length -gt 100000000 } | Select-Object -First 1
+            if ($potentialCabs) {
+              echo "Found potential CAB file: $($potentialCabs.FullName), size: $($potentialCabs.Length) bytes"
+              Move-Item -Path $potentialCabs.FullName -Destination "dxsdk\dxsdk.cab" -Force
+            } else {
+              echo "No CAB or similar archive found in dxsdk folder"
+              Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "File: $($_.FullName), Size: $($_.Length) bytes" }
+              exit 1
+            }
+          }
+
+          # Распаковываем CAB-файл
+          echo "Extracting dxsdk.cab with 7-Zip..."
+          7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
+          if ($LASTEXITCODE -ne 0) {
+            echo "7-Zip failed to extract dxsdk.cab, trying WinRAR..."
+            rar x dxsdk\dxsdk.cab dxsdk\extracted\ -y
+            if ($LASTEXITCODE -ne 0) {
+              echo "WinRAR also failed to extract dxsdk.cab, exit code $LASTEXITCODE"
+              exit 1
+            }
+          }
+
+          # Перемещаем файлы из extracted в dxsdk
+          echo "Moving extracted files to dxsdk folder..."
+          Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
+
+          # Проверяем наличие папки Include
+          echo "Listing files in dxsdk folder after CAB extraction:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
+          if (Test-Path dxsdk\Include) {
+            echo "DirectX SDK extracted successfully, Include folder found!"
+          } else {
+            echo "Include folder not found after extraction. Attempting alternative extraction..."
+            echo "Running dxsdk.exe as installer..."
+            Start-Process -FilePath "dxsdk.exe" -ArgumentList "/S /D=dxsdk_install" -Wait -NoNewWindow
+            if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk_install)) {
+              echo "Installer ran successfully, moving files to dxsdk..."
+              Move-Item -Path dxsdk_install\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+              Remove-Item -Path dxsdk_install -Recurse -Force -ErrorAction SilentlyContinue
+              if (Test-Path dxsdk\Include) {
+                echo "DirectX SDK extracted successfully via installer!"
+              } else {
+                echo "Include folder still not found after installer extraction"
+                exit 1
+              }
+            } else {
+              echo "Installer failed or did not create expected folder, exit code $LASTEXITCODE"
+              exit 1
+            }
           }
 
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment..."
+          echo "Setting up DirectX SDK environment at 14:59 MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -176,20 +230,20 @@ jobs:
           }
           echo "Environment variables set successfully"
 
-      - name: Build DLL
+      - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DLL..."
+          echo "Compiling DirectXSample DLL at 14:59 MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
-            echo "DLL compilation failed with exit code $LASTEXITCODE"
+            echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
             exit 1
           }
           if (-not (Test-Path DirectXSample.dll)) {
             echo "DirectXSample.dll not created"
             exit 1
           }
-          echo "DLL compilation completed"
+          echo "DirectXSample DLL compilation completed"
 
       - name: Upload DLL artifact
         uses: actions/upload-artifact@v4
