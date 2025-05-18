@@ -109,10 +109,52 @@ jobs:
             exit 1
           }
           mkdir dxsdk -ErrorAction SilentlyContinue
-          echo "Attempting to extract with Expand-Archive..."
-          Expand-Archive -Path dxsdk.exe -DestinationPath dxsdk -Force -ErrorAction Stop
-          if (-not (Test-Path dxsdk\Include)) {
-            echo "DirectX SDK extraction failed, Include folder not found"
+          $extractSuccess = $false
+          echo "Attempting to extract by running dxsdk.exe in silent mode..."
+          try {
+            Start-Process -FilePath dxsdk.exe -ArgumentList "/Q /T:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
+              $process = $_
+              $timeout = 300 # 5 minutes timeout
+              $process.WaitForExit($timeout * 1000)
+              if ($process.HasExited -and $process.ExitCode -eq 0) {
+                if (Test-Path dxsdk\Include) {
+                  echo "Extraction with dxsdk.exe silent mode succeeded"
+                  $extractSuccess = $true
+                } else {
+                  echo "Include folder not found after silent extraction"
+                }
+              } else {
+                echo "Silent extraction failed with exit code $($process.ExitCode) or timed out after $timeout seconds"
+              }
+            }
+          } catch {
+            echo "Silent extraction failed: $_"
+          }
+          if (-not $extractSuccess) {
+            echo "Falling back to Shell.Application extraction..."
+            try {
+              $shell = New-Object -ComObject Shell.Application
+              $zip = $shell.NameSpace($PWD.Path + "\dxsdk.exe")
+              if (-not $zip) {
+                throw "Failed to initialize Shell.Application zip namespace"
+              }
+              $dest = $shell.NameSpace($PWD.Path + "\dxsdk")
+              if (-not $dest) {
+                throw "Failed to initialize Shell.Application destination namespace"
+              }
+              $dest.CopyHere($zip.Items(), 156) # 4 + 8 + 144 for overwrite and no progress UI
+              if (Test-Path dxsdk\Include) {
+                echo "Extraction with Shell.Application succeeded"
+                $extractSuccess = $true
+              } else {
+                echo "Include folder not found after Shell.Application extraction"
+              }
+            } catch {
+              echo "Shell.Application extraction failed: $_"
+            }
+          }
+          if (-not $extractSuccess) {
+            echo "All extraction attempts failed, Include folder not found"
             exit 1
           }
           echo "DirectX SDK extracted successfully"
