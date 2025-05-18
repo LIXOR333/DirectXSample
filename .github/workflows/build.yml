@@ -112,9 +112,13 @@ jobs:
           $extractSuccess = $false
           echo "Attempting to extract by running dxsdk.exe in silent mode..."
           try {
-            $process = Start-Process -FilePath dxsdk.exe -ArgumentList "/Q /T:dxsdk" -Wait -NoNewWindow -PassThru
+            $process = Start-Process -FilePath dxsdk.exe -ArgumentList "/Q /T:dxsdk" -NoNewWindow -PassThru
             $timeout = 180 # 3 minutes timeout
-            $process.WaitForExit($timeout * 1000)
+            $elapsed = 0
+            while (!$process.HasExited -and $elapsed -lt ($timeout * 1000)) {
+              Start-Sleep -Milliseconds 1000
+              $elapsed += 1000
+            }
             if ($process.HasExited -and $process.ExitCode -eq 0) {
               if (Test-Path dxsdk\Include) {
                 echo "Extraction with dxsdk.exe silent mode succeeded"
@@ -123,10 +127,20 @@ jobs:
                 echo "Include folder not found after silent extraction"
               }
             } else {
-              echo "Silent extraction failed with exit code $($process.ExitCode) or timed out after $timeout seconds"
+              echo "Silent extraction timed out or failed with exit code $($process.ExitCode) after $timeout seconds"
+              if (!$process.HasExited) {
+                echo "Killing stuck process..."
+                $process.Kill()
+                $process.WaitForExit()
+              }
             }
           } catch {
             echo "Silent extraction failed: $_"
+            if ($process -and !$process.HasExited) {
+              echo "Killing stuck process due to exception..."
+              $process.Kill()
+              $process.WaitForExit()
+            }
           }
           if (-not $extractSuccess) {
             echo "Falling back to Shell.Application extraction..."
@@ -140,7 +154,7 @@ jobs:
               if (-not $dest) {
                 throw "Failed to initialize Shell.Application destination namespace"
               }
-              $dest.CopyHere($zip.Items(), 156) # 4 + 8 + 144 for overwrite and no progress UI
+              $dest.CopyHere($zip.Items(), 156)
               if (Test-Path dxsdk\Include) {
                 echo "Extraction with Shell.Application succeeded"
                 $extractSuccess = $true
