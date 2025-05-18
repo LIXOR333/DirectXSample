@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 05:26 PM MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 05:33 PM MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 05:26 PM MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 05:33 PM MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 05:26 PM MSK, 18 May 2025..."
+          echo "Installing MinGW at 05:33 PM MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -73,7 +73,7 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 05:26 PM MSK, 18 May 2025..."
+          echo "Downloading DirectX SDK at 05:33 PM MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -125,7 +125,7 @@ jobs:
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 05:26 PM MSK, 18 May 2025..."
+          echo "Installing archivers at 05:33 PM MSK, 18 May 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -239,7 +239,7 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 05:26 PM MSK, 18 May 2025..."
+          echo "Extracting DirectX SDK at 05:33 PM MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
@@ -294,7 +294,7 @@ jobs:
                   Invoke-Expression $archiver.PostExtract
                 }
                 # Проверяем наличие папок Include и Lib
-                if (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib) {
+                if ((Test-Path dxsdk\Include) -and (Test-Path dxsdk\Lib)) {
                   echo "$($archiver.Name) extracted dxsdk.exe successfully on attempt $attempt"
                   $extractSuccess = $true
                   break
@@ -393,9 +393,7 @@ jobs:
           # Проверяем наличие папки Include
           echo "Listing files in dxsdk folder after CAB extraction:"
           Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-          if (Test-Path dxsdk\Include) {
-            echo "DirectX SDK extracted successfully, Include folder found!"
-          } else {
+          if (-not (Test-Path dxsdk\Include)) {
             echo "Include folder not found after extraction. Attempting alternative extraction..."
             echo "Running dxsdk.exe as installer..."
             for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
@@ -424,12 +422,14 @@ jobs:
                 Start-Sleep -Seconds 5
               }
             }
+          } else {
+            echo "DirectX SDK extracted successfully, Include folder found!"
           }
 
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 05:26 PM MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 05:33 PM MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -443,7 +443,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 05:26 PM MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 05:33 PM MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
