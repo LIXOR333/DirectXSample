@@ -112,20 +112,18 @@ jobs:
           $extractSuccess = $false
           echo "Attempting to extract by running dxsdk.exe in silent mode..."
           try {
-            Start-Process -FilePath dxsdk.exe -ArgumentList "/Q /T:dxsdk" -Wait -NoNewWindow -PassThru | ForEach-Object {
-              $process = $_
-              $timeout = 300 # 5 minutes timeout
-              $process.WaitForExit($timeout * 1000)
-              if ($process.HasExited -and $process.ExitCode -eq 0) {
-                if (Test-Path dxsdk\Include) {
-                  echo "Extraction with dxsdk.exe silent mode succeeded"
-                  $extractSuccess = $true
-                } else {
-                  echo "Include folder not found after silent extraction"
-                }
+            $process = Start-Process -FilePath dxsdk.exe -ArgumentList "/Q /T:dxsdk" -Wait -NoNewWindow -PassThru
+            $timeout = 180 # 3 minutes timeout
+            $process.WaitForExit($timeout * 1000)
+            if ($process.HasExited -and $process.ExitCode -eq 0) {
+              if (Test-Path dxsdk\Include) {
+                echo "Extraction with dxsdk.exe silent mode succeeded"
+                $extractSuccess = $true
               } else {
-                echo "Silent extraction failed with exit code $($process.ExitCode) or timed out after $timeout seconds"
+                echo "Include folder not found after silent extraction"
               }
+            } else {
+              echo "Silent extraction failed with exit code $($process.ExitCode) or timed out after $timeout seconds"
             }
           } catch {
             echo "Silent extraction failed: $_"
@@ -151,6 +149,23 @@ jobs:
               }
             } catch {
               echo "Shell.Application extraction failed: $_"
+            }
+          }
+          if (-not $extractSuccess) {
+            echo "Falling back to 7-Zip extraction..."
+            choco install 7zip -y --no-progress
+            if ($LASTEXITCODE -eq 0) {
+              $env:Path += ";C:\Program Files\7-Zip"
+              echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+              7z x dxsdk.exe -o"dxsdk" -y
+              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk\Include)) {
+                echo "Extraction with 7-Zip succeeded"
+                $extractSuccess = $true
+              } else {
+                echo "Include folder not found after 7-Zip extraction or extraction failed with exit code $LASTEXITCODE"
+              }
+            } else {
+              echo "7-Zip installation failed with exit code $LASTEXITCODE"
             }
           }
           if (-not $extractSuccess) {
