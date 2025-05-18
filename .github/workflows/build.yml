@@ -34,7 +34,7 @@ jobs:
     - name: Download and set up archivers
       shell: pwsh
       run: |
-        echo "Installing archivers at 15:50 MSK, 18 May 2025..."
+        echo "Installing archivers at 15:56 MSK, 18 May 2025..."
         $archiver = ""
         $success = $false
 
@@ -1043,4 +1043,9 @@ jobs:
               @{ Name = "Keka"; Command = "& 'C:\Program Files\Keka\Keka.exe' -extract dxsdk.exe -o dxsdk"; InstallPath = "C:\Program Files\Keka" },
               @{ Name = "RAR Extractor"; Command = "& 'C:\Program Files\RAR Extractor\RARExtractor.exe' dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\RAR Extractor" },
               @{ Name = "UnRarX"; Command = "& 'C:\Program Files\UnRarX\UnRarX.exe' -x dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\UnRarX" },
-              @{
+              @{ Name = "IZArc2Go"; Command = "& 'C:\Program Files\IZArc2Go\IZArc2Go.exe' -e dxsdk.exe dxsdk"; InstallPath = "C:\Program Files\IZArc2Go" }
+          )
+
+          foreach ($arch in $archivers) {
+              if ($extractSuccess) { break }
+              if ($env:ARCHIVER
