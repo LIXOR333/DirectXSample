@@ -111,7 +111,7 @@ jobs:
     - name: Build DLL
       run: |
         echo Building DLL... >> logs/build.log
-        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I curl/include /I zlib /I json-develop/single_include /link /LIBPATH:curl/lib libcurl.lib /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib
+        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I curl/include /I zlib /I json-develop/single_include /link /LIBPATH:curl/lib libcurl.lib /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
         if %ERRORLEVEL% NEQ 0 (
           echo Build failed >> logs/build.log
           exit 1
