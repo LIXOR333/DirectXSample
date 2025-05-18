@@ -9,18 +9,18 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 15:29 MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 04:40 PM MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 15:29 MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 04:40 PM MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 15:29 MSK, 18 May 2025..."
+          echo "Installing MinGW at 04:40 PM MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -73,7 +73,7 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 15:29 MSK, 18 May 2025..."
+          echo "Downloading DirectX SDK at 04:40 PM MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -125,7 +125,7 @@ jobs:
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 15:29 MSK, 18 May 2025..."
+          echo "Installing archivers at 04:40 PM MSK, 18 May 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -133,7 +133,7 @@ jobs:
                 "https://www.7-zip.org/a/7z2301-x64.exe",
                 "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.exe/download",
                 "https://github.com/ip7z/7zip/releases/download/23.01/7z2301-x64.exe",
-                "https://web.archive.org/web/20230601000000*/https://www.7-zip.org/a/7z2301-x64.exe",
+                "https://web.archive.org/web/20230601000000/https://www.7-zip.org/a/7z2301-x64.exe",
                 "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
                 "https://www.filehorse.com/download-7-zip-64/7z2301-x64.exe"
               )
@@ -149,7 +149,7 @@ jobs:
                 "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-701.exe",
                 "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
                 "https://www.filehorse.com/download-winrar-64/winrar-x64-701.exe",
-                "https://web.archive.org/web/20240801000000*/https://www.rarlab.com/rar/winrar-x64-701.exe",
+                "https://web.archive.org/web/20240801000000/https://www.rarlab.com/rar/winrar-x64-701.exe",
                 "https://sourceforge.net/projects/winrar/files/WinRAR/7.01/winrar-x64-701.exe/download"
               )
               InstallPath = "C:\Program Files\WinRAR"
@@ -163,7 +163,7 @@ jobs:
                 "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
                 "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
                 "https://www.filehorse.com/download-peazip-64/peazip-10.0.0.WIN64.exe",
-                "https://web.archive.org/web/20240801000000*/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
+                "https://web.archive.org/web/20240801000000/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
                 "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
                 "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe"
               )
@@ -178,7 +178,7 @@ jobs:
                 "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
                 "https://www.bandizip.com/dl/BANDIZIP-SETUP.EXE",
                 "https://sourceforge.net/projects/bandizip/files/Bandizip/7.32/BANDIZIP-SETUP.EXE/download",
-                "https://web.archive.org/web/20240801000000*/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
+                "https://web.archive.org/web/20240801000000/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
                 "https://www.filehorse.com/download-bandizip/BANDIZIP-SETUP.EXE",
                 "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html"
               )
@@ -190,11 +190,11 @@ jobs:
             @{
               Name = "NanaZip"
               Urls = @(
-                "https://github.com/M2Team/NanaZip/releases/download/2.0.451/NanaZipSetup.exe",
-                "https://sourceforge.net/projects/nanazip/files/2.0.451/NanaZipSetup.exe/download",
+                "https://github.com/M2Team/NanaZip/releases/download/3.0.850/NanaZipSetup.exe",
+                "https://sourceforge.net/projects/nanazip/files/3.0.850/NanaZipSetup.exe/download",
                 "https://www.filehorse.com/download-nanazip/NanaZipSetup.exe",
                 "https://download.cnet.com/NanaZip/3000-2250_4-85994102.html",
-                "https://web.archive.org/web/20240801000000*/https://github.com/M2Team/NanaZip/releases/download/2.0.451/NanaZipSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://github.com/M2Team/NanaZip/releases/download/3.0.850/NanaZipSetup.exe",
                 "https://www.microsoft.com/store/apps/9NBB5K5KX8QN"
               )
               InstallPath = "C:\Program Files\NanaZip"
@@ -209,7 +209,7 @@ jobs:
                 "https://download.cnet.com/WinZip/3000-2250_4-10003164.html",
                 "https://www.filehorse.com/download-winzip/WinZipSetup.exe",
                 "https://sourceforge.net/projects/winzip/files/WinZip/27.0/WinZipSetup.exe/download",
-                "https://web.archive.org/web/20240801000000*/https://www.winzip.com/win/en/downwz.html",
+                "https://web.archive.org/web/20240801000000/https://www.winzip.com/win/en/downwz.html",
                 "https://www.softonic.com/download/winzip/windows"
               )
               InstallPath = "C:\Program Files\WinZip"
@@ -224,7 +224,7 @@ jobs:
                 "https://download.cnet.com/HaoZip/3000-2250_4-75914102.html",
                 "https://www.filehorse.com/download-haozip/HaoZipSetup.exe",
                 "https://sourceforge.net/projects/haozip/files/HaoZip/6.3/HaoZipSetup.exe/download",
-                "https://web.archive.org/web/20240801000000*/https://www.haosoft.com/download/HaoZipSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.haosoft.com/download/HaoZipSetup.exe",
                 "https://www.softonic.com/download/haozip/windows"
               )
               InstallPath = "C:\Program Files\HaoZip"
@@ -239,7 +239,7 @@ jobs:
                 "https://sourceforge.net/projects/zipeg/files/Zipeg/2.9/ZipegSetup.exe/download",
                 "https://www.filehorse.com/download-zipeg/ZipegSetup.exe",
                 "https://download.cnet.com/Zipeg/3000-2250_4-10893402.html",
-                "https://web.archive.org/web/20240801000000*/https://www.zipeg.com/download/ZipegSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.zipeg.com/download/ZipegSetup.exe",
                 "https://www.softonic.com/download/zipeg/windows"
               )
               InstallPath = "C:\Program Files\Zipeg"
@@ -254,7 +254,7 @@ jobs:
                 "https://sourceforge.net/projects/freearc/files/FreeArc/0.666/FreeArcSetup.exe/download",
                 "https://www.filehorse.com/download-freearc/FreeArcSetup.exe",
                 "https://download.cnet.com/FreeArc/3000-2250_4-10893403.html",
-                "https://web.archive.org/web/20240801000000*/https://freearc.org/download/FreeArcSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://freearc.org/download/FreeArcSetup.exe",
                 "https://www.softonic.com/download/freearc/windows"
               )
               InstallPath = "C:\Program Files\FreeArc"
@@ -269,7 +269,7 @@ jobs:
                 "https://sourceforge.net/projects/izarc/files/IZArc/4.5/IZArcSetup.exe/download",
                 "https://www.filehorse.com/download-izarc/IZArcSetup.exe",
                 "https://download.cnet.com/IZArc/3000-2250_4-10093404.html",
-                "https://web.archive.org/web/20240801000000*/https://www.izarc.org/download/IZArcSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.izarc.org/download/IZArcSetup.exe",
                 "https://www.softonic.com/download/izarc/windows"
               )
               InstallPath = "C:\Program Files\IZArc"
@@ -284,7 +284,7 @@ jobs:
                 "https://sourceforge.net/projects/tugzip/files/TUGZip/3.5/TUGZipSetup.exe/download",
                 "https://www.filehorse.com/download-tugzip/TUGZipSetup.exe",
                 "https://download.cnet.com/TUGZip/3000-2250_4-10893405.html",
-                "https://web.archive.org/web/20240801000000*/https://www.tugzip.com/download/TUGZipSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.tugzip.com/download/TUGZipSetup.exe",
                 "https://www.softonic.com/download/tugzip/windows"
               )
               InstallPath = "C:\Program Files\TUGZip"
@@ -299,7 +299,7 @@ jobs:
                 "https://sourceforge.net/projects/extractnow/files/ExtractNow/4.8/ExtractNowSetup.exe/download",
                 "https://www.filehorse.com/download-extractnow/ExtractNowSetup.exe",
                 "https://download.cnet.com/ExtractNow/3000-2250_4-10893406.html",
-                "https://web.archive.org/web/20240801000000*/https://www.extractnow.com/download/ExtractNowSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.extractnow.com/download/ExtractNowSetup.exe",
                 "https://www.softonic.com/download/extractnow/windows"
               )
               InstallPath = "C:\Program Files\ExtractNow"
@@ -314,7 +314,7 @@ jobs:
                 "https://sourceforge.net/projects/uniextract/files/Universal Extractor/1.6/UniversalExtractorSetup.exe/download",
                 "https://www.filehorse.com/download-universal-extractor/UniversalExtractorSetup.exe",
                 "https://download.cnet.com/Universal-Extractor/3000-2250_4-10893407.html",
-                "https://web.archive.org/web/20240801000000*/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
                 "https://www.softonic.com/download/universal-extractor/windows"
               )
               InstallPath = "C:\Program Files\Universal Extractor"
@@ -329,7 +329,7 @@ jobs:
                 "https://sourceforge.net/projects/alzip/files/ALZip/8.5/ALZipSetup.exe/download",
                 "https://www.filehorse.com/download-alzip/ALZipSetup.exe",
                 "https://download.cnet.com/ALZip/3000-2250_4-10893408.html",
-                "https://web.archive.org/web/20240801000000*/https://www.altools.com/download/ALZipSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.altools.com/download/ALZipSetup.exe",
                 "https://www.softonic.com/download/alzip/windows"
               )
               InstallPath = "C:\Program Files\ALZip"
@@ -344,7 +344,7 @@ jobs:
                 "https://sourceforge.net/projects/zipgenius/files/ZipGenius/6.3/ZipGeniusSetup.exe/download",
                 "https://www.filehorse.com/download-zipgenius/ZipGeniusSetup.exe",
                 "https://download.cnet.com/ZipGenius/3000-2250_4-10893409.html",
-                "https://web.archive.org/web/20240801000000*/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
                 "https://www.softonic.com/download/zipgenius/windows"
               )
               InstallPath = "C:\Program Files\ZipGenius"
@@ -359,7 +359,7 @@ jobs:
                 "https://sourceforge.net/projects/powerarchiver/files/PowerArchiver/21.0/PowerArchiverSetup.exe/download",
                 "https://www.filehorse.com/download-powerarchiver/PowerArchiverSetup.exe",
                 "https://download.cnet.com/PowerArchiver/3000-2250_4-10893410.html",
-                "https://web.archive.org/web/20240801000000*/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
                 "https://www.softonic.com/download/powerarchiver/windows"
               )
               InstallPath = "C:\Program Files\PowerArchiver"
@@ -374,7 +374,7 @@ jobs:
                 "https://sourceforge.net/projects/b1archiver/files/B1 Free Archiver/1.7/B1FreeArchiverSetup.exe/download",
                 "https://www.filehorse.com/download-b1-free-archiver/B1FreeArchiverSetup.exe",
                 "https://download.cnet.com/B1-Free-Archiver/3000-2250_4-10893411.html",
-                "https://web.archive.org/web/20240801000000*/https://b1.org/download/B1FreeArchiverSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://b1.org/download/B1FreeArchiverSetup.exe",
                 "https://www.softonic.com/download/b1-free-archiver/windows"
               )
               InstallPath = "C:\Program Files\B1 Free Archiver"
@@ -389,7 +389,7 @@ jobs:
                 "https://sourceforge.net/projects/ashampoozip/files/Ashampoo ZIP Free/1.0/AshampooZIPFreeSetup.exe/download",
                 "https://www.filehorse.com/download-ashampoo-zip-free/AshampooZIPFreeSetup.exe",
                 "https://download.cnet.com/Ashampoo-ZIP-Free/3000-2250_4-10893412.html",
-                "https://web.archive.org/web/20240801000000*/https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
                 "https://www.softonic.com/download/ashampoo-zip-free/windows"
               )
               InstallPath = "C:\Program Files\Ashampoo ZIP Free"
@@ -404,7 +404,7 @@ jobs:
                 "https://sourceforge.net/projects/hamsterzip/files/Hamster ZIP Archiver/4.0/HamsterZIPSetup.exe/download",
                 "https://www.filehorse.com/download-hamster-zip-archiver/HamsterZIPSetup.exe",
                 "https://download.cnet.com/Hamster-ZIP-Archiver/3000-2250_4-10893413.html",
-                "https://web.archive.org/web/20240801000000*/https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
                 "https://www.softonic.com/download/hamster-zip-archiver/windows"
               )
               InstallPath = "C:\Program Files\Hamster ZIP Archiver"
@@ -419,13 +419,58 @@ jobs:
                 "https://sourceforge.net/projects/jzip/files/jZip/2.0/jZipSetup.exe/download",
                 "https://www.filehorse.com/download-jzip/jZipSetup.exe",
                 "https://download.cnet.com/jZip/3000-2250_4-10893414.html",
-                "https://web.archive.org/web/20240801000000*/https://www.jzip.com/download/jZipSetup.exe",
+                "https://web.archive.org/web/20240801000000/https://www.jzip.com/download/jZipSetup.exe",
                 "https://www.softonic.com/download/jzip/windows"
               )
               InstallPath = "C:\Program Files\jZip"
               Command = "jZip.exe"
               InstallArgs = "/S"
               TestCommand = "& 'C:\Program Files\jZip\jZip.exe' -h"
+            },
+            @{
+              Name = "Keka"
+              Urls = @(
+                "https://www.keka.io/download/keka-windows-latest.exe",
+                "https://github.com/aonez/Keka/releases/download/v1.2.0/keka-windows-latest.exe",
+                "https://www.filehorse.com/download-keka/keka-windows-latest.exe",
+                "https://download.cnet.com/Keka/3000-2250_4-10893415.html",
+                "https://web.archive.org/web/20240801000000/https://www.keka.io/download/keka-windows-latest.exe",
+                "https://www.softonic.com/download/keka/windows"
+              )
+              InstallPath = "C:\Program Files\Keka"
+              Command = "keka.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Keka\keka.exe' --help"
+            },
+            @{
+              Name = "QuickZip"
+              Urls = @(
+                "https://www.quickzip.org/download/QuickZipSetup.exe",
+                "https://sourceforge.net/projects/quickzip/files/QuickZip/5.1/QuickZipSetup.exe/download",
+                "https://www.filehorse.com/download-quickzip/QuickZipSetup.exe",
+                "https://download.cnet.com/QuickZip/3000-2250_4-10893416.html",
+                "https://web.archive.org/web/20240801000000/https://www.quickzip.org/download/QuickZipSetup.exe",
+                "https://www.softonic.com/download/quickzip/windows"
+              )
+              InstallPath = "C:\Program Files\QuickZip"
+              Command = "QuickZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\QuickZip\QuickZip.exe' -h"
+            },
+            @{
+              Name = "ZipZag"
+              Urls = @(
+                "https://www.zipzag.com/download/ZipZagSetup.exe",
+                "https://sourceforge.net/projects/zipzag/files/ZipZag/2.0/ZipZagSetup.exe/download",
+                "https://www.filehorse.com/download-zipzag/ZipZagSetup.exe",
+                "https://download.cnet.com/ZipZag/3000-2250_4-10893417.html",
+                "https://web.archive.org/web/20240801000000/https://www.zipzag.com/download/ZipZagSetup.exe",
+                "https://www.softonic.com/download/zipzag/windows"
+              )
+              InstallPath = "C:\Program Files\ZipZag"
+              Command = "ZipZag.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\ZipZag\ZipZag.exe' -h"
             }
           )
 
@@ -437,6 +482,13 @@ jobs:
               echo "Attempting to download $($archiver.Name) from $url..."
               curl -L -o "$($archiver.Name).exe" $url --retry 5 --retry-delay 5
               if ($LASTEXITCODE -eq 0 -and (Test-Path "$($archiver.Name).exe")) {
+                $fileSize = (Get-Item "$($archiver.Name).exe").Length
+                echo "Downloaded file size: $fileSize bytes"
+                if ($fileSize -lt 1MB) {
+                  echo "File size too small ($fileSize bytes), likely corrupted. Skipping to next URL..."
+                  Remove-Item -Path "$($archiver.Name).exe" -Force -ErrorAction SilentlyContinue
+                  continue
+                }
                 Start-Process -FilePath "$($archiver.Name).exe" -ArgumentList $archiver.InstallArgs -Wait -NoNewWindow
                 if ($LASTEXITCODE -eq 0) {
                   $env:Path += ";$($archiver.InstallPath)"
@@ -470,7 +522,7 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 15:29 MSK, 18 May 2025..."
+          echo "Extracting DirectX SDK at 04:40 PM MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
@@ -501,7 +553,10 @@ jobs:
             @{Name="B1 Free Archiver"; Command="B1Archiver.exe"; ExtractCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' l dxsdk.exe"},
             @{Name="Ashampoo ZIP Free"; Command="AshampooZIP.exe"; ExtractCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' l dxsdk.exe"},
             @{Name="Hamster ZIP Archiver"; Command="HamsterZIP.exe"; ExtractCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' l dxsdk.exe"},
-            @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"}
+            @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"},
+            @{Name="Keka"; Command="keka.exe"; ExtractCommand="& 'C:\Program Files\Keka\keka.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Keka\keka.exe' l dxsdk.exe"},
+            @{Name="QuickZip"; Command="QuickZip.exe"; ExtractCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' l dxsdk.exe"},
+            @{Name="ZipZag"; Command="ZipZag.exe"; ExtractCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' l dxsdk.exe"}
           )
 
           # Проверяем содержимое dxsdk.exe перед распаковкой
@@ -545,11 +600,11 @@ jobs:
                   $extractSuccess = $true
                   break
                 } else {
-                  echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying..."
+                  echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying with next archiver..."
                   Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
                 }
               } else {
-                echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
                 Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
               }
               Start-Sleep -Seconds 5
@@ -612,11 +667,11 @@ jobs:
                   $cabExtractSuccess = $true
                   break
                 } else {
-                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying..."
+                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying with next archiver..."
                   Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
                 }
               } else {
-                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
                 Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
               }
               Start-Sleep -Seconds 5
@@ -675,7 +730,7 @@ jobs:
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 15:29 MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 04:40 PM MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -689,7 +744,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 15:29 MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 04:40 PM MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
