@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 05:33 PM MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 05:42 PM MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 05:33 PM MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 05:42 PM MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 05:33 PM MSK, 18 May 2025..."
+          echo "Installing MinGW at 05:42 PM MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -73,7 +73,7 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 05:33 PM MSK, 18 May 2025..."
+          echo "Downloading DirectX SDK at 05:42 PM MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -125,7 +125,7 @@ jobs:
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 05:33 PM MSK, 18 May 2025..."
+          echo "Installing archivers at 05:42 PM MSK, 18 May 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -239,7 +239,7 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 05:33 PM MSK, 18 May 2025..."
+          echo "Extracting DirectX SDK at 05:42 PM MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
@@ -251,11 +251,11 @@ jobs:
 
           # Список установленных архиваторов из предыдущего шага
           $installedArchivers = @(
-            @{Name="7-Zip"; Command="7z"; ExtractCommand="7z x dxsdk.exe -o`"`"dxsdk`"`" -y"; CheckCommand="7z l dxsdk.exe -r"},
-            @{Name="WinRAR"; Command="rar"; ExtractCommand="rar x dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
+            @{Name="7-Zip"; Command="7z"; ExtractCommand="7z e dxsdk.exe -o`"`"dxsdk`"`" -y"; CheckCommand="7z l dxsdk.exe -r"},
+            @{Name="WinRAR"; Command="rar"; ExtractCommand="rar e dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
             @{Name="PeaZip"; Command="peazip.exe"; ExtractCommand="& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; CheckCommand="& 'C:\Program Files\PeaZip\peazip.exe' -l dxsdk.exe"; PostExtract="Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue"},
-            @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
-            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"}
+            @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' e dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
+            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' e dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"}
           )
 
           # Проверяем содержимое dxsdk.exe перед распаковкой
@@ -279,98 +279,75 @@ jobs:
             exit 1
           }
 
-          # Пробуем распаковать dxsdk.exe каждым архиватором по очереди
+          # Извлекаем CAB-файл из dxsdk.exe
+          echo "Attempting to extract CAB from dxsdk.exe with 7-Zip..."
+          for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+            7z e dxsdk.exe -odxsdk -y
+            if ($LASTEXITCODE -eq 0) {
+              $cabFile = Get-ChildItem -Path dxsdk -Filter "*.cab" -Recurse | Where-Object { $_.Length -gt 500000000 } | Select-Object -First 1
+              if ($cabFile) {
+                echo "Found CAB file: $($cabFile.FullName), size: $($cabFile.Length) bytes"
+                Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+                break
+              } else {
+                echo "CAB file not found on attempt $attempt, retrying..."
+                Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            } else {
+              echo "Failed to extract CAB on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+              Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Seconds 5
+          }
+
+          if (-not (Test-Path "dxsdk\dxsdk.cab")) {
+            echo "Error: Failed to extract CAB file from dxsdk.exe after $maxExtractAttempts attempts"
+            exit 1
+          }
+
+          # Извлекаем содержимое CAB-файла
+          $cabExtractSuccess = $false
           foreach ($archiver in $installedArchivers) {
             if (-not ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
               echo "Skipping $($archiver.Name) - not installed or not found"
               continue
             }
 
-            echo "Attempting to extract dxsdk.exe with $($archiver.Name)..."
-            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
-              Invoke-Expression $archiver.ExtractCommand
-              if ($LASTEXITCODE -eq 0) {
-                if ($archiver.PostExtract) {
-                  Invoke-Expression $archiver.PostExtract
-                }
-                # Проверяем наличие папок Include и Lib
-                if ((Test-Path dxsdk\Include) -and (Test-Path dxsdk\Lib)) {
-                  echo "$($archiver.Name) extracted dxsdk.exe successfully on attempt $attempt"
-                  $extractSuccess = $true
-                  break
-                } else {
-                  echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying with next archiver..."
-                  Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
-                }
-              } else {
-                echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
-                Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
-              }
-              Start-Sleep -Seconds 5
-            }
-            if ($extractSuccess) { break }
-            echo "$($archiver.Name) failed after $maxExtractAttempts attempts, trying next archiver..."
-          }
-
-          if (-not $extractSuccess) {
-            echo "Error: Failed to extract dxsdk.exe with all available archivers"
-            exit 1
-          }
-
-          # Логируем файлы после первой распаковки
-          echo "Listing all files in dxsdk folder after initial extraction:"
-          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
-
-          # Ищем большой файл (CAB или другой архив)
-          echo "Searching for potential large files (>300MB)..."
-          $largeFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
-          if ($largeFile) {
-            echo "Found large file: $($largeFile.FullName), size: $($largeFile.Length) bytes"
-            Move-Item -Path $largeFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
-          } else {
-            echo "No large file found with size > 300MB. Trying alternative extraction method..."
-            $potentialCabs = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Extension -match "\.cab|\.msi|\.zip" -and $_.Length -gt 100000000 } | Select-Object -First 1
-            if ($potentialCabs) {
-              echo "Found potential CAB file: $($potentialCabs.FullName), size: $($potentialCabs.Length) bytes"
-              Move-Item -Path $potentialCabs.FullName -Destination "dxsdk\dxsdk.cab" -Force
-            } else {
-              echo "No CAB or similar archive found in dxsdk folder"
-              Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "File: $($_.FullName), Size: $($_.Length) bytes" }
-              exit 1
-            }
-          }
-
-          # Распаковываем CAB-файл с помощью доступных архиваторов
-          $cabExtractSuccess = $false
-          foreach ($archiver in $installedArchivers) {
-            if (-not ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
-              echo "Skipping $($archiver.Name) for CAB extraction - not installed or not found"
-              continue
-            }
-
             echo "Attempting to extract dxsdk.cab with $($archiver.Name)..."
             for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
               $cabExtractCommand = $archiver.ExtractCommand -replace "dxsdk.exe", "dxsdk\dxsdk.cab" -replace "-o dxsdk", "-o dxsdk\extracted"
-              if ($archiver.Name -eq "WinRAR") {
+              if ($archiver.Name -eq "7-Zip") {
+                $cabExtractCommand = "7z x dxsdk\dxsdk.cab -o`"`"dxsdk\extracted`"`" -y"
+              } elseif ($archiver.Name -eq "WinRAR") {
                 $cabExtractCommand = "rar x dxsdk\dxsdk.cab dxsdk\extracted\ -y"
               } elseif ($archiver.Name -eq "PeaZip") {
                 $cabExtractCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk\dxsdk.cab"
+              } elseif ($archiver.Name -eq "Bandizip") {
+                $cabExtractCommand = "& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk\dxsdk.cab -o dxsdk\extracted"
+              } elseif ($archiver.Name -eq "NanaZip") {
+                $cabExtractCommand = "& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk\dxsdk.cab -o dxsdk\extracted"
               }
               Invoke-Expression $cabExtractCommand
               if ($LASTEXITCODE -eq 0) {
-                if ($archiver.Name -eq "PeaZip") {
+                if ($archiver.Name -eq "PeaZip" -and (Test-Path "dxsdk\dxsdk.cab")) {
                   Move-Item -Path dxsdk\dxsdk.cab\* -Destination dxsdk\extracted -Force -ErrorAction SilentlyContinue
                 }
                 if (Test-Path dxsdk\extracted) {
-                  echo "$($archiver.Name) extracted dxsdk.cab successfully on attempt $attempt"
-                  $cabExtractSuccess = $true
-                  break
+                  # Проверяем наличие папок Include и Lib
+                  if ((Test-Path dxsdk\extracted\Include) -and (Test-Path dxsdk\extracted\Lib)) {
+                    echo "$($archiver.Name) extracted dxsdk.cab successfully on attempt $attempt"
+                    $cabExtractSuccess = $true
+                    break
+                  } else {
+                    echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying..."
+                    Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+                  }
                 } else {
-                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying with next archiver..."
+                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying..."
                   Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
                 }
               } else {
-                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, switching to next archiver..."
+                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
                 Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
               }
               Start-Sleep -Seconds 5
@@ -429,7 +406,7 @@ jobs:
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 05:33 PM MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 05:42 PM MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -443,7 +420,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 05:33 PM MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 05:42 PM MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
