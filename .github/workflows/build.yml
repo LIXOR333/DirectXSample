@@ -15,26 +15,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Глубокий клон, чтобы не было проблем с субмодулями
+          fetch-depth: 0  # Полный клон, чтобы не было сюрпризов
 
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Чистим Git от мусора..."
+          echo "Чистим Git от всякого хлама..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
-          git config --local --unset-all http.https://github.com/.extraheader || echo "Всё чисто, без косяков"
-          git config --local --unset-all core.sshCommand || echo "SSH тоже чист"
+          git config --local --unset-all http.https://github.com/.extraheader || echo "Чисто!"
+          git config --local --unset-all core.sshCommand || echo "SSH тоже чист!"
           git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'Чисто'; git config --local --unset-all core.sshCommand || echo 'SSH чист'"
 
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Ставим Chocolatey, чтобы всё было чётко..."
+          echo "Кидаем Chocolatey, чтобы всё было по кайфу..."
           $chocoExists = $false
           try {
             choco -v
             if ($LASTEXITCODE -eq 0) {
-              echo "Chocolatey уже на месте, красавчик!"
+              echo "Chocolatey уже стоит, красота!"
               $chocoExists = $true
             }
           } catch {
@@ -45,16 +45,16 @@ jobs:
             [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
             iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             if ($LASTEXITCODE -ne 0) {
-              echo "Чот Chocolatey не встал, ошибка $LASTEXITCODE"
+              echo "Chocolatey не встал, пипец, ошибка $LASTEXITCODE"
               exit 1
             }
-            echo "Chocolatey готов к бою!"
+            echo "Chocolatey готов жарить!"
           }
 
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Кидаем MinGW, чтобы компилить как боги..."
+          echo "Ставим MinGW, чтобы компилить как босс..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW не встал, ошибка $LASTEXITCODE"
@@ -64,10 +64,10 @@ jobs:
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           g++ --version
           if ($LASTEXITCODE -ne 0) {
-            echo "g++ где-то потерялся, пипец!"
+            echo "g++ где-то потерялся, беда!"
             exit 1
           }
-          echo "MinGW на месте, можно жарить!"
+          echo "MinGW на месте, погнали дальше!"
 
       - name: Download DirectX SDK
         shell: pwsh
@@ -81,7 +81,7 @@ jobs:
             if ($fileSize -gt 500000000) {
               echo "SDK скачан, размер $fileSize байт, всё чётко!"
             } else {
-              echo "Файл мелкий, $fileSize байт, это не то!"
+              echo "Файл мелкий, $fileSize байт, не катит!"
               exit 1
             }
           } else {
@@ -101,33 +101,37 @@ jobs:
           $env:Path += ";C:\Program Files\7-Zip"
           echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
           mkdir dxsdk -ErrorAction SilentlyContinue
+          echo "Распаковываем dxsdk.exe в dxsdk..."
           7z x dxsdk.exe -o"dxsdk" -y
-          if ($LASTEXITCODE -eq 0) {
-            $cabFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 500000000 } | Select-Object -First 1
-            if ($cabFile) {
-              echo "Нашёл CAB: $($cabFile.FullName), переименовываем..."
-              Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
-              7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
-              if ($LASTEXITCODE -eq 0) {
-                Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force
-                Remove-Item -Path dxsdk\extracted -Recurse -Force
-                Remove-Item -Path dxsdk\dxsdk.cab -Force
-                if (Test-Path dxsdk\Include) {
-                  echo "Распаковка удалась, всё огонь!"
-                } else {
-                  echo "Папка Include не появилась, косяк!"
-                  exit 1
-                }
-              } else {
-                echo "CAB не распаковался, ошибка $LASTEXITCODE"
-                exit 1
-              }
+          if ($LASTEXITCODE -ne 0) {
+            echo "7-Zip облажался на dxsdk.exe, ошибка $LASTEXITCODE"
+            exit 1
+          }
+          echo "Что у нас в dxsdk:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) байт)" }
+          $cabFile = Get-ChildItem -Path dxsdk -Recurse -File -Include "*.cab" | Where-Object { $_.Length -gt 400000000 } | Select-Object -First 1
+          if ($cabFile) {
+            echo "Нашёл CAB: $($cabFile.FullName), размер: $($cabFile.Length) байт"
+            Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+            echo "Распаковываем dxsdk.cab..."
+            7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
+            if ($LASTEXITCODE -ne 0) {
+              echo "CAB не распаковался, ошибка $LASTEXITCODE"
+              exit 1
+            }
+            echo "Перекидываем файлы из extracted в dxsdk..."
+            Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
+            if (Test-Path dxsdk\Include) {
+              echo "Всё разложено, Include на месте, погнали!"
             } else {
-              echo "CAB-файл не нашёл, беда!"
+              echo "Где папка Include? Косяк!"
               exit 1
             }
           } else {
-            echo "7-Zip облажался, ошибка $LASTEXITCODE"
+            echo "CAB-файл не нашёл, беда! Вот что есть:"
+            Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "Файл: $($_.FullName), Размер: $($_.Length) байт" }
             exit 1
           }
 
@@ -143,7 +147,7 @@ jobs:
             echo "Include-папка не найдена, пипец!"
             exit 1
           }
-          echo "Среда готова, погнали компилить!"
+          echo "Среда готова, можно компилить!"
 
       - name: Build DLL
         shell: pwsh
