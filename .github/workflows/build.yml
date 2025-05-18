@@ -1,4 +1,4 @@
-name: Build DirectX Sample DLL
+name: Build DirectX Sample DLL with Maximum Reliability
 
 on:
   push:
@@ -9,698 +9,700 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 15 # Prevent hanging
+    timeout-minutes: 60
 
     steps:
-    # Checkout the repository
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    # Install Chocolatey (for MinGW and archiver fallback)
-    - name: Install Chocolatey
-      run: |
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+      - name: Fix Git Config
+        shell: pwsh
+        run: |
+          echo "Configuring Git safe directory at 15:29 MSK, 18 May 2025..."
+          git config --global --add safe.directory $env:GITHUB_WORKSPACE
+          git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
+          git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
+          git submodule foreach --recursive "git config --local --unset-all http.https://github.com/.extraheader || echo 'No extraheader'; git config --local --unset-all core.sshCommand || echo 'No SSH config'"
 
-    # Install MinGW
-    - name: Install MinGW
-      run: |
-        choco install mingw --version 8.1.0 -y
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-        g++ --version
+      - name: Install Chocolatey
+        shell: pwsh
+        run: |
+          echo "Checking for existing Chocolatey installation at 15:29 MSK, 18 May 2025..."
+          $chocoExists = $false
+          try {
+            choco -v
+            if ($LASTEXITCODE -eq 0) {
+              echo "Chocolatey is already installed"
+              $chocoExists = $true
+            }
+          } catch {
+            echo "Chocolatey not found, proceeding with installation..."
+          }
+          if (-not $chocoExists) {
+            echo "Installing Chocolatey..."
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+            if ($LASTEXITCODE -ne 0) {
+              echo "Chocolatey installation failed with exit code $LASTEXITCODE"
+              exit 1
+            }
+            echo "Chocolatey installed successfully"
+          }
 
-    # Download and set up archivers
-    - name: Download and set up archivers
-      shell: pwsh
-      run: |
-        echo "Installing archivers at 04:10 PM MSK, 18 May 2025..."
-        $archiver = ""
-        $success = $false
+      - name: Install MinGW
+        shell: pwsh
+        run: |
+          echo "Installing MinGW at 15:29 MSK, 18 May 2025..."
+          choco install mingw --version 8.1.0 -y
+          if ($LASTEXITCODE -ne 0) {
+            echo "MinGW installation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          $env:Path += ";C:\tools\mingw64\bin"
+          echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          g++ --version
+          if ($LASTEXITCODE -ne 0) {
+            echo "MinGW verification failed"
+            exit 1
+          }
+          echo "MinGW installed successfully"
 
-        $archivers = @(
+      - name: Download DirectX SDK
+        shell: pwsh
+        run: |
+          echo "Downloading DirectX SDK at 15:29 MSK, 18 May 2025..."
+          $urls = @(
+            "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
+            "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
+            "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe",
+            "https://web.archive.org/web/20160330101053/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe"
+          )
+          $success = $false
+          $maxAttempts = 5
+          foreach ($url in $urls) {
+            echo "Attempting to download from $url..."
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              curl -L -o dxsdk.exe $url --retry 5 --retry-delay 5
+              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk.exe)) {
+                $fileSize = (Get-Item dxsdk.exe).Length
+                echo "Downloaded file size: $fileSize bytes"
+                if ($fileSize -gt 500000000) {
+                  $checkResult = $null
+                  if (Get-Command "7z" -ErrorAction SilentlyContinue) {
+                    $checkResult = 7z l dxsdk.exe -r 2>&1
+                  } elseif (Get-Command "rar" -ErrorAction SilentlyContinue) {
+                    $checkResult = rar lt dxsdk.exe 2>&1
+                  }
+                  if ($checkResult -and $checkResult -match "Include" -and $checkResult -match "Lib") {
+                    echo "DirectX SDK content verified, size $fileSize bytes"
+                    $success = $true
+                    break
+                  } else {
+                    echo "Downloaded file does not contain expected DirectX SDK structure, size $fileSize bytes"
+                    Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+                  }
+                } else {
+                  echo "Downloaded file too small ($fileSize bytes), retrying attempt $attempt of $maxAttempts..."
+                  Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+                }
+              } else {
+                echo "Download failed with exit code $LASTEXITCODE, retrying attempt $attempt of $maxAttempts..."
+                Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
+              }
+              Start-Sleep -Seconds 5
+            }
+            if ($success) { break }
+            echo "Failed to download from $url after $maxAttempts attempts, trying next mirror..."
+          }
+          if (-not $success) {
+            echo "All download attempts failed for DirectX SDK after exhausting all mirrors and attempts"
+            exit 1
+          }
+
+      - name: Install Archivers
+        shell: pwsh
+        run: |
+          echo "Installing archivers at 15:29 MSK, 18 May 2025..."
+          $archivers = @(
             @{
-                Name = "7-Zip"
-                Urls = @(
-                    "https://www.7-zip.org/a/7z2409-x64.exe",
-                    "https://sourceforge.net/projects/sevenzip/files/7-Zip/24.09/7z2409-x64.exe/download"
-                )
-                InstallPath = "C:\Program Files\7-Zip"
-                Command = "7z"
-                InstallArgs = "/S"
-                TestCommand = "7z --help"
+              Name = "7-Zip"
+              Urls = @(
+                "https://www.7-zip.org/a/7z2301-x64.exe",
+                "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.exe/download",
+                "https://github.com/ip7z/7zip/releases/download/23.01/7z2301-x64.exe",
+                "https://web.archive.org/web/20230601000000*/https://www.7-zip.org/a/7z2301-x64.exe",
+                "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
+                "https://www.filehorse.com/download-7-zip-64/7z2301-x64.exe"
+              )
+              InstallPath = "C:\Program Files\7-Zip"
+              Command = "7z"
+              InstallArgs = "/S"
+              TestCommand = "7z --help"
             },
             @{
-                Name = "WinRAR"
-                Urls = @(
-                    "https://www.rarlab.com/rar/winrar-x64-702.exe",
-                    "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-702.exe"
-                )
-                InstallPath = "C:\Program Files\WinRAR"
-                Command = "rar"
-                InstallArgs = "/S"
-                TestCommand = "rar -?"
+              Name = "WinRAR"
+              Urls = @(
+                "https://www.rarlab.com/rar/winrar-x64-701.exe",
+                "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-701.exe",
+                "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
+                "https://www.filehorse.com/download-winrar-64/winrar-x64-701.exe",
+                "https://web.archive.org/web/20240801000000*/https://www.rarlab.com/rar/winrar-x64-701.exe",
+                "https://sourceforge.net/projects/winrar/files/WinRAR/7.01/winrar-x64-701.exe/download"
+              )
+              InstallPath = "C:\Program Files\WinRAR"
+              Command = "rar"
+              InstallArgs = "/S"
+              TestCommand = "rar -?"
+            },
+            @{
+              Name = "PeaZip"
+              Urls = @(
+                "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
+                "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
+                "https://www.filehorse.com/download-peazip-64/peazip-10.0.0.WIN64.exe",
+                "https://web.archive.org/web/20240801000000*/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
+                "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
+                "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe"
+              )
+              InstallPath = "C:\Program Files\PeaZip"
+              Command = "peazip.exe"
+              InstallArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+              TestCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -h"
+            },
+            @{
+              Name = "Bandizip"
+              Urls = @(
+                "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
+                "https://www.bandizip.com/dl/BANDIZIP-SETUP.EXE",
+                "https://sourceforge.net/projects/bandizip/files/Bandizip/7.32/BANDIZIP-SETUP.EXE/download",
+                "https://web.archive.org/web/20240801000000*/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
+                "https://www.filehorse.com/download-bandizip/BANDIZIP-SETUP.EXE",
+                "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html"
+              )
+              InstallPath = "C:\Program Files\Bandizip"
+              Command = "Bandizip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Bandizip\Bandizip.exe' --help"
+            },
+            @{
+              Name = "NanaZip"
+              Urls = @(
+                "https://github.com/M2Team/NanaZip/releases/download/2.0.451/NanaZipSetup.exe",
+                "https://sourceforge.net/projects/nanazip/files/2.0.451/NanaZipSetup.exe/download",
+                "https://www.filehorse.com/download-nanazip/NanaZipSetup.exe",
+                "https://download.cnet.com/NanaZip/3000-2250_4-85994102.html",
+                "https://web.archive.org/web/20240801000000*/https://github.com/M2Team/NanaZip/releases/download/2.0.451/NanaZipSetup.exe",
+                "https://www.microsoft.com/store/apps/9NBB5K5KX8QN"
+              )
+              InstallPath = "C:\Program Files\NanaZip"
+              Command = "NanaZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\NanaZip\NanaZip.exe' --help"
+            },
+            @{
+              Name = "WinZip"
+              Urls = @(
+                "https://www.winzip.com/win/en/downwz.html",
+                "https://download.cnet.com/WinZip/3000-2250_4-10003164.html",
+                "https://www.filehorse.com/download-winzip/WinZipSetup.exe",
+                "https://sourceforge.net/projects/winzip/files/WinZip/27.0/WinZipSetup.exe/download",
+                "https://web.archive.org/web/20240801000000*/https://www.winzip.com/win/en/downwz.html",
+                "https://www.softonic.com/download/winzip/windows"
+              )
+              InstallPath = "C:\Program Files\WinZip"
+              Command = "winzip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\WinZip\winzip.exe' -h"
+            },
+            @{
+              Name = "HaoZip"
+              Urls = @(
+                "https://www.haosoft.com/download/HaoZipSetup.exe",
+                "https://download.cnet.com/HaoZip/3000-2250_4-75914102.html",
+                "https://www.filehorse.com/download-haozip/HaoZipSetup.exe",
+                "https://sourceforge.net/projects/haozip/files/HaoZip/6.3/HaoZipSetup.exe/download",
+                "https://web.archive.org/web/20240801000000*/https://www.haosoft.com/download/HaoZipSetup.exe",
+                "https://www.softonic.com/download/haozip/windows"
+              )
+              InstallPath = "C:\Program Files\HaoZip"
+              Command = "HaoZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\HaoZip\HaoZip.exe' -h"
+            },
+            @{
+              Name = "Zipeg"
+              Urls = @(
+                "https://www.zipeg.com/download/ZipegSetup.exe",
+                "https://sourceforge.net/projects/zipeg/files/Zipeg/2.9/ZipegSetup.exe/download",
+                "https://www.filehorse.com/download-zipeg/ZipegSetup.exe",
+                "https://download.cnet.com/Zipeg/3000-2250_4-10893402.html",
+                "https://web.archive.org/web/20240801000000*/https://www.zipeg.com/download/ZipegSetup.exe",
+                "https://www.softonic.com/download/zipeg/windows"
+              )
+              InstallPath = "C:\Program Files\Zipeg"
+              Command = "Zipeg.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Zipeg\Zipeg.exe' -h"
+            },
+            @{
+              Name = "FreeArc"
+              Urls = @(
+                "https://freearc.org/download/FreeArcSetup.exe",
+                "https://sourceforge.net/projects/freearc/files/FreeArc/0.666/FreeArcSetup.exe/download",
+                "https://www.filehorse.com/download-freearc/FreeArcSetup.exe",
+                "https://download.cnet.com/FreeArc/3000-2250_4-10893403.html",
+                "https://web.archive.org/web/20240801000000*/https://freearc.org/download/FreeArcSetup.exe",
+                "https://www.softonic.com/download/freearc/windows"
+              )
+              InstallPath = "C:\Program Files\FreeArc"
+              Command = "FreeArc.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\FreeArc\FreeArc.exe' -h"
+            },
+            @{
+              Name = "IZArc"
+              Urls = @(
+                "https://www.izarc.org/download/IZArcSetup.exe",
+                "https://sourceforge.net/projects/izarc/files/IZArc/4.5/IZArcSetup.exe/download",
+                "https://www.filehorse.com/download-izarc/IZArcSetup.exe",
+                "https://download.cnet.com/IZArc/3000-2250_4-10093404.html",
+                "https://web.archive.org/web/20240801000000*/https://www.izarc.org/download/IZArcSetup.exe",
+                "https://www.softonic.com/download/izarc/windows"
+              )
+              InstallPath = "C:\Program Files\IZArc"
+              Command = "IZArc.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\IZArc\IZArc.exe' -h"
+            },
+            @{
+              Name = "TUGZip"
+              Urls = @(
+                "https://www.tugzip.com/download/TUGZipSetup.exe",
+                "https://sourceforge.net/projects/tugzip/files/TUGZip/3.5/TUGZipSetup.exe/download",
+                "https://www.filehorse.com/download-tugzip/TUGZipSetup.exe",
+                "https://download.cnet.com/TUGZip/3000-2250_4-10893405.html",
+                "https://web.archive.org/web/20240801000000*/https://www.tugzip.com/download/TUGZipSetup.exe",
+                "https://www.softonic.com/download/tugzip/windows"
+              )
+              InstallPath = "C:\Program Files\TUGZip"
+              Command = "TUGZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\TUGZip\TUGZip.exe' -h"
+            },
+            @{
+              Name = "ExtractNow"
+              Urls = @(
+                "https://www.extractnow.com/download/ExtractNowSetup.exe",
+                "https://sourceforge.net/projects/extractnow/files/ExtractNow/4.8/ExtractNowSetup.exe/download",
+                "https://www.filehorse.com/download-extractnow/ExtractNowSetup.exe",
+                "https://download.cnet.com/ExtractNow/3000-2250_4-10893406.html",
+                "https://web.archive.org/web/20240801000000*/https://www.extractnow.com/download/ExtractNowSetup.exe",
+                "https://www.softonic.com/download/extractnow/windows"
+              )
+              InstallPath = "C:\Program Files\ExtractNow"
+              Command = "ExtractNow.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\ExtractNow\ExtractNow.exe' -h"
+            },
+            @{
+              Name = "Universal Extractor"
+              Urls = @(
+                "https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
+                "https://sourceforge.net/projects/uniextract/files/Universal Extractor/1.6/UniversalExtractorSetup.exe/download",
+                "https://www.filehorse.com/download-universal-extractor/UniversalExtractorSetup.exe",
+                "https://download.cnet.com/Universal-Extractor/3000-2250_4-10893407.html",
+                "https://web.archive.org/web/20240801000000*/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
+                "https://www.softonic.com/download/universal-extractor/windows"
+              )
+              InstallPath = "C:\Program Files\Universal Extractor"
+              Command = "UniExtract.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Universal Extractor\UniExtract.exe' -h"
+            },
+            @{
+              Name = "ALZip"
+              Urls = @(
+                "https://www.altools.com/download/ALZipSetup.exe",
+                "https://sourceforge.net/projects/alzip/files/ALZip/8.5/ALZipSetup.exe/download",
+                "https://www.filehorse.com/download-alzip/ALZipSetup.exe",
+                "https://download.cnet.com/ALZip/3000-2250_4-10893408.html",
+                "https://web.archive.org/web/20240801000000*/https://www.altools.com/download/ALZipSetup.exe",
+                "https://www.softonic.com/download/alzip/windows"
+              )
+              InstallPath = "C:\Program Files\ALZip"
+              Command = "ALZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\ALZip\ALZip.exe' -h"
+            },
+            @{
+              Name = "ZipGenius"
+              Urls = @(
+                "https://www.zipgenius.com/download/ZipGeniusSetup.exe",
+                "https://sourceforge.net/projects/zipgenius/files/ZipGenius/6.3/ZipGeniusSetup.exe/download",
+                "https://www.filehorse.com/download-zipgenius/ZipGeniusSetup.exe",
+                "https://download.cnet.com/ZipGenius/3000-2250_4-10893409.html",
+                "https://web.archive.org/web/20240801000000*/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
+                "https://www.softonic.com/download/zipgenius/windows"
+              )
+              InstallPath = "C:\Program Files\ZipGenius"
+              Command = "ZipGenius.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\ZipGenius\ZipGenius.exe' -h"
+            },
+            @{
+              Name = "PowerArchiver"
+              Urls = @(
+                "https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
+                "https://sourceforge.net/projects/powerarchiver/files/PowerArchiver/21.0/PowerArchiverSetup.exe/download",
+                "https://www.filehorse.com/download-powerarchiver/PowerArchiverSetup.exe",
+                "https://download.cnet.com/PowerArchiver/3000-2250_4-10893410.html",
+                "https://web.archive.org/web/20240801000000*/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
+                "https://www.softonic.com/download/powerarchiver/windows"
+              )
+              InstallPath = "C:\Program Files\PowerArchiver"
+              Command = "PowerArchiver.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' -h"
+            },
+            @{
+              Name = "B1 Free Archiver"
+              Urls = @(
+                "https://b1.org/download/B1FreeArchiverSetup.exe",
+                "https://sourceforge.net/projects/b1archiver/files/B1 Free Archiver/1.7/B1FreeArchiverSetup.exe/download",
+                "https://www.filehorse.com/download-b1-free-archiver/B1FreeArchiverSetup.exe",
+                "https://download.cnet.com/B1-Free-Archiver/3000-2250_4-10893411.html",
+                "https://web.archive.org/web/20240801000000*/https://b1.org/download/B1FreeArchiverSetup.exe",
+                "https://www.softonic.com/download/b1-free-archiver/windows"
+              )
+              InstallPath = "C:\Program Files\B1 Free Archiver"
+              Command = "B1Archiver.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' -h"
+            },
+            @{
+              Name = "Ashampoo ZIP Free"
+              Urls = @(
+                "https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
+                "https://sourceforge.net/projects/ashampoozip/files/Ashampoo ZIP Free/1.0/AshampooZIPFreeSetup.exe/download",
+                "https://www.filehorse.com/download-ashampoo-zip-free/AshampooZIPFreeSetup.exe",
+                "https://download.cnet.com/Ashampoo-ZIP-Free/3000-2250_4-10893412.html",
+                "https://web.archive.org/web/20240801000000*/https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
+                "https://www.softonic.com/download/ashampoo-zip-free/windows"
+              )
+              InstallPath = "C:\Program Files\Ashampoo ZIP Free"
+              Command = "AshampooZIP.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' -h"
+            },
+            @{
+              Name = "Hamster ZIP Archiver"
+              Urls = @(
+                "https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
+                "https://sourceforge.net/projects/hamsterzip/files/Hamster ZIP Archiver/4.0/HamsterZIPSetup.exe/download",
+                "https://www.filehorse.com/download-hamster-zip-archiver/HamsterZIPSetup.exe",
+                "https://download.cnet.com/Hamster-ZIP-Archiver/3000-2250_4-10893413.html",
+                "https://web.archive.org/web/20240801000000*/https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
+                "https://www.softonic.com/download/hamster-zip-archiver/windows"
+              )
+              InstallPath = "C:\Program Files\Hamster ZIP Archiver"
+              Command = "HamsterZIP.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' -h"
+            },
+            @{
+              Name = "jZip"
+              Urls = @(
+                "https://www.jzip.com/download/jZipSetup.exe",
+                "https://sourceforge.net/projects/jzip/files/jZip/2.0/jZipSetup.exe/download",
+                "https://www.filehorse.com/download-jzip/jZipSetup.exe",
+                "https://download.cnet.com/jZip/3000-2250_4-10893414.html",
+                "https://web.archive.org/web/20240801000000*/https://www.jzip.com/download/jZipSetup.exe",
+                "https://www.softonic.com/download/jzip/windows"
+              )
+              InstallPath = "C:\Program Files\jZip"
+              Command = "jZip.exe"
+              InstallArgs = "/S"
+              TestCommand = "& 'C:\Program Files\jZip\jZip.exe' -h"
             }
-        )
-
-        foreach ($arch in $archivers) {
-            if ($success) { break }
-            echo "Attempting to install $($arch.Name)..."
-            foreach ($url in $arch.Urls) {
-                echo "Downloading $($arch.Name) from $url..."
-                curl -L -o archiver.exe $url --retry 1 --retry-delay 2 -w "%{http_code}\n" -s
-                $httpStatus = $LASTEXITCODE
-                if ($httpStatus -eq 0) {
-                    $fileSize = (Get-Item archiver.exe -ErrorAction SilentlyContinue).Length
-                    if ($fileSize -gt 5000000) {
-                        echo "$($arch.Name) download succeeded from $url (size: $fileSize bytes)"
-                        $success = $true
-                        $archiver = $arch.Name
-                        break
-                    } else {
-                        echo "File too small ($fileSize bytes), trying next mirror..."
-                        Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
-                    }
-                } else {
-                    echo "Download failed with status $httpStatus, trying next mirror..."
-                    Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
-                }
-            }
-
-            if ($success) {
-                echo "Installing $($arch.Name)..."
-                Start-Process -FilePath .\archiver.exe -ArgumentList $arch.InstallArgs -Wait -NoNewWindow
-                if ($LASTEXITCODE -eq 0) {
-                    echo "Adding $($arch.Name) to PATH..."
-                    $env:Path += ";$($arch.InstallPath)"
-                    echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-                    Invoke-Expression $arch.TestCommand
-                    if ($LASTEXITCODE -eq 0) {
-                        echo "$($arch.Name) installed and verified successfully."
-                    } else {
-                        echo "$($arch.Name) installed but verification failed, trying next archiver..."
-                        $success = $false
-                    }
-                } else {
-                    echo "Failed to install $($arch.Name), trying next archiver..."
-                    $success = $false
-                }
-                Remove-Item -Path archiver.exe -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        if (-not $success) {
-            echo "All download attempts failed, falling back to Chocolatey..."
-            choco install 7zip -y
-            if ($LASTEXITCODE -eq 0) {
-                echo "7-Zip installed via Chocolatey, using default path..."
-                $env:Path += ";C:\Program Files\7-Zip"
-                echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-                $archiver = "7-Zip"
-                $success = $true
-            } else {
-                echo "Failed to install 7-Zip via Chocolatey"
-                exit 1
-            }
-        }
-
-        echo "ARCHIVER=$archiver" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-    # Download DirectX SDK
-    - name: Download DirectX SDK
-      run: |
-        $urls = @(
-          "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
-          "https://archive.org/download/dxsdk-jun10/DXSDK_Jun10.exe"
-        )
-        $success = $false
-        foreach ($url in $urls) {
-          echo "Attempting to download DirectX SDK from $url..."
-          curl -L -o dxsdk.exe $url --retry 3 --retry-delay 2 -w "%{http_code}\n" -s
-          $httpStatus = $LASTEXITCODE
-          if ($httpStatus -eq 0) {
-            $fileSize = (Get-Item dxsdk.exe -ErrorAction SilentlyContinue).Length
-            if ($fileSize -gt 500000000) {
-              echo "DirectX SDK download succeeded from $url (size: $fileSize bytes)"
-              $success = $true
-              break
-            } else {
-              echo "File too small ($fileSize bytes), trying next mirror..."
-              Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
-            }
-          } else {
-            echo "Download failed with status $httpStatus, trying next mirror..."
-            Remove-Item -Path dxsdk.exe -Force -ErrorAction SilentlyContinue
-          }
-        }
-        if (-not $success) {
-          echo "All download attempts failed for DirectX SDK"
-          exit 1
-        }
-
-    # Extract DirectX SDK
-    - name: Extract DirectX SDK
-      shell: pwsh
-      run: |
-        if (Test-Path dxsdk.exe) {
-          mkdir dxsdk
-          $extractSuccess = $false
-          
-          $archivers = @(
-              @{ Name = "7-Zip"; Command = "7z x dxsdk.exe -odxsdk" },
-              @{ Name = "WinRAR"; Command = "rar x dxsdk.exe dxsdk\" }
           )
 
-          foreach ($arch in $archivers) {
-              if ($extractSuccess) { break }
-              if ($env:ARCHIVER -eq $arch.Name) {
-                  echo "Extracting with $($arch.Name)..."
-                  Invoke-Expression $arch.Command
+          $installedArchivers = @()
+
+          foreach ($archiver in $archivers) {
+            $success = $false
+            foreach ($url in $archiver.Urls) {
+              echo "Attempting to download $($archiver.Name) from $url..."
+              curl -L -o "$($archiver.Name).exe" $url --retry 5 --retry-delay 5
+              if ($LASTEXITCODE -eq 0 -and (Test-Path "$($archiver.Name).exe")) {
+                Start-Process -FilePath "$($archiver.Name).exe" -ArgumentList $archiver.InstallArgs -Wait -NoNewWindow
+                if ($LASTEXITCODE -eq 0) {
+                  $env:Path += ";$($archiver.InstallPath)"
+                  echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                  $testResult = Invoke-Expression $archiver.TestCommand 2>&1
                   if ($LASTEXITCODE -eq 0) {
-                      echo "Extraction successful with $($arch.Name)"
-                      $extractSuccess = $true
+                    echo "$($archiver.Name) installed successfully"
+                    $success = $true
+                    $installedArchivers += $archiver
+                    break
                   } else {
-                      echo "Extraction failed with $($arch.Name), trying next..."
+                    echo "$($archiver.Name) test failed: $testResult"
                   }
+                }
+                Remove-Item -Path "$($archiver.Name).exe" -Force -ErrorAction SilentlyContinue
               }
+              echo "Failed to install $($archiver.Name) from $url, trying next source..."
+            }
+            if (-not $success) {
+              echo "Warning: $($archiver.Name) installation failed, proceeding with other archivers..."
+            }
+          }
+
+          if ($installedArchivers.Count -eq 0) {
+            echo "Error: No archivers were installed successfully"
+            exit 1
+          }
+
+          echo "Successfully installed archivers: $($installedArchivers.Name -join ', ')"
+
+      - name: Extract DirectX SDK
+        shell: pwsh
+        run: |
+          echo "Extracting DirectX SDK at 15:29 MSK, 18 May 2025..."
+          if (-not (Test-Path dxsdk.exe)) {
+            echo "dxsdk.exe not found"
+            exit 1
+          }
+
+          mkdir dxsdk -ErrorAction SilentlyContinue
+          $extractSuccess = $false
+          $maxExtractAttempts = 5
+
+          # Список установленных архиваторов из предыдущего шага
+          $installedArchivers = @(
+            @{Name="7-Zip"; Command="7z"; ExtractCommand="7z x dxsdk.exe -o`"`"dxsdk`"`" -y"; CheckCommand="7z l dxsdk.exe -r"},
+            @{Name="WinRAR"; Command="rar"; ExtractCommand="rar x dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
+            @{Name="PeaZip"; Command="peazip.exe"; ExtractCommand="& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; CheckCommand="& 'C:\Program Files\PeaZip\peazip.exe' -l dxsdk.exe"; PostExtract="Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue"},
+            @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
+            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"},
+            @{Name="WinZip"; Command="winzip.exe"; ExtractCommand="& 'C:\Program Files\WinZip\winzip.exe' -e dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\WinZip\winzip.exe' -l dxsdk.exe"},
+            @{Name="HaoZip"; Command="HaoZip.exe"; ExtractCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' l dxsdk.exe"},
+            @{Name="Zipeg"; Command="Zipeg.exe"; ExtractCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' l dxsdk.exe"},
+            @{Name="FreeArc"; Command="FreeArc.exe"; ExtractCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' l dxsdk.exe"},
+            @{Name="IZArc"; Command="IZArc.exe"; ExtractCommand="& 'C:\Program Files\IZArc\IZArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\IZArc\IZArc.exe' l dxsdk.exe"},
+            @{Name="TUGZip"; Command="TUGZip.exe"; ExtractCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' l dxsdk.exe"},
+            @{Name="ExtractNow"; Command="ExtractNow.exe"; ExtractCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' l dxsdk.exe"},
+            @{Name="Universal Extractor"; Command="UniExtract.exe"; ExtractCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' l dxsdk.exe"},
+            @{Name="ALZip"; Command="ALZip.exe"; ExtractCommand="& 'C:\Program Files\ALZip\ALZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ALZip\ALZip.exe' l dxsdk.exe"},
+            @{Name="ZipGenius"; Command="ZipGenius.exe"; ExtractCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' l dxsdk.exe"},
+            @{Name="PowerArchiver"; Command="PowerArchiver.exe"; ExtractCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' l dxsdk.exe"},
+            @{Name="B1 Free Archiver"; Command="B1Archiver.exe"; ExtractCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' l dxsdk.exe"},
+            @{Name="Ashampoo ZIP Free"; Command="AshampooZIP.exe"; ExtractCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' l dxsdk.exe"},
+            @{Name="Hamster ZIP Archiver"; Command="HamsterZIP.exe"; ExtractCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' l dxsdk.exe"},
+            @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"}
+          )
+
+          # Проверяем содержимое dxsdk.exe перед распаковкой
+          echo "Checking contents of dxsdk.exe..."
+          $checkSuccess = $false
+          foreach ($archiver in $installedArchivers) {
+            if (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)")) {
+              echo "Checking with $($archiver.Name)..."
+              $checkResult = Invoke-Expression $archiver.CheckCommand 2>&1
+              if ($LASTEXITCODE -eq 0 -and $checkResult -match "Include" -and $checkResult -match "Lib") {
+                echo "Contents check succeeded with $($archiver.Name), sample output: $checkResult"
+                $checkSuccess = $true
+                break
+              } else {
+                echo "Failed to list contents with $($archiver.Name), output: $checkResult"
+              }
+            }
+          }
+          if (-not $checkSuccess) {
+            echo "Error: Unable to check contents with any archiver"
+            exit 1
+          }
+
+          # Пробуем распаковать dxsdk.exe каждым архиватором по очереди
+          foreach ($archiver in $installedArchivers) {
+            if (-not (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)"))) {
+              echo "Skipping $($archiver.Name) - not installed or not found"
+              continue
+            }
+
+            echo "Attempting to extract dxsdk.exe with $($archiver.Name)..."
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              Invoke-Expression $archiver.ExtractCommand
+              if ($LASTEXITCODE -eq 0) {
+                if ($archiver.PostExtract) {
+                  Invoke-Expression $archiver.PostExtract
+                }
+                # Проверяем наличие папок Include и Lib
+                if (Test-Path dxsdk\Include -and Test-Path dxsdk\Lib) {
+                  echo "$($archiver.Name) extracted dxsdk.exe successfully on attempt $attempt"
+                  $extractSuccess = $true
+                  break
+                } else {
+                  echo "$($archiver.Name) extracted but required folders (Include/Lib) not found on attempt $attempt, retrying..."
+                  Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+                }
+              } else {
+                echo "$($archiver.Name) failed to extract dxsdk.exe on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                Remove-Item -Path dxsdk\* -Recurse -Force -ErrorAction SilentlyContinue
+              }
+              Start-Sleep -Seconds 5
+            }
+            if ($extractSuccess) { break }
+            echo "$($archiver.Name) failed after $maxExtractAttempts attempts, trying next archiver..."
           }
 
           if (-not $extractSuccess) {
-              echo "Failed to extract DirectX SDK with available archivers"
-              exit 1
+            echo "Error: Failed to extract dxsdk.exe with all available archivers"
+            exit 1
           }
-        } else {
-          echo "DirectX SDK installer not found"
-          exit 1
-        }
 
-    # Create RustCheat.h
-    - name: Create RustCheat.h
-      shell: pwsh
-      run: |
-        $content = @"
-// RustCheat.h - Header file for a DirectX-based application
-#ifndef RUST_CHEAT_H
-#define RUST_CHEAT_H
+          # Логируем файлы после первой распаковки
+          echo "Listing all files in dxsdk folder after initial extraction:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
 
-#include <vector>
-#include <map>
-#include <string>
-
-// 2D Vector structure for screen coordinates
-struct Vector2 {
-    float x, y;
-};
-
-// 3D Vector structure for world coordinates
-struct Vector3 {
-    float x, y, z;
-};
-
-// Signature map for memory parsing (simplified)
-using Signatures = std::map<std::string, std::vector<unsigned char>>;
-
-// Offset map for memory addresses
-using Offsets = std::map<std::string, unsigned long long>;
-
-#endif
-"@
-        Set-Content -Path "RustCheat.h" -Value $content
-        if (Test-Path "RustCheat.h") {
-          echo "RustCheat.h created successfully"
-        } else {
-          echo "Failed to create RustCheat.h"
-          exit 1
-        }
-
-    # Create dllmain.cpp
-    - name: Create dllmain.cpp
-      shell: pwsh
-      run: |
-        $content = @"
-// dllmain.cpp - Maxed-out DirectX DLL cheat for Rust Alkad 2588
-#define _CRT_SECURE_NO_WARNINGS
-#define _USE_MATH_DEFINES
-
-#include \"RustCheat.h\"
-#include <d3d9.h>
-#include <d3dx9.h>
-#include <windows.h>
-#include <string>
-#include <vector>
-#include <thread>
-#include <cmath>
-#include <algorithm>
-#include <fstream>
-#include <ctime>
-
-// Encryption key (simple XOR for demo)
-const unsigned char XOR_KEY = 0x5F;
-
-// Global variables
-static HWND g_hwnd = nullptr;
-static LPDIRECT3D9 g_pD3D = nullptr;
-static LPDIRECT3DDEVICE9 g_pd3dDevice = nullptr;
-static LPD3DXFONT g_pFont = nullptr;
-static D3DPRESENT_PARAMETERS g_d3dpp = {};
-static HANDLE g_hProcess = nullptr;
-static DWORD g_baseAddr = 0x7FF60000; // Placeholder, will auto-update
-static bool g_featureEnabled1 = false; // ESP
-static bool g_featureEnabled2 = false; // Aim
-static bool g_featureEnabled3 = false; // Silent
-static float g_aimFOV = 90.0f, g_aimSpeed = 0.2f;
-static float g_silentFOV = 90.0f, g_silentSpeed = 0.2f;
-static Offsets g_offsets = {
-    {\"Offset1\", DecryptOffset(0x3091C30)}, // Entity list (updated for Alkad 2588)
-    {\"Offset2\", DecryptOffset(0xC8)},      // Camera offset (adjusted for Alkad)
-    {\"Offset3\", DecryptOffset(0x331B3D0)}, // Base offset (updated for Jungle Update)
-    {\"Offset4\", DecryptOffset(0x4E0)},     // Input offset (same)
-    {\"Offset5\", DecryptOffset(0x38)},      // Item offset (shifted for new items)
-    {\"Offset6\", DecryptOffset(0x3093D50)}, // Projectile offset (updated for Alkad 2588)
-    {\"Offset7\", DecryptOffset(0x68)}       // Angles offset (same)
-};
-
-// Encryption/Decryption function
-unsigned long long EncryptOffset(unsigned long long offset) {
-    return offset ^ XOR_KEY;
-}
-
-unsigned long long DecryptOffset(unsigned long long offset) {
-    return offset ^ XOR_KEY;
-}
-
-// Auto-dump offsets
-void AutoDumpOffsets() {
-    static time_t lastDump = 0;
-    if (time(nullptr) - lastDump < 300) return; // Dump every 5 minutes
-    std::ofstream file(\"offsets_dump.txt\", std::ios::app);
-    if (file.is_open()) {
-        file << \"Dump at \" << ctime(&lastDump) << \"\n\";
-        for (const auto& [key, value] : g_offsets) {
-            file << key << \": 0x\" << std::hex << value << \"\n\";
-        }
-        file << \"----------------\n\";
-        file.close();
-    }
-    lastDump = time(nullptr);
-}
-
-// Validate offsets (simplified for demo)
-bool ValidateOffset(DWORD64 offset) {
-    unsigned char buffer[1];
-    return ReadProcessMemory(GetCurrentProcess(), (LPCVOID)offset, buffer, sizeof(buffer), nullptr);
-}
-
-// Update base address (simplified placeholder)
-void UpdateBaseAddr() {
-    // In real scenario, scan memory for Rust module base using Zydis (web:12)
-    g_baseAddr += 0x1000; // Dummy update for demo
-    AutoDumpOffsets();
-}
-
-// Initialize DirectX device
-bool InitD3D(HWND hwnd) {
-    g_pD3D = Direct3DCreate9(D3D_SDK_VERSION);
-    if (!g_pD3D) return false;
-
-    ZeroMemory(&g_d3dpp, sizeof(g_d3dpp));
-    g_d3dpp.Windowed = TRUE;
-    g_d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-    g_d3dpp.BackBufferFormat = D3DFMT_A8R8G8B8;
-    g_d3dpp.EnableAutoDepthStencil = TRUE;
-    g_d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
-    g_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-
-    HRESULT result = g_pD3D->CreateDevice(
-        D3DADAPTER_DEFAULT,
-        D3DDEVTYPE_HAL,
-        hwnd,
-        D3DCREATE_HARDWARE_VERTEXPROCESSING,
-        &g_d3dpp,
-        &g_pd3dDevice
-    );
-
-    if (FAILED(result)) {
-        g_pD3D->Release();
-        return false;
-    }
-
-    result = D3DXCreateFontA(
-        g_pd3dDevice,
-        14,
-        0,
-        FW_BOLD,
-        1,
-        FALSE,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS,
-        DEFAULT_QUALITY,
-        DEFAULT_PITCH | FF_DONTCARE,
-        \"Arial\",
-        &g_pFont
-    );
-
-    if (FAILED(result)) {
-        g_pd3dDevice->Release();
-        g_pD3D->Release();
-        return false;
-    }
-
-    return true;
-}
-
-// Cleanup DirectX resources
-void CleanupD3D() {
-    if (g_pFont) g_pFont->Release();
-    if (g_pd3dDevice) g_pd3dDevice->Release();
-    if (g_pD3D) g_pD3D->Release();
-}
-
-// Read memory
-bool ReadMemory(DWORD64 address, void* buffer, SIZE_T size) {
-    return ReadProcessMemory(g_hProcess, (LPCVOID)address, buffer, size, nullptr);
-}
-
-// Write memory
-bool WriteMemory(DWORD64 address, const void* value, SIZE_T size) {
-    return WriteProcessMemory(g_hProcess, (LPVOID)address, value, size, nullptr);
-}
-
-// Entity structure
-struct Entity {
-    Vector3 pos;
-    float health;
-    bool isItem;
-};
-
-// Read 3D vector
-Vector3 ReadVector3(DWORD64 address) {
-    Vector3 v = {0};
-    if (ValidateOffset(address + 0x30)) ReadMemory(address + 0x30, &v.x, sizeof(float));
-    if (ValidateOffset(address + 0x34)) ReadMemory(address + 0x34, &v.y, sizeof(float));
-    if (ValidateOffset(address + 0x38)) ReadMemory(address + 0x38, &v.z, sizeof(float));
-    return v;
-}
-
-// Get entities
-std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
-    std::vector<Entity> entities;
-    DWORD64 listAddr;
-    if (!ValidateOffset(baseAddr + offset) || !ReadMemory(baseAddr + offset, &listAddr, sizeof(DWORD64)) || !listAddr) return entities;
-
-    DWORD count;
-    if (!ValidateOffset(listAddr + 0x4) || !ReadMemory(listAddr + 0x4, &count, sizeof(DWORD))) return entities;
-
-    for (DWORD i = 0; i < std::min<DWORD>(count, 200); ++i) {
-        DWORD64 entityAddr;
-        if (!ValidateOffset(listAddr + 0x8 + i * 0x8) || !ReadMemory(listAddr + 0x8 + i * 0x8, &entityAddr, sizeof(DWORD64)) || !entityAddr) continue;
-
-        DWORD64 posAddr;
-        if (!ValidateOffset(entityAddr + 0x10) || !ReadMemory(entityAddr + 0x10, &posAddr, sizeof(DWORD64)) || !posAddr) continue;
-
-        DWORD64 extraAddr;
-        if (!ValidateOffset(entityAddr + (isItem ? 0x28 : 0x20)) || !ReadMemory(entityAddr + (isItem ? 0x28 : 0x20), &extraAddr, sizeof(DWORD64)) || !extraAddr) continue;
-
-        Vector3 pos = ReadVector3(posAddr);
-        float health = 0.0f;
-        if (!isItem && ValidateOffset(extraAddr)) ReadMemory(extraAddr, &health, sizeof(float));
-
-        if (!isItem && health > 0.0f || isItem) {
-            entities.push_back({pos, health, isItem});
-        }
-    }
-    return entities;
-}
-
-// Convert world to screen (adaptive resolution)
-Vector2 WorldToScreen(const Vector3& pos, const Vector3& cameraPos, float fov, int screenWidth, int screenHeight) {
-    Vector2 screen = {0};
-    float dx = pos.x - cameraPos.x;
-    float dy = pos.y - cameraPos.y;
-    float dz = pos.z - cameraPos.z;
-    float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-    if (dist < 0.1f) return screen;
-
-    screen.x = screenWidth / 2 + (dx / dist) * (screenWidth / (2 * tanf(fov * M_PI / 360.0f)));
-    screen.y = screenHeight / 2 - (dz / dist) * (screenHeight / (2 * tanf(fov * M_PI / 360.0f)));
-    return screen;
-}
-
-// Find target
-Entity* GetTarget(const std::vector<Entity>& entities, const Vector3& cameraPos, const Vector2& angles, float fov) {
-    Entity* closest = nullptr;
-    float minDist = FLT_MAX;
-
-    for (const auto& entity : entities) {
-        float dx = entity.pos.x - cameraPos.x;
-        float dy = entity.pos.y - cameraPos.y;
-        float dz = entity.pos.z - cameraPos.z;
-        float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-
-        if (dist < minDist && dist > 0.1f) {
-            float yaw = atan2f(dy, dx) * 180.0f / static_cast<float>(M_PI);
-            float yawDiff = fmodf(yaw - angles.x + 180.0f, 360.0f) - 180.0f;
-
-            if (fabsf(yawDiff) < fov) {
-                minDist = dist;
-                closest = const_cast<Entity*>(&entity);
+          # Ищем большой файл (CAB или другой архив)
+          echo "Searching for potential large files (>300MB)..."
+          $largeFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 300000000 } | Select-Object -First 1
+          if ($largeFile) {
+            echo "Found large file: $($largeFile.FullName), size: $($largeFile.Length) bytes"
+            Move-Item -Path $largeFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+          } else {
+            echo "No large file found with size > 300MB. Trying alternative extraction method..."
+            $potentialCabs = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Extension -match "\.cab|\.msi|\.zip" -and $_.Length -gt 100000000 } | Select-Object -First 1
+            if ($potentialCabs) {
+              echo "Found potential CAB file: $($potentialCabs.FullName), size: $($potentialCabs.Length) bytes"
+              Move-Item -Path $potentialCabs.FullName -Destination "dxsdk\dxsdk.cab" -Force
+            } else {
+              echo "No CAB or similar archive found in dxsdk folder"
+              Get-ChildItem -Path dxsdk -Recurse -File | ForEach-Object { echo "File: $($_.FullName), Size: $($_.Length) bytes" }
+              exit 1
             }
-        }
-    }
-    return closest;
-}
+          }
 
-// Set angles
-void SetAngles(DWORD64 inputAddr, const Entity& target, const Vector3& cameraPos, float speed) {
-    float dx = target.pos.x - cameraPos.x;
-    float dy = target.pos.y - cameraPos.y;
-    float dz = target.pos.z - cameraPos.z;
-    float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-    float yaw = atan2f(dy, dx) * 180.0f / static_cast<float>(M_PI);
-    float pitch = asinf(dz / dist) * 180.0f / static_cast<float>(M_PI);
-
-    float currentYaw = 0.0f, currentPitch = 0.0f;
-    if (ValidateOffset(inputAddr + 0x40)) ReadMemory(inputAddr + 0x40, &currentYaw, sizeof(float));
-    if (ValidateOffset(inputAddr + 0x44)) ReadMemory(inputAddr + 0x44, &currentPitch, sizeof(float));
-
-    float newYaw = currentYaw + (yaw - currentYaw) * speed;
-    float newPitch = currentPitch + (pitch - currentPitch) * speed;
-    if (ValidateOffset(inputAddr + 0x40)) WriteMemory(inputAddr + 0x40, &newYaw, sizeof(float));
-    if (ValidateOffset(inputAddr + 0x44)) WriteMemory(inputAddr + 0x44, &newPitch, sizeof(float));
-}
-
-// Set silent angles
-void SetSilentAngles(DWORD64 projectileAddr, const Entity& target, const Vector3& cameraPos, float speed) {
-    float dx = target.pos.x - cameraPos.x;
-    float dy = target.pos.y - cameraPos.y;
-    float dz = target.pos.z - cameraPos.z;
-    float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-    float yaw = atan2f(dy, dx) * 180.0f / static_cast<float>(M_PI);
-    float pitch = asinf(dz / dist) * 180.0f / static_cast<float>(M_PI);
-
-    float currentYaw = 0.0f, currentPitch = 0.0f;
-    if (ValidateOffset(projectileAddr + g_offsets[\"Offset7\"])) ReadMemory(projectileAddr + g_offsets[\"Offset7\"], &currentYaw, sizeof(float));
-    if (ValidateOffset(projectileAddr + g_offsets[\"Offset7\"] + 0x4)) ReadMemory(projectileAddr + g_offsets[\"Offset7\"] + 0x4, &currentPitch, sizeof(float));
-
-    float newYaw = currentYaw + (yaw - currentYaw) * speed;
-    float newPitch = currentPitch + (pitch - currentPitch) * speed;
-    if (ValidateOffset(projectileAddr + g_offsets[\"Offset7\"])) WriteMemory(projectileAddr + g_offsets[\"Offset7\"], &newYaw, sizeof(float));
-    if (ValidateOffset(projectileAddr + g_offsets[\"Offset7\"] + 0x4)) WriteMemory(projectileAddr + g_offsets[\"Offset7\"] + 0x4, &newPitch, sizeof(float));
-}
-
-// Render loop
-void RenderLoop() {
-    if (!g_pd3dDevice) return;
-    g_pd3dDevice->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_ARGB(0, 0, 0, 0), 1.0f, 0);
-    g_pd3dDevice->BeginScene();
-
-    UpdateBaseAddr(); // Auto-update base address
-
-    DWORD64 inputAddr;
-    if (!ValidateOffset(g_baseAddr + g_offsets[\"Offset1\"] + g_offsets[\"Offset4\"]) || 
-        !ReadMemory(g_baseAddr + g_offsets[\"Offset1\"] + g_offsets[\"Offset4\"], &inputAddr, sizeof(DWORD64)) || !inputAddr) {
-        g_pd3dDevice->EndScene();
-        g_pd3dDevice->Present(nullptr, nullptr, nullptr, nullptr);
-        return;
-    }
-
-    Vector3 cameraPos = ReadVector3(inputAddr + 0x10);
-    Vector2 cameraAngles;
-    if (ValidateOffset(inputAddr + 0x44)) ReadMemory(inputAddr + 0x44, &cameraAngles.x, sizeof(float));
-    if (ValidateOffset(inputAddr + 0x40)) ReadMemory(inputAddr + 0x40, &cameraAngles.y, sizeof(float));
-
-    D3DVIEWPORT9 viewport;
-    g_pd3dDevice->GetViewport(&viewport);
-    int screenWidth = viewport.Width;
-    int screenHeight = viewport.Height;
-
-    auto entities = GetEntities(g_baseAddr, g_offsets[\"Offset3\"], false);
-    auto items = GetEntities(g_baseAddr, g_offsets[\"Offset5\"], true);
-
-    if (g_featureEnabled1) {
-        for (const auto& entity : entities) {
-            Vector2 screen = WorldToScreen(entity.pos, cameraPos, g_aimFOV, screenWidth, screenHeight);
-            float dist = sqrtf(powf(entity.pos.x - cameraPos.x, 2) + powf(entity.pos.y - cameraPos.y, 2) + powf(entity.pos.z - cameraPos.z, 2));
-            if (screen.x > 0 && screen.x < screenWidth && screen.y > 0 && screen.y < screenHeight) {
-                g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
-                D3DRECT rect = { (LONG)screen.x - 10, (LONG)screen.y - 20, (LONG)screen.x + 10, (LONG)screen.y + 20 };
-                g_pd3dDevice->Clear(1, &rect, D3DCLEAR_TARGET, D3DCOLOR_ARGB(255, 255, 0, 0), 0, 0);
-                RECT textRect = { (LONG)screen.x + 15, (LONG)screen.y - 20, (LONG)screen.x + 100, (LONG)screen.y + 20 };
-                g_pFont->DrawTextA(nullptr, (\"Health: \" + std::to_string((int)entity.health)).c_str(), -1, &textRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 255, 255));
-                textRect.top += 15;
-                g_pFont->DrawTextA(nullptr, (\"Dist: \" + std::to_string((int)dist) + \"m\").c_str(), -1, &textRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 255, 255));
+          # Распаковываем CAB-файл с помощью доступных архиваторов
+          $cabExtractSuccess = $false
+          foreach ($archiver in $installedArchivers) {
+            if (-not (Get-Command $archiver.Command -ErrorAction SilentlyContinue -or (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)"))) {
+              echo "Skipping $($archiver.Name) for CAB extraction - not installed or not found"
+              continue
             }
-        }
-        for (const auto& item : items) {
-            Vector2 screen = WorldToScreen(item.pos, cameraPos, g_aimFOV, screenWidth, screenHeight);
-            float dist = sqrtf(powf(item.pos.x - cameraPos.x, 2) + powf(item.pos.y - cameraPos.y, 2) + powf(item.pos.z - cameraPos.z, 2));
-            if (screen.x > 0 && screen.x < screenWidth && screen.y > 0 && screen.y < screenHeight) {
-                D3DRECT rect = { (LONG)screen.x - 10, (LONG)screen.y - 20, (LONG)screen.x + 10, (LONG)screen.y + 20 };
-                g_pd3dDevice->Clear(1, &rect, D3DCLEAR_TARGET, D3DCOLOR_ARGB(255, 0, 255, 0), 0, 0);
-                RECT textRect = { (LONG)screen.x + 15, (LONG)screen.y - 20, (LONG)screen.x + 100, (LONG)screen.y + 20 };
-                g_pFont->DrawTextA(nullptr, (\"Dist: \" + std::to_string((int)dist) + \"m\").c_str(), -1, &textRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 255, 255));
+
+            echo "Attempting to extract dxsdk.cab with $($archiver.Name)..."
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              $cabExtractCommand = $archiver.ExtractCommand -replace "dxsdk.exe", "dxsdk\dxsdk.cab" -replace "-o dxsdk", "-o dxsdk\extracted"
+              if ($archiver.Name -eq "WinRAR") {
+                $cabExtractCommand = "rar x dxsdk\dxsdk.cab dxsdk\extracted\ -y"
+              } elseif ($archiver.Name -eq "PeaZip") {
+                $cabExtractCommand = "& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk\dxsdk.cab"
+              }
+              Invoke-Expression $cabExtractCommand
+              if ($LASTEXITCODE -eq 0) {
+                if ($archiver.Name -eq "PeaZip") {
+                  Move-Item -Path dxsdk\dxsdk.cab\* -Destination dxsdk\extracted -Force -ErrorAction SilentlyContinue
+                }
+                if (Test-Path dxsdk\extracted) {
+                  echo "$($archiver.Name) extracted dxsdk.cab successfully on attempt $attempt"
+                  $cabExtractSuccess = $true
+                  break
+                } else {
+                  echo "$($archiver.Name) extracted but extracted folder not found on attempt $attempt, retrying..."
+                  Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+                }
+              } else {
+                echo "$($archiver.Name) failed to extract dxsdk.cab on attempt $attempt, exit code $LASTEXITCODE, retrying..."
+                Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+              }
+              Start-Sleep -Seconds 5
             }
-        }
-    }
+            if ($cabExtractSuccess) { break }
+            echo "$($archiver.Name) failed to extract dxsdk.cab after $maxExtractAttempts attempts, trying next archiver..."
+          }
 
-    if (g_featureEnabled2 && GetAsyncKeyState(VK_RBUTTON)) {
-        auto target = GetTarget(entities, cameraPos, cameraAngles, g_aimFOV);
-        if (target) {
-            SetAngles(inputAddr, *target, cameraPos, g_aimSpeed);
-        }
-    }
+          if (-not $cabExtractSuccess) {
+            echo "Error: Failed to extract dxsdk.cab with all available archivers"
+            exit 1
+          }
 
-    if (g_featureEnabled3 && GetAsyncKeyState(VK_LBUTTON)) {
-        DWORD64 projectileAddr;
-        if (ValidateOffset(g_baseAddr + g_offsets[\"Offset6\"]) && 
-            ReadMemory(g_baseAddr + g_offsets[\"Offset6\"], &projectileAddr, sizeof(DWORD64)) && projectileAddr) {
-            auto target = GetTarget(entities, cameraPos, cameraAngles, g_silentFOV);
-            if (target) {
-                SetSilentAngles(projectileAddr, *target, cameraPos, g_silentSpeed);
+          # Перемещаем файлы из extracted в dxsdk
+          echo "Moving extracted files to dxsdk folder..."
+          Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path dxsdk\extracted -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path dxsdk\dxsdk.cab -Force -ErrorAction SilentlyContinue
+
+          # Проверяем наличие папки Include
+          echo "Listing files in dxsdk folder after CAB extraction:"
+          Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName) ($($_.Length) bytes)" }
+          if (Test-Path dxsdk\Include) {
+            echo "DirectX SDK extracted successfully, Include folder found!"
+          } else {
+            echo "Include folder not found after extraction. Attempting alternative extraction..."
+            echo "Running dxsdk.exe as installer..."
+            for ($attempt = 1; $attempt -le $maxExtractAttempts; $attempt++) {
+              Start-Process -FilePath "dxsdk.exe" -ArgumentList "/S /D=dxsdk_install" -Wait -NoNewWindow
+              if ($LASTEXITCODE -eq 0 -and (Test-Path dxsdk_install)) {
+                echo "Installer ran successfully on attempt $attempt, moving files to dxsdk..."
+                Move-Item -Path dxsdk_install\* -Destination dxsdk -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path dxsdk_install -Recurse -Force -ErrorAction SilentlyContinue
+                if (Test-Path dxsdk\Include) {
+                  echo "DirectX SDK extracted successfully via installer on attempt $attempt!"
+                  break
+                } else {
+                  echo "Include folder still not found after installer on attempt $attempt, retrying..."
+                  if ($attempt -eq $maxExtractAttempts) {
+                    echo "Installer failed to create Include folder after $maxExtractAttempts attempts"
+                    exit 1
+                  }
+                  Start-Sleep -Seconds 5
+                }
+              } else {
+                echo "Installer failed on attempt $attempt with exit code $LASTEXITCODE, retrying..."
+                if ($attempt -eq $maxExtractAttempts) {
+                  echo "Installer failed after $maxExtractAttempts attempts"
+                  exit 1
+                }
+                Start-Sleep -Seconds 5
+              }
             }
-        }
-    }
+          }
 
-    // Draw indicators
-    if (g_featureEnabled1) {
-        RECT espRect = { 10, 10, 200, 30 };
-        g_pFont->DrawTextA(nullptr, \"ESP ON\", -1, &espRect, DT_LEFT, D3DCOLOR_ARGB(255, 0, 255, 0));
-    } else {
-        RECT espRect = { 10, 10, 200, 30 };
-        g_pFont->DrawTextA(nullptr, \"ESP OFF\", -1, &espRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 0, 0));
-    }
-    if (g_featureEnabled2) {
-        RECT aimRect = { 10, 40, 200, 60 };
-        g_pFont->DrawTextA(nullptr, \"AIM ON\", -1, &aimRect, DT_LEFT, D3DCOLOR_ARGB(255, 0, 255, 0));
-    } else {
-        RECT aimRect = { 10, 40, 200, 60 };
-        g_pFont->DrawTextA(nullptr, \"AIM OFF\", -1, &aimRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 0, 0));
-    }
-    if (g_featureEnabled3) {
-        RECT silentRect = { 10, 70, 200, 90 };
-        g_pFont->DrawTextA(nullptr, \"SILENT ON\", -1, &silentRect, DT_LEFT, D3DCOLOR_ARGB(255, 0, 255, 0));
-    } else {
-        RECT silentRect = { 10, 70, 200, 90 };
-        g_pFont->DrawTextA(nullptr, \"SILENT OFF\", -1, &silentRect, DT_LEFT, D3DCOLOR_ARGB(255, 255, 0, 0));
-    }
+      - name: Set up DirectX SDK environment
+        shell: pwsh
+        run: |
+          echo "Setting up DirectX SDK environment at 15:29 MSK, 18 May 2025..."
+          echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "Path=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;C:\tools\mingw64\bin;$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\dxsdk\Include")) {
+            echo "Include folder not found"
+            exit 1
+          }
+          echo "Environment variables set successfully"
 
-    g_pd3dDevice->EndScene();
-    g_pd3dDevice->Present(nullptr, nullptr, nullptr, nullptr);
-}
+      - name: Build DirectXSample DLL
+        shell: pwsh
+        run: |
+          echo "Compiling DirectXSample DLL at 15:29 MSK, 18 May 2025..."
+          g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
+          if ($LASTEXITCODE -ne 0) {
+            echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          if (-not (Test-Path DirectXSample.dll)) {
+            echo "DirectXSample.dll not created"
+            exit 1
+          }
+          echo "DirectXSample DLL compilation completed"
 
-// Main thread loop
-void MainThread() {
-    g_hwnd = CreateWindowExA(
-        WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED,
-        \"STATIC\",
-        \"EpicCheat\",
-        WS_POPUP,
-        0, 0, 1920, 1080,
-        nullptr,
-        nullptr,
-        GetModuleHandle(nullptr),
-        nullptr
-    );
-
-    if (!g_hwnd) return;
-
-    SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
-    ShowWindow(g_hwnd, SW_SHOW);
-
-    if (!InitD3D(g_hwnd)) {
-        DestroyWindow(g_hwnd);
-        return;
-    }
-
-    MSG msg;
-    ZeroMemory(&msg, sizeof(msg));
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        // Toggle features
-        if (GetAsyncKeyState(VK_F1) & 1) { g_featureEnabled1 = !g_featureEnabled1; Sleep(100); }
-        if (GetAsyncKeyState(VK_F7) & 1) {
-            g_aimFOV = (g_aimFOV > 10.0f) ? g_aimFOV - 10.0f : 180.0f;
-            g_aimSpeed = (g_aimSpeed > 0.1f) ? g_aimSpeed - 0.1f : 1.0f;
-            Sleep(100);
-        }
-        if (GetAsyncKeyState(VK_F8) & 1) {
-            g_silentFOV = (g_silentFOV > 10.0f) ? g_silentFOV - 10.0f : 180.0f;
-            g_silentSpeed = (g_silentSpeed > 0.1f) ? g_silentSpeed - 0.1f : 1.0f;
-            Sleep(100);
-        }
-        if (GetAsyncKeyState(VK_F2) & 1) { g_featureEnabled2 = !g_featureEnabled2; Sleep(100); }
-        if (GetAsyncKeyState(VK_F5) & 1) { g_featureEnabled3 = !g_featureEnabled3; Sleep(100); }
-        if (GetAsyncKeyState(VK_F4) & 1) break;
-        RenderLoop();
-        Sleep(1);
-    }
-
-    CleanupD3D();
-    DestroyWindow(g_hwnd);
-    CloseHandle(g_hProcess);
-}
-
-// DLL entry point
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
-    if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
-        DisableThreadLibraryCalls(hModule);
-        g_hProcess = GetCurrentProcess();
-        std::thread(MainThread).detach();
-    }
-    return TRUE;
-}
-"@
-        Set-Content -Path "dllmain.cpp" -Value $content
-        if (Test-Path "dllmain.cpp") {
-          echo "dllmain.cpp created successfully"
-        } else {
-          echo "Failed to create dllmain.cpp"
-          exit 1
-        }
-
-    # Compile the DLL
-    - name: Compile DLL
-      shell: cmd
-      run: |
-        echo "Compiling EpicCheat.dll at 04:10 PM MSK, 18 May 2025..."
-        set "DXSDK_DIR=%CD%\dxsdk"
-        set "INCLUDE=%DXSDK_DIR%\Include;%INCLUDE%"
-        set "LIB=%DXSDK_DIR%\Lib\x86;%LIB%"
-        g++ -shared -o EpicCheat.dll dllmain.cpp -I"%DXSDK_DIR%\Include" -L"%DXSDK_DIR%\Lib\x86" -ld3d9 -ld3dx9 -D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES -Wall
-        if %ERRORLEVEL% NEQ 0 (
-          echo "Compilation failed"
-          exit 1
-        ) else (
-          echo "EpicCheat.dll compiled successfully"
-        )
-
-    # Upload the DLL as an artifact
-    - name: Upload DLL Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: EpicCheat-DLL
-        path: EpicCheat.dll
-        retention-days: 7
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DirectXSample-DLL
+          path: DirectXSample.dll
