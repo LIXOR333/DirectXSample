@@ -21,7 +21,6 @@ jobs:
         path: |
           imgui-master
           minhook-master
-          curl
           zlib-1.3.1
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('build.yml') }}
@@ -213,96 +212,6 @@ jobs:
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
-    - name: Download libcurl
-      run: |
-        echo Downloading libcurl... >> logs/build.log
-        curl -L -o curl.zip https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from primary (curl.se) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-          echo Primary libcurl download or validation failed, trying mirror 1... >> logs/build.log
-          curl -L -o curl.zip https://curl.haxx.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 1 (haxx.se) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
-            curl -L -o curl.zip https://bintray.com/artifact/download/curl/downloads/curl-8.10.1-win64.zip && echo libcurl downloaded from mirror 2 (bintray) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-              echo Mirror 2 failed, trying mirror 3... >> logs/build.log
-              curl -L -o curl.zip https://web.archive.org/web/20250518000000/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 3 (archive.org) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                echo Mirror 3 failed, trying mirror 4... >> logs/build.log
-                curl -L -o curl.zip https://sourceforge.net/projects/curl/files/libcurl/8.10.1/libcurl-x64.zip && echo libcurl downloaded from mirror 4 (SourceForge) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                  echo Mirror 4 failed, trying mirror 5... >> logs/build.log
-                  curl -L -o curl.zip https://curl.tuxfamily.org/dl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 5 (tuxfamily) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                    echo Mirror 5 failed, trying mirror 6... >> logs/build.log
-                    curl -L -o curl.zip https://github.com/curl/curl/releases/download/curl-8_10_1/libcurl-x64.zip && echo libcurl downloaded from mirror 6 (GitHub) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                      echo Mirror 6 failed, trying mirror 7... >> logs/build.log
-                      curl -L -o curl.zip https://mirror.ghproxy.com/https://curl.se/windows/dl-8.10.1_7/libcurl-x64.zip && echo libcurl downloaded from mirror 7 (ghproxy) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                        echo Mirror 7 failed, trying mirror 8... >> logs/build.log
-                        curl -L -o curl.zip https://gitee.com/mirror-curl/curl/repository/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 8 (Gitee) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                          echo Mirror 8 failed, trying mirror 9... >> logs/build.log
-                          curl -L -o curl.zip https://codeberg.org/curl-mirror/curl/archive/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 9 (Codeberg) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                            echo Mirror 9 failed, trying mirror 10... >> logs/build.log
-                            curl -L -o curl.zip https://bitbucket.org/curl-mirror/curl/get/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 10 (Bitbucket) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
-                              curl -L -o curl.zip https://git.savannah.gnu.org/cgit/curl.git/snapshot/curl-libcurl-x64-8.10.1.tar.gz && echo libcurl downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
-                                curl -L -o curl.zip https://archive.org/download/curl-windows/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 12 (Internet Archive) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                  echo Mirror 12 failed, trying mirror 13... >> logs/build.log
-                                  curl -L -o curl.zip https://files.phpmyadmin.net/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 13 (phpMyAdmin) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                    echo Mirror 13 failed, trying mirror 14... >> logs/build.log
-                                    curl -L -o curl.zip https://mirror.centos.org/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 14 (CentOS Mirror) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                      echo Mirror 14 failed, trying mirror 15... >> logs/build.log
-                                      curl -L -o curl.zip https://mirror.fsf.org/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 15 (FSF Mirror) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                        echo Mirror 15 failed, trying mirror 16... >> logs/build.log
-                                        curl -L -o curl.zip https://mirror.rackspace.com/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 16 (Rackspace) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                          echo Mirror 16 failed, trying mirror 17... >> logs/build.log
-                                          curl -L -o curl.zip https://mirror.netcologne.de/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 17 (NetCologne) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                            echo Mirror 17 failed, trying mirror 18... >> logs/build.log
-                                            curl -L -o curl.zip https://mirror.leaseweb.com/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 18 (Leaseweb) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                              echo Mirror 18 failed, trying mirror 19... >> logs/build.log
-                                              curl -L -o curl.zip https://mirror.nexcess.net/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 19 (Nexcess) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                echo Mirror 19 failed, trying mirror 20... >> logs/build.log
-                                                curl -L -o curl.zip https://mirror.umd.edu/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 20 (UMD) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                  echo Mirror 20 failed, trying mirror 21... >> logs/build.log
-                                                  curl -L -o curl.zip https://mirror.csclub.uwaterloo.ca/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 21 (UWaterloo) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                    echo Mirror 21 failed, trying mirror 22... >> logs/build.log
-                                                    curl -L -o curl.zip https://mirror.ox.ac.uk/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 22 (Oxford) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                      echo Mirror 22 failed, trying mirror 23... >> logs/build.log
-                                                      curl -L -o curl.zip https://mirror.yandex.ru/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 23 (Yandex) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                        echo Mirror 23 failed, trying mirror 24... >> logs/build.log
-                                                        curl -L -o curl.zip https://mirror.1und1.de/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 24 (1und1) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                          echo Mirror 24 failed, trying mirror 25... >> logs/build.log
-                                                          curl -L -o curl.zip https://mirror.easyname.at/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 25 (Easyname) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                            echo Mirror 25 failed, trying mirror 26... >> logs/build.log
-                                                            curl -L -o curl.zip https://mirror.hetzner.de/curl/libcurl-x64-8.10.1.zip && echo libcurl downloaded from mirror 26 (Hetzner) >> logs/build.log && unzip -t curl.zip >> logs/build.log 2>&1 && echo libcurl archive validated >> logs/build.log || (
-                                                              echo libcurl download or validation failed from all sources >> logs/build.log
-                                                              exit 1
-                                                            )
-                                                          )
-                                                        )
-                                                      )
-                                                    )
-                                                  )
-                                                )
-                                              )
-                                            )
-                                          )
-                                        )
-                                      )
-                                    )
-                                  )
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-        unzip -o curl.zip
-        echo libcurl unzipped >> logs/build.log
-      shell: cmd
-      if: steps.cache.outputs.cache-hit != 'true'
-
     - name: Download zlib
       run: |
         echo Downloading zlib... >> logs/build.log
@@ -487,7 +396,7 @@ jobs:
     - name: Build DLL
       run: |
         echo Building DLL... >> logs/build.log
-        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I curl/include /I zlib /I json-develop/single_include /link /LIBPATH:curl/lib libcurl.lib /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
+        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
         if %ERRORLEVEL% NEQ 0 (
           echo Build failed >> logs/build.log
           exit 1
