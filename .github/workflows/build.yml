@@ -20,7 +20,7 @@ jobs:
       - name: Fix Git Config
         shell: pwsh
         run: |
-          echo "Configuring Git safe directory at 05:12 PM MSK, 18 May 2025..."
+          echo "Configuring Git safe directory at 05:26 PM MSK, 18 May 2025..."
           git config --global --add safe.directory $env:GITHUB_WORKSPACE
           git config --local --unset-all http.https://github.com/.extraheader || echo "No extraheader to unset"
           git config --local --unset-all core.sshCommand || echo "No SSH config to unset"
@@ -29,7 +29,7 @@ jobs:
       - name: Install Chocolatey
         shell: pwsh
         run: |
-          echo "Checking for existing Chocolatey installation at 05:12 PM MSK, 18 May 2025..."
+          echo "Checking for existing Chocolatey installation at 05:26 PM MSK, 18 May 2025..."
           $chocoExists = $false
           try {
             choco -v
@@ -55,7 +55,7 @@ jobs:
       - name: Install MinGW
         shell: pwsh
         run: |
-          echo "Installing MinGW at 05:12 PM MSK, 18 May 2025..."
+          echo "Installing MinGW at 05:26 PM MSK, 18 May 2025..."
           choco install mingw --version 8.1.0 -y
           if ($LASTEXITCODE -ne 0) {
             echo "MinGW installation failed with exit code $LASTEXITCODE"
@@ -73,7 +73,7 @@ jobs:
       - name: Download DirectX SDK
         shell: pwsh
         run: |
-          echo "Downloading DirectX SDK at 05:12 PM MSK, 18 May 2025..."
+          echo "Downloading DirectX SDK at 05:26 PM MSK, 18 May 2025..."
           $urls = @(
             "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe",
             "https://github.com/LIXOR333/DirectXSample/releases/download/v1.0/DXSDK_Jun10.exe",
@@ -125,7 +125,7 @@ jobs:
       - name: Install Archivers
         shell: pwsh
         run: |
-          echo "Installing archivers at 05:12 PM MSK, 18 May 2025..."
+          echo "Installing archivers at 05:26 PM MSK, 18 May 2025..."
           $archivers = @(
             @{
               Name = "7-Zip"
@@ -133,9 +133,7 @@ jobs:
                 "https://www.7-zip.org/a/7z2301-x64.exe",
                 "https://sourceforge.net/projects/sevenzip/files/7-Zip/23.01/7z2301-x64.exe/download",
                 "https://github.com/ip7z/7zip/releases/download/23.01/7z2301-x64.exe",
-                "https://web.archive.org/web/20230601000000/https://www.7-zip.org/a/7z2301-x64.exe",
-                "https://download.cnet.com/7-Zip-64-bit/3000-2250_4-10005462.html",
-                "https://www.filehorse.com/download-7-zip-64/7z2301-x64.exe"
+                "https://web.archive.org/web/20230601000000/https://www.7-zip.org/a/7z2301-x64.exe"
               )
               InstallPath = "C:\Program Files\7-Zip"
               Command = "7z"
@@ -147,8 +145,6 @@ jobs:
               Urls = @(
                 "https://www.rarlab.com/rar/winrar-x64-701.exe",
                 "https://www.win-rar.com/fileadmin/winrar-versions/winrar-x64-701.exe",
-                "https://download.cnet.com/WinRAR-64-bit/3000-2250_4-10007677.html",
-                "https://www.filehorse.com/download-winrar-64/winrar-x64-701.exe",
                 "https://web.archive.org/web/20240801000000/https://www.rarlab.com/rar/winrar-x64-701.exe",
                 "https://sourceforge.net/projects/winrar/files/WinRAR/7.01/winrar-x64-701.exe/download"
               )
@@ -162,10 +158,7 @@ jobs:
               Urls = @(
                 "https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
                 "https://sourceforge.net/projects/peazip/files/10.0.0/peazip-10.0.0.WIN64.exe/download",
-                "https://www.filehorse.com/download-peazip-64/peazip-10.0.0.WIN64.exe",
-                "https://web.archive.org/web/20240801000000/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe",
-                "https://download.cnet.com/PeaZip-64-bit/3000-2250_4-10888824.html",
-                "https://osdn.net/projects/peazip/storage/10.0.0/peazip-10.0.0.WIN64.exe"
+                "https://web.archive.org/web/20240801000000/https://github.com/peazip/PeaZip/releases/download/10.0.0/peazip-10.0.0.WIN64.exe"
               )
               InstallPath = "C:\Program Files\PeaZip"
               Command = "peazip.exe"
@@ -178,9 +171,7 @@ jobs:
                 "https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
                 "https://www.bandizip.com/dl/BANDIZIP-SETUP.EXE",
                 "https://sourceforge.net/projects/bandizip/files/Bandizip/7.32/BANDIZIP-SETUP.EXE/download",
-                "https://web.archive.org/web/20240801000000/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE",
-                "https://www.filehorse.com/download-bandizip/BANDIZIP-SETUP.EXE",
-                "https://download.cnet.com/Bandizip/3000-2250_4-75794102.html"
+                "https://web.archive.org/web/20240801000000/https://dl.bandisoft.com/bandizip/BANDIZIP-SETUP.EXE"
               )
               InstallPath = "C:\Program Files\Bandizip"
               Command = "Bandizip.exe"
@@ -192,285 +183,12 @@ jobs:
               Urls = @(
                 "https://github.com/M2Team/NanaZip/releases/download/3.0.850/NanaZipSetup.exe",
                 "https://sourceforge.net/projects/nanazip/files/3.0.850/NanaZipSetup.exe/download",
-                "https://www.filehorse.com/download-nanazip/NanaZipSetup.exe",
-                "https://download.cnet.com/NanaZip/3000-2250_4-85994102.html",
-                "https://web.archive.org/web/20240801000000/https://github.com/M2Team/NanaZip/releases/download/3.0.850/NanaZipSetup.exe",
-                "https://www.microsoft.com/store/apps/9NBB5K5KX8QN"
+                "https://web.archive.org/web/20240801000000/https://github.com/M2Team/NanaZip/releases/download/3.0.850/NanaZipSetup.exe"
               )
               InstallPath = "C:\Program Files\NanaZip"
               Command = "NanaZip.exe"
               InstallArgs = "/S"
               TestCommand = "& 'C:\Program Files\NanaZip\NanaZip.exe' --help"
-            },
-            @{
-              Name = "WinZip"
-              Urls = @(
-                "https://www.winzip.com/win/en/downwz.html",
-                "https://download.cnet.com/WinZip/3000-2250_4-10003164.html",
-                "https://www.filehorse.com/download-winzip/WinZipSetup.exe",
-                "https://sourceforge.net/projects/winzip/files/WinZip/27.0/WinZipSetup.exe/download",
-                "https://web.archive.org/web/20240801000000/https://www.winzip.com/win/en/downwz.html",
-                "https://www.softonic.com/download/winzip/windows"
-              )
-              InstallPath = "C:\Program Files\WinZip"
-              Command = "winzip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\WinZip\winzip.exe' -h"
-            },
-            @{
-              Name = "HaoZip"
-              Urls = @(
-                "https://www.haosoft.com/download/HaoZipSetup.exe",
-                "https://download.cnet.com/HaoZip/3000-2250_4-75914102.html",
-                "https://www.filehorse.com/download-haozip/HaoZipSetup.exe",
-                "https://sourceforge.net/projects/haozip/files/HaoZip/6.3/HaoZipSetup.exe/download",
-                "https://web.archive.org/web/20240801000000/https://www.haosoft.com/download/HaoZipSetup.exe",
-                "https://www.softonic.com/download/haozip/windows"
-              )
-              InstallPath = "C:\Program Files\HaoZip"
-              Command = "HaoZip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\HaoZip\HaoZip.exe' -h"
-            },
-            @{
-              Name = "Zipeg"
-              Urls = @(
-                "https://www.zipeg.com/download/ZipegSetup.exe",
-                "https://sourceforge.net/projects/zipeg/files/Zipeg/2.9/ZipegSetup.exe/download",
-                "https://www.filehorse.com/download-zipeg/ZipegSetup.exe",
-                "https://download.cnet.com/Zipeg/3000-2250_4-10893402.html",
-                "https://web.archive.org/web/20240801000000/https://www.zipeg.com/download/ZipegSetup.exe",
-                "https://www.softonic.com/download/zipeg/windows"
-              )
-              InstallPath = "C:\Program Files\Zipeg"
-              Command = "Zipeg.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\Zipeg\Zipeg.exe' -h"
-            },
-            @{
-              Name = "FreeArc"
-              Urls = @(
-                "https://freearc.org/download/FreeArcSetup.exe",
-                "https cím://sourceforge.net/projects/freearc/files/FreeArc/0.666/FreeArcSetup.exe/download",
-                "https://www.filehorse.com/download-freearc/FreeArcSetup.exe",
-                "https://download.cnet.com/FreeArc/3000-2250_4-10893403.html",
-                "https://web.archive.org/web/20240801000000/https://freearc.org/download/FreeArcSetup.exe",
-                "https://www.softonic.com/download/freearc/windows"
-              )
-              InstallPath = "C:\Program Files\FreeArc"
-              Command = "FreeArc.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\FreeArc\FreeArc.exe' -h"
-            },
-            @{
-              Name = "IZArc"
-              Urls = @(
-                "https://www.izarc.org/download/IZArcSetup.exe",
-                "https://sourceforge.net/projects/izarc/files/IZArc/4.5/IZArcSetup.exe/download",
-                "https://www.filehorse.com/download-izarc/IZArcSetup.exe",
-                "https://download.cnet.com/IZArc/3000-2250_4-10093404.html",
-                "https://web.archive.org/web/20240801000000/https://www.izarc.org/download/IZArcSetup.exe",
-                "https://www.softonic.com/download/izarc/windows"
-              )
-              InstallPath = "C:\Program Files\IZArc"
-              Command = "IZArc.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\IZArc\IZArc.exe' -h"
-            },
-            @{
-              Name = "TUGZip"
-              Urls = @(
-                "https://www.tugzip.com/download/TUGZipSetup.exe",
-                "https://sourceforge.net/projects/tugzip/files/TUGZip/3.5/TUGZipSetup.exe/download",
-                "https://www.filehorse.com/download-tugzip/TUGZipSetup.exe",
-                "https://download.cnet.com/TUGZip/3000-2250_4-10893405.html",
-                "https://web.archive.org/web/20240801000000/https://www.tugzip.com/download/TUGZipSetup.exe",
-                "https://www.softonic.com/download/tugzip/windows"
-              )
-              InstallPath = "C:\Program Files\TUGZip"
-              Command = "TUGZip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\TUGZip\TUGZip.exe' -h"
-            },
-            @{
-              Name = "ExtractNow"
-              Urls = @(
-                "https://www.extractnow.com/download/ExtractNowSetup.exe",
-                "https://sourceforge.net/projects/extractnow/files/ExtractNow/4.8/ExtractNowSetup.exe/download",
-                "https://www.filehorse.com/download-extractnow/ExtractNowSetup.exe",
-                "https://download.cnet.com/ExtractNow/3000-2250_4-10893406.html",
-                "https://web.archive.org/web/20240801000000/https://www.extractnow.com/download/ExtractNowSetup.exe",
-                "https://www.softonic.com/download/extractnow/windows"
-              )
-              InstallPath = "C:\Program Files\ExtractNow"
-              Command = "ExtractNow.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\ExtractNow\ExtractNow.exe' -h"
-            },
-            @{
-              Name = "Universal Extractor"
-              Urls = @(
-                "https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
-                "https://sourceforge.net/projects/uniextract/files/Universal Extractor/1.6/UniversalExtractorSetup.exe/download",
-                "https://www.filehorse.com/download-universal-extractor/UniversalExtractorSetup.exe",
-                "https://download.cnet.com/Universal-Extractor/3000-2250_4-10893407.html",
-                "https://web.archive.org/web/20240801000000/https://www.universal-extractor.com/download/UniversalExtractorSetup.exe",
-                "https://www.softonic.com/download/universal-extractor/windows"
-              )
-              InstallPath = "C:\Program Files\Universal Extractor"
-              Command = "UniExtract.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\Universal Extractor\UniExtract.exe' -h"
-            },
-            @{
-              Name = "ALZip"
-              Urls = @(
-                "https://www.altools.com/download/ALZipSetup.exe",
-                "https://sourceforge.net/projects/alzip/files/ALZip/8.5/ALZipSetup.exe/download",
-                "https://www.filehorse.com/download-alzip/ALZipSetup.exe",
-                "https://download.cnet.com/ALZip/3000-2250_4-10893408.html",
-                "https://web.archive.org/web/20240801000000/https://www.altools.com/download/ALZipSetup.exe",
-                "https://www.softonic.com/download/alzip/windows"
-              )
-              InstallPath = "C:\Program Files\ALZip"
-              Command = "ALZip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\ALZip\ALZip.exe' -h"
-            },
-            @{
-              Name = "ZipGenius"
-              Urls = @(
-                "https://www.zipgenius.com/download/ZipGeniusSetup.exe",
-                "https://sourceforge.net/projects/zipgenius/files/ZipGenius/6.3/ZipGeniusSetup.exe/download",
-                "https://www.filehorse.com/download-zipgenius/ZipGeniusSetup.exe",
-                "https://download.cnet.com/ZipGenius/3000-2250_4-10893409.html",
-                "https://web.archive.org/web/20240801000000/https://www.zipgenius.com/download/ZipGeniusSetup.exe",
-                "https://www.softonic.com/download/zipgenius/windows"
-              )
-              InstallPath = "C:\Program Files\ZipGenius"
-              Command = "ZipGenius.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\ZipGenius\ZipGenius.exe' -h"
-            },
-            @{
-              Name = "PowerArchiver"
-              Urls = @(
-                "https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
-                "https://sourceforge.net/projects/powerarchiver/files/PowerArchiver/21.0/PowerArchiverSetup.exe/download",
-                "https://www.filehorse.com/download-powerarchiver/PowerArchiverSetup.exe",
-                "https://download.cnet.com/PowerArchiver/3000-2250_4-10893410.html",
-                "https://web.archive.org/web/20240801000000/https://www.powerarchiver.com/download/PowerArchiverSetup.exe",
-                "https://www.softonic.com/download/powerarchiver/windows"
-              )
-              InstallPath = "C:\Program Files\PowerArchiver"
-              Command = "PowerArchiver.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' -h"
-            },
-            @{
-              Name = "B1 Free Archiver"
-              Urls = @(
-                "https://b1.org/download/B1FreeArchiverSetup.exe",
-                "https://sourceforge.net/projects/b1archiver/files/B1 Free Archiver/1.7/B1FreeArchiverSetup.exe/download",
-                "https://www.filehorse.com/download-b1-free-archiver/B1FreeArchiverSetup.exe",
-                "https://download.cnet.com/B1-Free-Archiver/3000-2250_4-10893411.html",
-                "https://web.archive.org/web/20240801000000/https://b1.org/download/B1FreeArchiverSetup.exe",
-                "https://www.softonic.com/download/b1-free-archiver/windows"
-              )
-              InstallPath = "C:\Program Files\B1 Free Archiver"
-              Command = "B1Archiver.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' -h"
-            },
-            @{
-              Name = "Ashampoo ZIP Free"
-              Urls = @(
-                "https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
-                "https://sourceforge.net/projects/ashampoozip/files/Ashampoo ZIP Free/1.0/AshampooZIPFreeSetup.exe/download",
-                "https://www.filehorse.com/download-ashampoo-zip-free/AshampooZIPFreeSetup.exe",
-                "https://download.cnet.com/Ashampoo-ZIP-Free/3000-2250_4-10893412.html",
-                "https://web.archive.org/web/20240801000000/https://www.ashampoo.com/download/AshampooZIPFreeSetup.exe",
-                "https://www.softonic.com/download/ashampoo-zip-free/windows"
-              )
-              InstallPath = "C:\Program Files\Ashampoo ZIP Free"
-              Command = "AshampooZIP.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' -h"
-            },
-            @{
-              Name = "Hamster ZIP Archiver"
-              Urls = @(
-                "https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
-                "https://sourceforge.net/projects/hamsterzip/files/Hamster ZIP Archiver/4.0/HamsterZIPSetup.exe/download",
-                "https://www.filehorse.com/download-hamster-zip-archiver/HamsterZIPSetup.exe",
-                "https://download.cnet.com/Hamster-ZIP-Archiver/3000-2250_4-10893413.html",
-                "https://web.archive.org/web/20240801000000/https://www.hamstersoft.com/download/HamsterZIPSetup.exe",
-                "https://www.softonic.com/download/hamster-zip-archiver/windows"
-              )
-              InstallPath = "C:\Program Files\Hamster ZIP Archiver"
-              Command = "HamsterZIP.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' -h"
-            },
-            @{
-              Name = "jZip"
-              Urls = @(
-                "https://www.jzip.com/download/jZipSetup.exe",
-                "https://sourceforge.net/projects/jzip/files/jZip/2.0/jZipSetup.exe/download",
-                "https://www.filehorse.com/download-jzip/jZipSetup.exe",
-                "https://download.cnet.com/jZip/3000-2250_4-10893414.html",
-                "https://web.archive.org/web/20240801000000/https://www.jzip.com/download/jZipSetup.exe",
-                "https://www.softonic.com/download/jzip/windows"
-              )
-              InstallPath = "C:\Program Files\jZip"
-              Command = "jZip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\jZip\jZip.exe' -h"
-            },
-            @{
-              Name = "Keka"
-              Urls = @(
-                "https://www.keka.io/download/keka-windows-latest.exe",
-                "https://github.com/aonez/Keka/releases/download/v1.2.0/keka-windows-latest.exe",
-                "https://www.filehorse.com/download-keka/keka-windows-latest.exe",
-                "https://download.cnet.com/Keka/3000-2250_4-10893415.html",
-                "https://web.archive.org/web/20240801000000/https://www.keka.io/download/keka-windows-latest.exe",
-                "https://www.softonic.com/download/keka/windows"
-              )
-              InstallPath = "C:\Program Files\Keka"
-              Command = "keka.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\Keka\keka.exe' --help"
-            },
-            @{
-              Name = "QuickZip"
-              Urls = @(
-                "https://www.quickzip.org/download/QuickZipSetup.exe",
-                "https://sourceforge.net/projects/quickzip/files/QuickZip/5.1/QuickZipSetup.exe/download",
-                "https://www.filehorse.com/download-quickzip/QuickZipSetup.exe",
-                "https://download.cnet.com/QuickZip/3000-2250_4-10893416.html",
-                "https://web.archive.org/web/20240801000000/https://www.quickzip.org/download/QuickZipSetup.exe",
-                "https://www.softonic.com/download/quickzip/windows"
-              )
-              InstallPath = "C:\Program Files\QuickZip"
-              Command = "QuickZip.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\QuickZip\QuickZip.exe' -h"
-            },
-            @{
-              Name = "ZipZag"
-              Urls = @(
-                "https://www.zipzag.com/download/ZipZagSetup.exe",
-                "https://sourceforge.net/projects/zipzag/files/ZipZag/2.0/ZipZagSetup.exe/download",
-                "https://www.filehorse.com/download-zipzag/ZipZagSetup.exe",
-                "https://download.cnet.com/ZipZag/3000-2250_4-10893417.html",
-                "https://web.archive.org/web/20240801000000/https://www.zipzag.com/download/ZipZagSetup.exe",
-                "https://www.softonic.com/download/zipzag/windows"
-              )
-              InstallPath = "C:\Program Files\ZipZag"
-              Command = "ZipZag.exe"
-              InstallArgs = "/S"
-              TestCommand = "& 'C:\Program Files\ZipZag\ZipZag.exe' -h"
             }
           )
 
@@ -484,24 +202,23 @@ jobs:
               if ($LASTEXITCODE -eq 0 -and (Test-Path "$($archiver.Name).exe")) {
                 $fileSize = (Get-Item "$($archiver.Name).exe").Length
                 echo "Downloaded file size: $fileSize bytes"
-                if ($fileSize -lt 1MB) {
-                  echo "File size too small ($fileSize bytes), likely corrupted. Skipping to next URL..."
-                  Remove-Item -Path "$($archiver.Name).exe" -Force -ErrorAction SilentlyContinue
-                  continue
-                }
-                Start-Process -FilePath "$($archiver.Name).exe" -ArgumentList $archiver.InstallArgs -Wait -NoNewWindow
-                if ($LASTEXITCODE -eq 0) {
-                  $env:Path += ";$($archiver.InstallPath)"
-                  echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
-                  $testResult = Invoke-Expression $archiver.TestCommand 2>&1
+                if ($fileSize -gt 1MB) {
+                  Start-Process -FilePath "$($archiver.Name).exe" -ArgumentList $archiver.InstallArgs -Wait -NoNewWindow
                   if ($LASTEXITCODE -eq 0) {
-                    echo "$($archiver.Name) installed successfully"
-                    $success = $true
-                    $installedArchivers += $archiver
-                    break
-                  } else {
-                    echo "$($archiver.Name) test failed: $testResult"
+                    $env:Path += ";$($archiver.InstallPath)"
+                    echo "Path=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append
+                    $testResult = Invoke-Expression $archiver.TestCommand 2>&1
+                    if ($LASTEXITCODE -eq 0) {
+                      echo "$($archiver.Name) installed successfully"
+                      $success = $true
+                      $installedArchivers += $archiver
+                      break
+                    } else {
+                      echo "$($archiver.Name) test failed: $testResult"
+                    }
                   }
+                } else {
+                  echo "File size too small ($fileSize bytes), likely corrupted. Skipping to next URL..."
                 }
                 Remove-Item -Path "$($archiver.Name).exe" -Force -ErrorAction SilentlyContinue
               }
@@ -522,7 +239,7 @@ jobs:
       - name: Extract DirectX SDK
         shell: pwsh
         run: |
-          echo "Extracting DirectX SDK at 05:12 PM MSK, 18 May 2025..."
+          echo "Extracting DirectX SDK at 05:26 PM MSK, 18 May 2025..."
           if (-not (Test-Path dxsdk.exe)) {
             echo "dxsdk.exe not found"
             exit 1
@@ -538,32 +255,14 @@ jobs:
             @{Name="WinRAR"; Command="rar"; ExtractCommand="rar x dxsdk.exe dxsdk\ -y"; CheckCommand="rar lt dxsdk.exe"},
             @{Name="PeaZip"; Command="peazip.exe"; ExtractCommand="& 'C:\Program Files\PeaZip\peazip.exe' -ext2here dxsdk.exe"; CheckCommand="& 'C:\Program Files\PeaZip\peazip.exe' -l dxsdk.exe"; PostExtract="Move-Item -Path dxsdk.exe\* -Destination dxsdk -Force -ErrorAction SilentlyContinue"},
             @{Name="Bandizip"; Command="Bandizip.exe"; ExtractCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Bandizip\Bandizip.exe' l dxsdk.exe"},
-            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"},
-            @{Name="WinZip"; Command="winzip.exe"; ExtractCommand="& 'C:\Program Files\WinZip\winzip.exe' -e dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\WinZip\winzip.exe' -l dxsdk.exe"},
-            @{Name="HaoZip"; Command="HaoZip.exe"; ExtractCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\HaoZip\HaoZip.exe' l dxsdk.exe"},
-            @{Name="Zipeg"; Command="Zipeg.exe"; ExtractCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Zipeg\Zipeg.exe' l dxsdk.exe"},
-            @{Name="FreeArc"; Command="FreeArc.exe"; ExtractCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\FreeArc\FreeArc.exe' l dxsdk.exe"},
-            @{Name="IZArc"; Command="IZArc.exe"; ExtractCommand="& 'C:\Program Files\IZArc\IZArc.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\IZArc\IZArc.exe' l dxsdk.exe"},
-            @{Name="TUGZip"; Command="TUGZip.exe"; ExtractCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\TUGZip\TUGZip.exe' l dxsdk.exe"},
-            @{Name="ExtractNow"; Command="ExtractNow.exe"; ExtractCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\ExtractNow\ExtractNow.exe' l dxsdk.exe"},
-            @{Name="Universal Extractor"; Command="UniExtract.exe"; ExtractCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' dxsdk.exe dxsdk"; CheckCommand="& 'C:\Program Files\Universal Extractor\UniExtract.exe' l dxsdk.exe"},
-            @{Name="ALZip"; Command="ALZip.exe"; ExtractCommand="& 'C:\Program Files\ALZip\ALZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ALZip\ALZip.exe' l dxsdk.exe"},
-            @{Name="ZipGenius"; Command="ZipGenius.exe"; ExtractCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipGenius\ZipGenius.exe' l dxsdk.exe"},
-            @{Name="PowerArchiver"; Command="PowerArchiver.exe"; ExtractCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\PowerArchiver\PowerArchiver.exe' l dxsdk.exe"},
-            @{Name="B1 Free Archiver"; Command="B1Archiver.exe"; ExtractCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\B1 Free Archiver\B1Archiver.exe' l dxsdk.exe"},
-            @{Name="Ashampoo ZIP Free"; Command="AshampooZIP.exe"; ExtractCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Ashampoo ZIP Free\AshampooZIP.exe' l dxsdk.exe"},
-            @{Name="Hamster ZIP Archiver"; Command="HamsterZIP.exe"; ExtractCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Hamster ZIP Archiver\HamsterZIP.exe' l dxsdk.exe"},
-            @{Name="jZip"; Command="jZip.exe"; ExtractCommand="& 'C:\Program Files\jZip\jZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\jZip\jZip.exe' l dxsdk.exe"},
-            @{Name="Keka"; Command="keka.exe"; ExtractCommand="& 'C:\Program Files\Keka\keka.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\Keka\keka.exe' l dxsdk.exe"},
-            @{Name="QuickZip"; Command="QuickZip.exe"; ExtractCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\QuickZip\QuickZip.exe' l dxsdk.exe"},
-            @{Name="ZipZag"; Command="ZipZag.exe"; ExtractCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\ZipZag\ZipZag.exe' l dxsdk.exe"}
+            @{Name="NanaZip"; Command="NanaZip.exe"; ExtractCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' x dxsdk.exe -o dxsdk"; CheckCommand="& 'C:\Program Files\NanaZip\NanaZip.exe' l dxsdk.exe"}
           )
 
           # Проверяем содержимое dxsdk.exe перед распаковкой
           echo "Checking contents of dxsdk.exe..."
           $checkSuccess = $false
           foreach ($archiver in $installedArchivers) {
-            if (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue)) {
+            if ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue)) {
               echo "Checking with $($archiver.Name)..."
               $checkResult = Invoke-Expression $archiver.CheckCommand 2>&1
               if ($LASTEXITCODE -eq 0 -and $checkResult -match "Include" -and $checkResult -match "Lib") {
@@ -582,7 +281,7 @@ jobs:
 
           # Пробуем распаковать dxsdk.exe каждым архиватором по очереди
           foreach ($archiver in $installedArchivers) {
-            if (-not (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
+            if (-not ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
               echo "Skipping $($archiver.Name) - not installed or not found"
               continue
             }
@@ -644,7 +343,7 @@ jobs:
           # Распаковываем CAB-файл с помощью доступных архиваторов
           $cabExtractSuccess = $false
           foreach ($archiver in $installedArchivers) {
-            if (-not (Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)" -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
+            if (-not ((Test-Path "C:\Program Files\$($archiver.Name)\$($archiver.Command)") -or (Get-Command $archiver.Command -ErrorAction SilentlyContinue))) {
               echo "Skipping $($archiver.Name) for CAB extraction - not installed or not found"
               continue
             }
@@ -730,7 +429,7 @@ jobs:
       - name: Set up DirectX SDK environment
         shell: pwsh
         run: |
-          echo "Setting up DirectX SDK environment at 05:12 PM MSK, 18 May 2025..."
+          echo "Setting up DirectX SDK environment at 05:26 PM MSK, 18 May 2025..."
           echo "DXSDK_DIR=$env:GITHUB_WORKSPACE\dxsdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "INCLUDE=$env:GITHUB_WORKSPACE\dxsdk\Include;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "LIB=$env:GITHUB_WORKSPACE\dxsdk\Lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -744,7 +443,7 @@ jobs:
       - name: Build DirectXSample DLL
         shell: pwsh
         run: |
-          echo "Compiling DirectXSample DLL at 05:12 PM MSK, 18 May 2025..."
+          echo "Compiling DirectXSample DLL at 05:26 PM MSK, 18 May 2025..."
           g++ -shared -o DirectXSample.dll src/dllmain.cpp -I"$env:DXSDK_DIR\Include" -L"$env:DXSDK_DIR\Lib\x64" -ld3d9 -ld3dx9 -Wall -static-libgcc -static-libstdc++ -O2
           if ($LASTEXITCODE -ne 0) {
             echo "DirectXSample DLL compilation failed with exit code $LASTEXITCODE"
