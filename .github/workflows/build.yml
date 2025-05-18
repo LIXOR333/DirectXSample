@@ -156,14 +156,18 @@ jobs:
               echo "Extracting dxsdk.exe to get CAB file..."
               7z x dxsdk.exe -o"dxsdk" -y
               if ($LASTEXITCODE -eq 0) {
-                $cabFile = Get-ChildItem -Path dxsdk -Filter "[0]" -File | Select-Object -First 1
+                echo "Listing files in dxsdk after initial extraction:"
+                Get-ChildItem -Path dxsdk -Recurse | ForEach-Object { echo "$($_.FullName)" }
+                $cabFile = Get-ChildItem -Path dxsdk -Recurse -File | Where-Object { $_.Length -gt 500000000 } | Select-Object -First 1
                 if ($cabFile) {
-                  echo "Found CAB file: $($cabFile.FullName), extracting..."
-                  7z x $cabFile.FullName -o"dxsdk\extracted" -y
+                  echo "Found potential CAB file: $($cabFile.FullName), renaming to dxsdk.cab..."
+                  Move-Item -Path $cabFile.FullName -Destination "dxsdk\dxsdk.cab" -Force
+                  echo "Extracting dxsdk.cab..."
+                  7z x dxsdk\dxsdk.cab -o"dxsdk\extracted" -y
                   if ($LASTEXITCODE -eq 0) {
                     Move-Item -Path dxsdk\extracted\* -Destination dxsdk -Force
                     Remove-Item -Path dxsdk\extracted -Recurse -Force
-                    Remove-Item -Path $cabFile.FullName -Force
+                    Remove-Item -Path dxsdk\dxsdk.cab -Force
                     if (Test-Path dxsdk\Include) {
                       echo "Extraction with 7-Zip succeeded"
                       $extractSuccess = $true
@@ -174,7 +178,7 @@ jobs:
                     echo "Failed to extract CAB file with 7-Zip, exit code $LASTEXITCODE"
                   }
                 } else {
-                  echo "CAB file not found after initial 7-Zip extraction"
+                  echo "No CAB file found after initial 7-Zip extraction with size > 500MB"
                 }
               } else {
                 echo "Initial 7-Zip extraction failed with exit code $LASTEXITCODE"
