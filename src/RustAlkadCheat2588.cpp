@@ -35,6 +35,7 @@ static HANDLE g_hProcess = GetCurrentProcess();
 static DWORD64 g_baseAddr = 0x7FF60000;
 static bool g_menuOpen = true;
 static std::string g_updateStatus = "Offline mode (no updates)";
+static time_t g_lastDumpTime = 0;
 static json g_config;
 
 // Feature toggles (100+ features)
@@ -97,7 +98,7 @@ bool ValidateOffset(const std::string& name, DWORD64 offset) {
         DWORD64 listAddr;
         if (!ReadMemory(addr, &listAddr, sizeof(DWORD64)) || !listAddr) return false;
         DWORD count;
-        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 1000) return false;
+        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 5000) return false; // Увеличил лимит до 5000
         return true;
     } else if (name == "Base") {
         DWORD64 baseAddr;
@@ -136,9 +137,10 @@ void AutoDumpOffsets() {
     std::ofstream updateFile("offsets_update.txt", std::ios::app);
     std::ofstream validFile("offsets_validation.txt", std::ios::app);
     if (file.is_open() && updateFile.is_open() && validFile.is_open()) {
-        file << "Dump at " << std::ctime(&time(nullptr)) << "\n";
-        updateFile << "Update check at " << std::ctime(&time(nullptr)) << "\n";
-        validFile << "Validation at " << std::ctime(&time(nullptr)) << "\n";
+        time_t now = time(nullptr);
+        file << "Dump at " << std::ctime(&now) << "\n";
+        updateFile << "Update check at " << std::ctime(&now) << "\n";
+        validFile << "Validation at " << std::ctime(&now) << "\n";
 
         // Check signatures
         for (const auto& sig : signatures) {
@@ -164,6 +166,12 @@ void AutoDumpOffsets() {
         file.close();
         updateFile.close();
         validFile.close();
+
+        // Обновляем g_updateStatus с временем последнего дампа
+        g_lastDumpTime = now;
+        char timeBuf[64];
+        ctime_s(timeBuf, sizeof(timeBuf), &g_lastDumpTime);
+        g_updateStatus = "Offline mode (last dump: " + std::string(timeBuf, strlen(timeBuf) - 1) + ")";
     }
     lastDump = time(nullptr);
 }
@@ -223,13 +231,18 @@ struct Entity {
     std::string name;
 };
 
-// Read Vector3
+// Read Vector3 with validation
 Vector3 ReadVector3(DWORD64 address) {
     Vector3 v = {0};
     if (address) {
         ReadMemory(address + 0x30, &v.x, sizeof(float));
         ReadMemory(address + 0x34, &v.y, sizeof(float));
         ReadMemory(address + 0x38, &v.z, sizeof(float));
+        // Проверка на валидность координат
+        if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z) ||
+            std::abs(v.x) > 1000000.0f || std::abs(v.y) > 1000000.0f || std::abs(v.z) > 1000000.0f) {
+            v = {0, 0, 0}; // Сбрасываем на нули, если координаты некорректны
+        }
     }
     return v;
 }
@@ -243,7 +256,10 @@ std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
     DWORD count;
     if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD))) return entities;
 
-    for (DWORD i = 0; i < std::min<DWORD>(count, 200); ++i) {
+    // Убрал жёсткий лимит в 200, но добавил проверку на разумное количество
+    if (count > 5000) count = 5000; // Ограничение на 5000, чтобы избежать зависаний
+
+    for (DWORD i = 0; i < count; ++i) {
         DWORD64 entityAddr;
         if (!ReadMemory(listAddr + 0x8 + i * 0x8, &entityAddr, sizeof(DWORD64)) || !entityAddr) continue;
 
@@ -258,7 +274,7 @@ std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
         std::string name = "Unknown";
         if (!isItem) ReadMemory(extraAddr, &health, sizeof(float));
         if (!isItem) {
-            char nameBuf[64];
+            char nameBuf[64] = {0};
             if (ReadMemory(extraAddr + 0x10, nameBuf, sizeof(nameBuf))) name = nameBuf;
         }
         if (!isItem && health > 0.0f || isItem) {
@@ -361,17 +377,22 @@ void RenderLoop() {
 
     if (g_features.esp_players || g_features.esp_items || g_features.esp_npcs) {
         for (const auto& entity : entities) {
-            ImGui::GetBackgroundDrawList()->AddRectFilled(
-                ImVec2(entity.pos.x - 10, entity.pos.y - 20),
-                ImVec2(entity.pos.x + 10, entity.pos.y + 20),
-                IM_COL32(255, 0, 0, 255)
-            );
-            if (g_features.esp_names) {
-                ImGui::GetBackgroundDrawList()->AddText(
-                    ImVec2(entity.pos.x + 15, entity.pos.y - 20),
-                    IM_COL32(255, 255, 255, 255),
-                    entity.name.c_str()
+            // Преобразуем мировые координаты в экранные
+            Vector2 screenPos = WorldToScreen(entity.pos, cameraPos, 90.0f, 1920, 1080);
+            // Проверяем, что координаты в пределах экрана
+            if (screenPos.x > 0 && screenPos.x < 1920 && screenPos.y > 0 && screenPos.y < 1080) {
+                ImGui::GetBackgroundDrawList()->AddRectFilled(
+                    ImVec2(screenPos.x - 10, screenPos.y - 20),
+                    ImVec2(screenPos.x + 10, screenPos.y + 20),
+                    IM_COL32(255, 0, 0, 255)
                 );
+                if (g_features.esp_names) {
+                    ImGui::GetBackgroundDrawList()->AddText(
+                        ImVec2(screenPos.x + 15, screenPos.y - 20),
+                        IM_COL32(255, 255, 255, 255),
+                        entity.name.c_str()
+                    );
+                }
             }
         }
     }
