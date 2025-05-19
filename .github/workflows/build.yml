@@ -117,9 +117,9 @@ jobs:
             )
           )
         )
-        unzip -o imgui.zip -d imgui
-        if not exist imgui\imgui-master\imgui\imgui.h (
-          echo Error: imgui.h not found in imgui\imgui-master\imgui\ >> logs/build.log
+        unzip -o imgui.zip
+        if not exist imgui-master\imgui.h (
+          echo Error: imgui.h not found in imgui-master\ >> logs/build.log
           exit 1
         )
         echo ImGui unzipped >> logs/build.log
