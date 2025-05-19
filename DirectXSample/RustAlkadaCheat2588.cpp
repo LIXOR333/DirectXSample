@@ -53,8 +53,8 @@ void UpdateConsoleDisplay() {
     std::string display;
 
     // Build the display string with all feature statuses
-    display += "Aim: " + std::string(g_enableAimbot ? "On" : "Off") + "\n";
     display += "Wallhack: " + std::string(g_enableWallhack ? "On" : "Off") + "\n";
+    display += "Aimbot: " + std::string(g_enableAimbot ? "On" : "Off") + "\n";
     display += "ESP: " + std::string(g_enableESP ? "On" : "Off") + "\n";
     display += "Settings: On NumPad\n";
 
@@ -360,7 +360,7 @@ void LoadConfig() {
     file.close();
 }
 
-// Wallhack (ESP) (F2)
+// Wallhack (ESP) (F1)
 void DrawWallhack() {
     if (!g_enableESP || !g_enableWallhack) return;
 
@@ -401,7 +401,7 @@ void DrawWallhack() {
     }
 }
 
-// Aimbot (F1)
+// Aimbot (F2)
 void Aimbot() {
     if (!g_enableAimbot) return;
 
@@ -472,18 +472,23 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
     }
 
     while (true) {
-        // Toggle features
-        if (GetAsyncKeyState(VK_F1) & 0x8000) {
-            g_enableAimbot = !g_enableAimbot;
-            UpdateConsoleDisplay();
-            Sleep(200); // Debounce to prevent rapid toggling
-        }
-        if (GetAsyncKeyState(VK_F2) & 0x8000) {
+        // Toggle features with F1, F2, F3
+        if (GetAsyncKeyState(VK_F1) & 0x8000) { // F1 for Wallhack
             g_enableWallhack = !g_enableWallhack;
+            UpdateConsoleDisplay();
+            Sleep(200); // Debounce delay
+        }
+        if (GetAsyncKeyState(VK_F2) & 0x8000) { // F2 for Aimbot
+            g_enableAimbot = !g_enableAimbot;
             UpdateConsoleDisplay();
             Sleep(200);
         }
-        if (GetAsyncKeyState(VK_F10) & 0x8000) {
+        if (GetAsyncKeyState(VK_F3) & 0x8000) { // F3 for ESP
+            g_enableESP = !g_enableESP;
+            UpdateConsoleDisplay();
+            Sleep(200);
+        }
+        if (GetAsyncKeyState(VK_F10) & 0x8000) { // F10 for Auto-Dumper
             AutoDumpOffsets();
             DecryptGameFiles();
             Sleep(200);
@@ -510,7 +515,7 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
         }
         if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) {
             g_enableESP = !g_enableESP;
-            PrintConsoleMessage("Settings", std::string("ESP ") + (g_enableESP ? "On" : "Off"));
+            PrintConsoleMessage("Settings", "ESP " + std::string(g_enableESP ? "On" : "Off"));
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) {
