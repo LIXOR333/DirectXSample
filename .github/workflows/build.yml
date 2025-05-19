@@ -49,8 +49,11 @@ jobs:
 
     - name: Extract ImGui
       run: |
+        if (Test-Path imgui) { Remove-Item -Path imgui -Recurse -Force }
         Expand-Archive -Path imgui.zip -DestinationPath imgui -Force
-        if (-not (Test-Path imgui/imgui-master/imgui.h)) { Write-Output "Failed to extract ImGui" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Start-Sleep -Seconds 2
+        Get-ChildItem -Path imgui -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
+        if (-not (Test-Path imgui/imgui-master/imgui.h)) { Write-Output "Failed to extract ImGui: imgui.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
         Write-Output "ImGui extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
@@ -80,8 +83,11 @@ jobs:
 
     - name: Extract MinHook
       run: |
+        if (Test-Path minhook) { Remove-Item -Path minhook -Recurse -Force }
         Expand-Archive -Path minhook.zip -DestinationPath minhook -Force
-        if (-not (Test-Path minhook/minhook-master/include/MinHook.h)) { Write-Output "Failed to extract MinHook" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Start-Sleep -Seconds 2
+        Get-ChildItem -Path minhook -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
+        if (-not (Test-Path minhook/minhook-master/include/MinHook.h)) { Write-Output "Failed to extract MinHook: MinHook.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
         Write-Output "MinHook extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
@@ -111,8 +117,11 @@ jobs:
 
     - name: Extract zlib
       run: |
+        if (Test-Path zlib) { Remove-Item -Path zlib -Recurse -Force }
         Expand-Archive -Path zlib.zip -DestinationPath zlib -Force
-        if (-not (Test-Path zlib/zlib-1.2.13/zlib.h)) { Write-Output "Failed to extract zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Start-Sleep -Seconds 2
+        Get-ChildItem -Path zlib -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
+        if (-not (Test-Path zlib/zlib-1.2.13/zlib.h)) { Write-Output "Failed to extract zlib: zlib.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
         Write-Output "zlib extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
@@ -142,18 +151,37 @@ jobs:
 
     - name: Extract nlohmann/json
       run: |
-        # Очистка папки перед распаковкой
         if (Test-Path json) { Remove-Item -Path json -Recurse -Force }
         Expand-Archive -Path json.zip -DestinationPath json -Force
-        # Отладка: проверка структуры папок
+        Start-Sleep -Seconds 2
         Get-ChildItem -Path json -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
-        # Проверка наличия файла
-        $jsonPath = "json/json-develop/single_include/nlohmann/json.hpp"
-        if (-not (Test-Path $jsonPath)) {
-          Write-Output "Failed to extract nlohmann/json: $jsonPath not found" | Out-File -FilePath logs/build.log -Append
+        $jsonPaths = @(
+          "json/json-develop/single_include/nlohmann/json.hpp",
+          "json/json-3.11.3/single_include/nlohmann/json.hpp",
+          "json/json-develop/include/nlohmann/json.hpp"
+        )
+        $found = $false
+        foreach ($path in $jsonPaths) {
+          if (Test-Path $path) {
+            $found = $true
+            Write-Output "Found nlohmann/json at $path" | Out-File -FilePath logs/build.log -Append
+            break
+          }
+        }
+        if (-not $found) {
+          Write-Output "Failed to extract nlohmann/json: json.hpp not found in expected paths" | Out-File -FilePath logs/build.log -Append
           exit 1
         }
         Write-Output "nlohmann/json extracted successfully" | Out-File -FilePath logs/build.log -Append
+      shell: powershell
+
+    - name: Check RustAlkadCheat2588.cpp
+      run: |
+        if (-not (Test-Path RustAlkadCheat2588.cpp)) {
+          Write-Output "RustAlkadCheat2588.cpp not found in repository" | Out-File -FilePath logs/build.log -Append
+          exit 1
+        }
+        Write-Output "RustAlkadCheat2588.cpp found" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Build DLL
