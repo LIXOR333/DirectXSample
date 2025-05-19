@@ -259,8 +259,7 @@ jobs:
                           echo Mirror 8 failed, trying mirror 9... >> logs/build.log
                           curl -L -o zlib.tar.gz https://gitee.com/mirror-zlib/zlib/repository/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 9 (Gitee) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
                             echo Mirror 9 failed, trying mirror 10... >> logs/build.log
-                            curl -L -o zlib.tar.gz https://codeberg.org/zlib-mirror/zlib/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 1
-0 (Codeberg) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                            curl -L -o zlib.tar.gz https://codeberg.org/zlib-mirror/zlib/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 10 (Codeberg) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
                               echo Mirror 10 failed, trying mirror 11... >> logs/build.log
                               curl -L -o zlib.tar.gz https://git.savannah.gnu.org/cgit/zlib.git/snapshot/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
                                 echo Mirror 11 failed, trying mirror 12... >> logs/build.log
