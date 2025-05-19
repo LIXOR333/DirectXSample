@@ -9,16 +9,20 @@ set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
 set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
 
-# Находим ImGui
+# Находим зависимости
 find_package(imgui CONFIG REQUIRED)
+find_package(minhook CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # Добавляем исходник
 add_library(RustAlkadCheat2588 SHARED src/RustAlkadCheat2588.cpp)
 
-# Линкуем ImGui
+# Линкуем библиотеки (убрали ZLIB)
 target_link_libraries(RustAlkadCheat2588 PRIVATE
     imgui::imgui
-    -ld3d11
+    minhook::minhook
+    nlohmann_json::nlohmann_json
+    -lpsapi
 )
 
 # Путь к заголовкам
