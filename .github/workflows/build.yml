@@ -1,4 +1,36 @@
-- name: Download and extract nlohmann-json
+name: Build Rust Alkad Cheat 2588
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Chocolatey
+      shell: cmd
+      run: |
+        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+
+    - name: Install MinGW
+      shell: cmd
+      run: |
+        choco install mingw --force -y
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
+
+    - name: Install Archivers
+      shell: cmd
+      run: |
+        echo "Using built-in Windows Archive (no installation needed)"
+
+    - name: Download and extract nlohmann-json
       shell: cmd
       run: |
         if exist json\single_include\nlohmann\json.hpp (
@@ -52,40 +84,74 @@
         )
         echo "Extracted with Windows Archive"
         echo "Checking extracted contents..."
-        dir json_temp
-        if exist json_temp\json-3.11.3\single_include (
-          echo "Found json-3.11.3, moving single_include..."
-          move json_temp\json-3.11.3\single_include json\
-        ) else if exist json_temp\json-develop\single_include (
-          echo "Found json-develop, moving single_include..."
-          move json_temp\json-develop\single_include json\
-        ) else if exist json_temp\json-master\single_include (
-          echo "Found json-master, moving single_include..."
-          move json_temp\json-master\single_include json\
-        ) else if exist json_temp\nlohmann-json-v3.11.3\single_include (
-          echo "Found nlohmann-json-v3.11.3, moving single_include..."
-          move json_temp\nlohmann-json-v3.11.3\single_include json\
-        ) else (
-          echo "Searching for single_include in json_temp..."
-          for /d %%i in (json_temp\*) do (
-            if exist "%%i\single_include" (
-              echo "Found single_include in %%i, moving..."
-              move "%%i\single_include" json\
-              goto :move_done
-            )
-          )
-          echo "No single_include folder found in json_temp, failing..."
+        dir json_temp /s
+        set "found_jsonhpp="
+        for /r json_temp %%f in (json.hpp) do (
+          set "found_jsonhpp=%%f"
+          goto :found_jsonhpp
+        )
+        :found_jsonhpp
+        if not defined found_jsonhpp (
+          echo "json.hpp not found in json_temp, failing..."
           dir json_temp /s
           exit /b 1
         )
-        :move_done
+        echo "Found json.hpp at %found_jsonhpp%"
+        for %%f in ("%found_jsonhpp%") do (
+          set "parent_dir=%%~dpf"
+          set "grandparent_dir=%%~dpf"
+          set "grandparent_dir=!grandparent_dir:~0,-1!"
+          for %%g in ("!grandparent_dir!") do set "grandparent_dir=%%~dpf"
+          set "grandparent_dir=!grandparent_dir:~0,-1!"
+          for %%g in ("!grandparent_dir!") do set "single_include_dir=%%~fpf"
+        )
+        if not exist "!single_include_dir!" (
+          echo "Could not determine single_include directory, failing..."
+          dir json_temp /s
+          exit /b 1
+        )
+        echo "Moving single_include from !single_include_dir! to json..."
+        move "!single_include_dir!" json\ || (
+          echo "Failed to move single_include directory, failing..."
+          dir json_temp /s
+          exit /b 1
+        )
         echo "Checking moved contents..."
-        dir json
+        dir json /s
         if not exist json\single_include\nlohmann\json.hpp (
-          echo "Failed to extract nlohmann-json, json.hpp not found. Checking contents..."
+          echo "Failed to extract nlohmann-json, json.hpp not found in final location. Checking contents..."
           dir json /s
           exit /b 1
         )
         echo "nlohmann-json successfully extracted."
         :json_extracted
         rmdir /s /q json_temp
+
+    - name: Verify MinGW installation
+      shell: cmd
+      run: |
+        x86_64-w64-mingw32-gcc --version
+        x86_64-w64-mingw32-g++ --version
+
+    - name: Create directories if needed
+      shell: cmd
+      run: |
+        if not exist build mkdir build
+        if not exist build_msvc\Release mkdir build_msvc\Release
+
+    - name: Compile with MinGW (First Attempt)
+      shell: cmd
+      run: |
+        if exist DirectXSample\RustAlkadCheat2588.cpp (
+          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+            echo "First attempt to compile with MinGW failed, retrying..."
+            x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+              echo "Second attempt to compile with MinGW failed, failing build..."
+              exit /b 1
+            )
+          )
+        ) else (
+          echo "Could not find RustAlkadCheat2588.cpp, failing build"
+          dir DirectXSample /s
+          exit /b 1
+        )
