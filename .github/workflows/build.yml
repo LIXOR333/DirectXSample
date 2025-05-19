@@ -87,13 +87,13 @@ jobs:
         )
         echo Building MinHook... >> logs/build.log
         cd minhook
-        msbuild /p:Configuration=Release /p:Platform=x64
-        if not exist build\VC17\Release\MinHook.x64.lib (
+        nmake -f Makefile.msc CFG=release
+        if not exist lib\MinHook.x64.lib (
           echo Error: MinHook.x64.lib not found after build >> logs/build.log
-          dir build /s /b >> logs/build.log 2>&1
+          dir lib /s /b >> logs/build.log 2>&1
           exit 1
         )
-        copy build\VC17\Release\MinHook.x64.lib MinHook.lib
+        copy lib\MinHook.x64.lib MinHook.lib
         cd ..
         echo MinHook downloaded, built, and verified >> logs/build.log
       shell: cmd
