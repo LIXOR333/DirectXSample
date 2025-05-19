@@ -146,13 +146,14 @@ jobs:
               )
             )
           )
-          echo "Installing DirectX SDK..."
-          start /wait DXSDK_Jun10.exe /S
-          if not exist "%DXSDK_DIR%" (
-            echo "DirectX SDK installation failed, directory not found."
+          echo "Extracting DirectX SDK..."
+          7z x DXSDK_Jun10.exe -o"%DXSDK_DIR%" -y
+          if not exist "%DXSDK_DIR%\Lib\x86" (
+            echo "DirectX SDK extraction failed, Lib\x86 not found."
+            dir "%DXSDK_DIR%" /s
             exit /b 1
           )
-          echo "DirectX SDK installed at %DXSDK_DIR%"
+          echo "DirectX SDK extracted to %DXSDK_DIR%"
         ) else (
           echo "DirectX SDK already found at %DXSDK_DIR%"
         )
