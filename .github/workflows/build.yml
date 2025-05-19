@@ -27,6 +27,8 @@ jobs:
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
 
     - name: Create log directory
       run: |
@@ -92,9 +94,10 @@ jobs:
         )
         echo Building MinHook... >> logs/build.log
         cd minhook
-        msbuild minhook.sln /p:Configuration=Release /p:Platform=x64
+        msbuild minhook.sln /p:Configuration=Release /p:Platform=x64 /v:d > build.log 2>&1
         if %ERRORLEVEL% NEQ 0 (
           echo Error: Failed to build MinHook with msbuild >> logs/build.log
+          type build.log >> ../logs/build.log
           exit 1
         )
         if not exist build\VC17\Release\MinHook.x64.lib (
