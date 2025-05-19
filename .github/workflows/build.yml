@@ -25,22 +25,36 @@ jobs:
         choco install mingw --force -y
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
 
-    - name: Install vcpkg
-      shell: cmd
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git
-        .\vcpkg\bootstrap-vcpkg.bat
-
-    - name: Install dependencies via vcpkg
-      shell: cmd
-      run: |
-        .\vcpkg\vcpkg install imgui:x64-mingw-static minhook:x64-mingw-static nlohmann-json:x64-mingw-static --recurse --clean-after-build
-        .\vcpkg\vcpkg integrate install
-
     - name: Install CMake
       uses: lukka/get-cmake@v3.29.0
       with:
         cmakeVersion: '3.29.0'
+
+    - name: Install 7zip
+      shell: cmd
+      run: |
+        choco install 7zip --force -y
+
+    - name: Download ImGui
+      shell: cmd
+      run: |
+        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip
+        7z x imgui.zip
+        move imgui-master imgui
+
+    - name: Download MinHook
+      shell: cmd
+      run: |
+        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip
+        7z x minhook.zip
+        move minhook-master minhook
+
+    - name: Download nlohmann-json
+      shell: cmd
+      run: |
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip
+        7z x json.zip
+        move json-develop json
 
     - name: Verify MinGW installation
       shell: cmd
@@ -53,15 +67,17 @@ jobs:
       run: |
         dir
         dir DirectXSample 2> nul || echo "DirectXSample not found"
+        dir DirectXSample\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
         dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
-        dir DirectXSample\DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample\DirectXSample"
-        dir DirectXSample\src\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
+        dir imgui 2> nul || echo "imgui not found"
+        dir minhook 2> nul || echo "minhook not found"
+        dir json 2> nul || echo "json not found"
 
     - name: Configure CMake
       shell: cmd
       run: |
         if exist DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          cmake -S DirectXSample -B build -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
         ) else (
           echo "Could not find CMakeLists.txt, failing build"
           exit /b 1
