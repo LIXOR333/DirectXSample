@@ -1,8 +1,11 @@
 name: Build Rust Alkad 2588 Cheat DLL
 
 on:
-  push: # Запускаем при изменении любых файлов
-  workflow_dispatch: # Ручной запуск
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -10,199 +13,406 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
-      continue-on-error: true
+      uses: actions/checkout@v4
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          imgui-master
+          minhook-master
+          zlib-1.3.1
+          json-develop
+        key: ${{ runner.os }}-deps-${{ hashFiles('build.yml') }}
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
-      continue-on-error: true
 
     - name: Create log directory
-      run: |
-        New-Item -ItemType Directory -Path logs -Force
-        Write-Output "Log directory created" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
+      run: mkdir logs
+      shell: cmd
 
     - name: Download ImGui
       run: |
-        $urls = @(
-          "https://github.com/ocornut/imgui/archive/refs/heads/master.zip",
-          "https://github.com/ocornut/imgui/archive/master.zip",
-          "https://github.com/ocornut/imgui/archive/refs/tags/v1.90.zip",
-          "https://gitlab.com/mirror/imgui/-/archive/master/imgui-master.zip",
-          "https://sourceforge.net/projects/imgui/files/latest/download"
+        echo Downloading ImGui... >> logs/build.log
+        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from primary (GitHub) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+          echo Primary ImGui download or validation failed, trying mirror 1... >> logs/build.log
+          curl -L -o imgui.zip https://mirror.ghproxy.com/https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from mirror 1 (ghproxy) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o imgui.zip https://codeload.github.com/ocornut/imgui/zip/refs/heads/master && echo ImGui downloaded from mirror 2 (codeload) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+              echo Mirror 2 failed, trying mirror 3... >> logs/build.log
+              curl -L -o imgui.zip https://web.archive.org/web/20250518000000/https://github.com/ocornut/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from mirror 3 (archive.org) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                echo Mirror 3 failed, trying mirror 4... >> logs/build.log
+                curl -L -o imgui.zip https://github.com/mirror-imgui/imgui/archive/refs/heads/master.zip && echo ImGui downloaded from mirror 4 (mirror-imgui) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                  echo Mirror 4 failed, trying mirror 5... >> logs/build.log
+                  curl -L -o imgui.zip https://sourceforge.net/projects/imgui/files/master/imgui-master.zip && echo ImGui downloaded from mirror 5 (SourceForge) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                    echo Mirror 5 failed, trying mirror 6... >> logs/build.log
+                    curl -L -o imgui.zip https://bitbucket.org/imgui-mirror/imgui/get/master.zip && echo ImGui downloaded from mirror 6 (Bitbucket) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                      echo Mirror 6 failed, trying mirror 7... >> logs/build.log
+                      curl -L -o imgui.zip https://gitlab.com/imgui-mirror/imgui/-/archive/master/imgui-master.zip && echo ImGui downloaded from mirror 7 (GitLab) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                        echo Mirror 7 failed, trying mirror 8... >> logs/build.log
+                        curl -L -o imgui.zip https://gitcode.net/mirrors/ocornut/imgui/-/archive/master/imgui-master.zip && echo ImGui downloaded from mirror 8 (GitCode) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                          echo Mirror 8 failed, trying mirror 9... >> logs/build.log
+                          curl -L -o imgui.zip https://gitee.com/mirror-imgui/imgui/repository/archive/master.zip && echo ImGui downloaded from mirror 9 (Gitee) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                            echo Mirror 9 failed, trying mirror 10... >> logs/build.log
+                            curl -L -o imgui.zip https://codeberg.org/imgui-mirror/imgui/archive/master.zip && echo ImGui downloaded from mirror 10 (Codeberg) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o imgui.zip https://git.savannah.gnu.org/cgit/imgui.git/snapshot/imgui-master.tar.gz && echo ImGui downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
+                                curl -L -o imgui.zip https://archive.org/download/github.com-ocornut-imgui/imgui-master.zip && echo ImGui downloaded from mirror 12 (Internet Archive) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                  echo Mirror 12 failed, trying mirror 13... >> logs/build.log
+                                  curl -L -o imgui.zip https://files.phpmyadmin.net/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 13 (phpMyAdmin) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                    echo Mirror 13 failed, trying mirror 14... >> logs/build.log
+                                    curl -L -o imgui.zip https://mirror.centos.org/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 14 (CentOS Mirror) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                      echo Mirror 14 failed, trying mirror 15... >> logs/build.log
+                                      curl -L -o imgui.zip https://mirror.fsf.org/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 15 (FSF Mirror) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                        echo Mirror 15 failed, trying mirror 16... >> logs/build.log
+                                        curl -L -o imgui.zip https://mirror.rackspace.com/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 16 (Rackspace) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                          echo Mirror 16 failed, trying mirror 17... >> logs/build.log
+                                          curl -L -o imgui.zip https://mirror.netcologne.de/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 17 (NetCologne) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                            echo Mirror 17 failed, trying mirror 18... >> logs/build.log
+                                            curl -L -o imgui.zip https://mirror.leaseweb.com/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 18 (Leaseweb) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                              echo Mirror 18 failed, trying mirror 19... >> logs/build.log
+                                              curl -L -o imgui.zip https://mirror.nexcess.net/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 19 (Nexcess) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                echo Mirror 19 failed, trying mirror 20... >> logs/build.log
+                                                curl -L -o imgui.zip https://mirror.umd.edu/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 20 (UMD) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                  echo Mirror 20 failed, trying mirror 21... >> logs/build.log
+                                                  curl -L -o imgui.zip https://mirror.csclub.uwaterloo.ca/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 21 (UWaterloo) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                    echo Mirror 21 failed, trying mirror 22... >> logs/build.log
+                                                    curl -L -o imgui.zip https://mirror.ox.ac.uk/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 22 (Oxford) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                      echo Mirror 22 failed, trying mirror 23... >> logs/build.log
+                                                      curl -L -o imgui.zip https://mirror.yandex.ru/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 23 (Yandex) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                        echo Mirror 23 failed, trying mirror 24... >> logs/build.log
+                                                        curl -L -o imgui.zip https://mirror.1und1.de/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 24 (1und1) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                          echo Mirror 24 failed, trying mirror 25... >> logs/build.log
+                                                          curl -L -o imgui.zip https://mirror.easyname.at/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 25 (Easyname) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                            echo Mirror 25 failed, trying mirror 26... >> logs/build.log
+                                                            curl -L -o imgui.zip https://mirror.hetzner.de/imgui/master/imgui-master.zip && echo ImGui downloaded from mirror 26 (Hetzner) >> logs/build.log && unzip -t imgui.zip >> logs/build.log 2>&1 && echo ImGui archive validated >> logs/build.log || (
+                                                              echo ImGui download or validation failed from all sources >> logs/build.log
+                                                              exit 1
+                                                            )
+                                                          )
+                                                        )
+                                                      )
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
         )
-        $downloaded = $false
-        foreach ($url in $urls) {
-          try {
-            Invoke-WebRequest -Uri $url -OutFile imgui.zip
-            $downloaded = $true
-            Write-Output "Downloaded ImGui from $url" | Out-File -FilePath logs/build.log -Append
-            break
-          } catch {
-            Write-Output "Failed to download ImGui from $url" | Out-File -FilePath logs/build.log -Append
-          }
-        }
-        if (-not $downloaded) { Write-Output "Failed to download ImGui from all URLs" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        if (-not (Test-Path imgui.zip)) { Write-Output "ImGui zip not found after download" | Out-File -FilePath logs/build.log -Append; exit 1 }
-      shell: powershell
-
-    - name: Extract ImGui
-      run: |
-        if (Test-Path imgui) { Remove-Item -Path imgui -Recurse -Force }
-        Expand-Archive -Path imgui.zip -DestinationPath imgui -Force
-        Start-Sleep -Seconds 2
-        Get-ChildItem -Path imgui -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
-        if (-not (Test-Path imgui/imgui-master/imgui.h)) { Write-Output "Failed to extract ImGui: imgui.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        Write-Output "ImGui extracted" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
+        unzip -o imgui.zip
+        echo ImGui unzipped >> logs/build.log
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download MinHook
       run: |
-        $urls = @(
-          "https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip",
-          "https://github.com/TsudaKageyu/minhook/archive/master.zip",
-          "https://github.com/TsudaKageyu/minhook/archive/refs/tags/v1.3.3.zip",
-          "https://gitlab.com/mirrors/minhook/-/archive/master/minhook-master.zip",
-          "https://sourceforge.net/projects/minhook/files/latest/download"
+        echo Downloading MinHook... >> logs/build.log
+        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from primary (GitHub) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+          echo Primary MinHook download or validation failed, trying mirror 1... >> logs/build.log
+          curl -L -o minhook.zip https://mirror.ghproxy.com/https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from mirror 1 (ghproxy) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o minhook.zip https://codeload.github.com/TsudaKageyu/minhook/zip/refs/heads/master && echo MinHook downloaded from mirror 2 (codeload) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+              echo Mirror 2 failed, trying mirror 3... >> logs/build.log
+              curl -L -o minhook.zip https://web.archive.org/web/20250518000000/https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from mirror 3 (archive.org) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                echo Mirror 3 failed, trying mirror 4... >> logs/build.log
+                curl -L -o minhook.zip https://github.com/mirror-minhook/minhook/archive/refs/heads/master.zip && echo MinHook downloaded from mirror 4 (mirror-minhook) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                  echo Mirror 4 failed, trying mirror 5... >> logs/build.log
+                  curl -L -o minhook.zip https://sourceforge.net/projects/minhook/files/master/minhook-master.zip && echo MinHook downloaded from mirror 5 (SourceForge) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                    echo Mirror 5 failed, trying mirror 6... >> logs/build.log
+                    curl -L -o minhook.zip https://bitbucket.org/minhook-mirror/minhook/get/master.zip && echo MinHook downloaded from mirror 6 (Bitbucket) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                      echo Mirror 6 failed, trying mirror 7... >> logs/build.log
+                      curl -L -o minhook.zip https://gitlab.com/minhook-mirror/minhook/-/archive/master/minhook-master.zip && echo MinHook downloaded from mirror 7 (GitLab) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                        echo Mirror 7 failed, trying mirror 8... >> logs/build.log
+                        curl -L -o minhook.zip https://gitcode.net/mirrors/TsudaKageyu/minhook/-/archive/master/minhook-master.zip && echo MinHook downloaded from mirror 8 (GitCode) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                          echo Mirror 8 failed, trying mirror 9... >> logs/build.log
+                          curl -L -o minhook.zip https://gitee.com/mirror-minhook/minhook/repository/archive/master.zip && echo MinHook downloaded from mirror 9 (Gitee) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                            echo Mirror 9 failed, trying mirror 10... >> logs/build.log
+                            curl -L -o minhook.zip https://codeberg.org/minhook-mirror/minhook/archive/master.zip && echo MinHook downloaded from mirror 10 (Codeberg) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o minhook.zip https://git.savannah.gnu.org/cgit/minhook.git/snapshot/minhook-master.tar.gz && echo MinHook downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
+                                curl -L -o minhook.zip https://archive.org/download/github.com-TsudaKageyu-minhook/minhook-master.zip && echo MinHook downloaded from mirror 12 (Internet Archive) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                  echo Mirror 12 failed, trying mirror 13... >> logs/build.log
+                                  curl -L -o minhook.zip https://files.phpmyadmin.net/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 13 (phpMyAdmin) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                    echo Mirror 13 failed, trying mirror 14... >> logs/build.log
+                                    curl -L -o minhook.zip https://mirror.centos.org/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 14 (CentOS Mirror) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                      echo Mirror 14 failed, trying mirror 15... >> logs/build.log
+                                      curl -L -o minhook.zip https://mirror.fsf.org/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 15 (FSF Mirror) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                        echo Mirror 15 failed, trying mirror 16... >> logs/build.log
+                                        curl -L -o minhook.zip https://mirror.rackspace.com/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 16 (Rackspace) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                          echo Mirror 16 failed, trying mirror 17... >> logs/build.log
+                                          curl -L -o minhook.zip https://mirror.netcologne.de/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 17 (NetCologne) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                            echo Mirror 17 failed, trying mirror 18... >> logs/build.log
+                                            curl -L -o minhook.zip https://mirror.leaseweb.com/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 18 (Leaseweb) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                              echo Mirror 18 failed, trying mirror 19... >> logs/build.log
+                                              curl -L -o minhook.zip https://mirror.nexcess.net/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 19 (Nexcess) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                echo Mirror 19 failed, trying mirror 20... >> logs/build.log
+                                                curl -L -o minhook.zip https://mirror.umd.edu/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 20 (UMD) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                  echo Mirror 20 failed, trying mirror 21... >> logs/build.log
+                                                  curl -L -o minhook.zip https://mirror.csclub.uwaterloo.ca/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 21 (UWaterloo) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                    echo Mirror 21 failed, trying mirror 22... >> logs/build.log
+                                                    curl -L -o minhook.zip https://mirror.ox.ac.uk/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 22 (Oxford) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                      echo Mirror 22 failed, trying mirror 23... >> logs/build.log
+                                                      curl -L -o minhook.zip https://mirror.yandex.ru/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 23 (Yandex) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                        echo Mirror 23 failed, trying mirror 24... >> logs/build.log
+                                                        curl -L -o minhook.zip https://mirror.1und1.de/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 24 (1und1) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                          echo Mirror 24 failed, trying mirror 25... >> logs/build.log
+                                                          curl -L -o minhook.zip https://mirror.easyname.at/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 25 (Easyname) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                            echo Mirror 25 failed, trying mirror 26... >> logs/build.log
+                                                            curl -L -o minhook.zip https://mirror.hetzner.de/minhook/master/minhook-master.zip && echo MinHook downloaded from mirror 26 (Hetzner) >> logs/build.log && unzip -t minhook.zip >> logs/build.log 2>&1 && echo MinHook archive validated >> logs/build.log || (
+                                                              echo MinHook download or validation failed from all sources >> logs/build.log
+                                                              exit 1
+                                                            )
+                                                          )
+                                                        )
+                                                      )
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
         )
-        $downloaded = $false
-        foreach ($url in $urls) {
-          try {
-            Invoke-WebRequest -Uri $url -OutFile minhook.zip
-            $downloaded = $true
-            Write-Output "Downloaded MinHook from $url" | Out-File -FilePath logs/build.log -Append
-            break
-          } catch {
-            Write-Output "Failed to download MinHook from $url" | Out-File -FilePath logs/build.log -Append
-          }
-        }
-        if (-not $downloaded) { Write-Output "Failed to download MinHook from all URLs" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        if (-not (Test-Path minhook.zip)) { Write-Output "MinHook zip not found after download" | Out-File -FilePath logs/build.log -Append; exit 1 }
-      shell: powershell
-
-    - name: Extract MinHook
-      run: |
-        if (Test-Path minhook) { Remove-Item -Path minhook -Recurse -Force }
-        Expand-Archive -Path minhook.zip -DestinationPath minhook -Force
-        Start-Sleep -Seconds 2
-        Get-ChildItem -Path minhook -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
-        if (-not (Test-Path minhook/minhook-master/include/MinHook.h)) { Write-Output "Failed to extract MinHook: MinHook.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        Write-Output "MinHook extracted" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
+        unzip -o minhook.zip
+        echo MinHook unzipped >> logs/build.log
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download zlib
       run: |
-        $urls = @(
-          "https://zlib.net/zlib-1.2.13.zip",
-          "https://www.zlib.net/zlib1213.zip",
-          "https://sourceforge.net/projects/libpng/files/zlib/1.2.13/zlib-1.2.13.zip/download",
-          "https://ftp.osuosl.org/pub/blfs/conglomeration/zlib/zlib-1.2.13.tar.gz",
-          "https://mirror.ibcp.fr/pub/blfs/conglomeration/zlib/zlib-1.2.13.zip"
+        echo Downloading zlib... >> logs/build.log
+        curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz && echo zlib downloaded from primary (zlib.net) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+          echo Primary zlib download or validation failed, trying mirror 1... >> logs/build.log
+          curl -L -o zlib.tar.gz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 1 (GitHub) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o zlib.tar.gz https://sourceforge.net/projects/libpng/files/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 2 (SourceForge) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+              echo Mirror 2 failed, trying mirror 3... >> logs/build.log
+              curl -L -o zlib.tar.gz https://web.archive.org/web/20250518000000/https://zlib.net/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 3 (archive.org) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                echo Mirror 3 failed, trying mirror 4... >> logs/build.log
+                curl -L -o zlib.tar.gz https://zlib.net/fossils/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 4 (zlib fossils) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                  echo Mirror 4 failed, trying mirror 5... >> logs/build.log
+                  curl -L -o zlib.tar.gz https://mirror.ghproxy.com/https://zlib.net/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 5 (ghproxy) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                    echo Mirror 5 failed, trying mirror 6... >> logs/build.log
+                    curl -L -o zlib.tar.gz https://bitbucket.org/zlib-mirror/zlib/get/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 6 (Bitbucket) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                      echo Mirror 6 failed, trying mirror 7... >> logs/build.log
+                      curl -L -o zlib.tar.gz https://gitlab.com/zlib-mirror/zlib/-/archive/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 7 (GitLab) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                        echo Mirror 7 failed, trying mirror 8... >> logs/build.log
+                        curl -L -o zlib.tar.gz https://gitcode.net/mirrors/madler/zlib/-/archive/v1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 8 (GitCode) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                          echo Mirror 8 failed, trying mirror 9... >> logs/build.log
+                          curl -L -o zlib.tar.gz https://gitee.com/mirror-zlib/zlib/repository/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 9 (Gitee) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                            echo Mirror 9 failed, trying mirror 10... >> logs/build.log
+                            curl -L -o zlib.tar.gz https://codeberg.org/zlib-mirror/zlib/archive/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 10 (Codeberg) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o zlib.tar.gz https://git.savannah.gnu.org/cgit/zlib.git/snapshot/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
+                                curl -L -o zlib.tar.gz https://archive.org/download/zlib-1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 12 (Internet Archive) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                  echo Mirror 12 failed, trying mirror 13... >> logs/build.log
+                                  curl -L -o zlib.tar.gz https://files.phpmyadmin.net/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 13 (phpMyAdmin) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                    echo Mirror 13 failed, trying mirror 14... >> logs/build.log
+                                    curl -L -o zlib.tar.gz https://mirror.centos.org/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 14 (CentOS Mirror) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                      echo Mirror 14 failed, trying mirror 15... >> logs/build.log
+                                      curl -L -o zlib.tar.gz https://mirror.fsf.org/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 15 (FSF Mirror) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                        echo Mirror 15 failed, trying mirror 16... >> logs/build.log
+                                        curl -L -o zlib.tar.gz https://mirror.rackspace.com/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 16 (Rackspace) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                          echo Mirror 16 failed, trying mirror 17... >> logs/build.log
+                                          curl -L -o zlib.tar.gz https://mirror.netcologne.de/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 17 (NetCologne) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                            echo Mirror 17 failed, trying mirror 18... >> logs/build.log
+                                            curl -L -o zlib.tar.gz https://mirror.leaseweb.com/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 18 (Leaseweb) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                              echo Mirror 18 failed, trying mirror 19... >> logs/build.log
+                                              curl -L -o zlib.tar.gz https://mirror.nexcess.net/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 19 (Nexcess) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                echo Mirror 19 failed, trying mirror 20... >> logs/build.log
+                                                curl -L -o zlib.tar.gz https://mirror.umd.edu/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 20 (UMD) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                  echo Mirror 20 failed, trying mirror 21... >> logs/build.log
+                                                  curl -L -o zlib.tar.gz https://mirror.csclub.uwaterloo.ca/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 21 (UWaterloo) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                    echo Mirror 21 failed, trying mirror 22... >> logs/build.log
+                                                    curl -L -o zlib.tar.gz https://mirror.ox.ac.uk/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 22 (Oxford) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                      echo Mirror 22 failed, trying mirror 23... >> logs/build.log
+                                                      curl -L -o zlib.tar.gz https://mirror.yandex.ru/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 23 (Yandex) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                        echo Mirror 23 failed, trying mirror 24... >> logs/build.log
+                                                        curl -L -o zlib.tar.gz https://mirror.1und1.de/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 24 (1und1) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                          echo Mirror 24 failed, trying mirror 25... >> logs/build.log
+                                                          curl -L -o zlib.tar.gz https://mirror.easyname.at/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 25 (Easyname) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                            echo Mirror 25 failed, trying mirror 26... >> logs/build.log
+                                                            curl -L -o zlib.tar.gz https://mirror.hetzner.de/zlib/1.3.1/zlib-1.3.1.tar.gz && echo zlib downloaded from mirror 26 (Hetzner) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
+                                                              echo zlib download or validation failed from all sources >> logs/build.log
+                                                              exit 1
+                                                            )
+                                                          )
+                                                        )
+                                                      )
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
         )
-        $downloaded = $false
-        foreach ($url in $urls) {
-          try {
-            Invoke-WebRequest -Uri $url -OutFile zlib.zip
-            $downloaded = $true
-            Write-Output "Downloaded zlib from $url" | Out-File -FilePath logs/build.log -Append
-            break
-          } catch {
-            Write-Output "Failed to download zlib from $url" | Out-File -FilePath logs/build.log -Append
-          }
-        }
-        if (-not $downloaded) { Write-Output "Failed to download zlib from all URLs" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        if (-not (Test-Path zlib.zip)) { Write-Output "zlib zip not found after download" | Out-File -FilePath logs/build.log -Append; exit 1 }
-      shell: powershell
-
-    - name: Extract zlib
-      run: |
-        if (Test-Path zlib) { Remove-Item -Path zlib -Recurse -Force }
-        Expand-Archive -Path zlib.zip -DestinationPath zlib -Force
-        Start-Sleep -Seconds 2
-        Get-ChildItem -Path zlib -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
-        if (-not (Test-Path zlib/zlib-1.2.13/zlib.h)) { Write-Output "Failed to extract zlib: zlib.h not found" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        Write-Output "zlib extracted" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
+        tar -xzf zlib.tar.gz
+        ren zlib-1.3.1 zlib
+        echo zlib unzipped and renamed >> logs/build.log
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download nlohmann/json
       run: |
-        $urls = @(
-          "https://github.com/nlohmann/json/archive/refs/heads/develop.zip",
-          "https://github.com/nlohmann/json/archive/develop.zip",
-          "https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip",
-          "https://gitlab.com/mirrors/nlohmann-json/-/archive/develop/nlohmann-json-develop.zip",
-          "https://github.com/nlohmann/json/releases/latest/download/json.zip"
+        echo Downloading nlohmann/json... >> logs/build.log
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from primary (GitHub) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+          echo Primary nlohmann/json download or validation failed, trying mirror 1... >> logs/build.log
+          curl -L -o json.zip https://mirror.ghproxy.com/https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from mirror 1 (ghproxy) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+            echo Mirror 1 failed, trying mirror 2... >> logs/build.log
+            curl -L -o json.zip https://codeload.github.com/nlohmann/json/zip/refs/heads/develop && echo nlohmann/json downloaded from mirror 2 (codeload) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+              echo Mirror 2 failed, trying mirror 3... >> logs/build.log
+              curl -L -o json.zip https://web.archive.org/web/20250518000000/https://github.com/nlohmann/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from mirror 3 (archive.org) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                echo Mirror 3 failed, trying mirror 4... >> logs/build.log
+                curl -L -o json.zip https://github.com/mirror-nlohmann-json/json/archive/refs/heads/develop.zip && echo nlohmann/json downloaded from mirror 4 (mirror-nlohmann-json) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                  echo Mirror 4 failed, trying mirror 5... >> logs/build.log
+                  curl -L -o json.zip https://sourceforge.net/projects/nlohmann-json/files/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 5 (SourceForge) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                    echo Mirror 5 failed, trying mirror 6... >> logs/build.log
+                    curl -L -o json.zip https://bitbucket.org/nlohmann-json-mirror/json/get/develop.zip && echo nlohmann/json downloaded from mirror 6 (Bitbucket) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                      echo Mirror 6 failed, trying mirror 7... >> logs/build.log
+                      curl -L -o json.zip https://gitlab.com/nlohmann-json-mirror/json/-/archive/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 7 (GitLab) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                        echo Mirror 7 failed, trying mirror 8... >> logs/build.log
+                        curl -L -o json.zip https://gitcode.net/mirrors/nlohmann/json/-/archive/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 8 (GitCode) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                          echo Mirror 8 failed, trying mirror 9... >> logs/build.log
+                          curl -L -o json.zip https://gitee.com/mirror-nlohmann-json/json/repository/archive/develop.zip && echo nlohmann/json downloaded from mirror 9 (Gitee) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                            echo Mirror 9 failed, trying mirror 10... >> logs/build.log
+                            curl -L -o json.zip https://codeberg.org/nlohmann-json-mirror/json/archive/develop.zip && echo nlohmann/json downloaded from mirror 10 (Codeberg) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                              echo Mirror 10 failed, trying mirror 11... >> logs/build.log
+                              curl -L -o json.zip https://git.savannah.gnu.org/cgit/json.git/snapshot/json-develop.tar.gz && echo nlohmann/json downloaded from mirror 11 (Savannah) >> logs/build.log && tar -tzf json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                echo Mirror 11 failed, trying mirror 12... >> logs/build.log
+                                curl -L -o json.zip https://archive.org/download/github.com-nlohmann-json/json-develop.zip && echo nlohmann/json downloaded from mirror 12 (Internet Archive) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                  echo Mirror 12 failed, trying mirror 13... >> logs/build.log
+                                  curl -L -o json.zip https://files.phpmyadmin.net/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 13 (phpMyAdmin) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                    echo Mirror 13 failed, trying mirror 14... >> logs/build.log
+                                    curl -L -o json.zip https://mirror.centos.org/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 14 (CentOS Mirror) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                      echo Mirror 14 failed, trying mirror 15... >> logs/build.log
+                                      curl -L -o json.zip https://mirror.fsf.org/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 15 (FSF Mirror) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                        echo Mirror 15 failed, trying mirror 16... >> logs/build.log
+                                        curl -L -o json.zip https://mirror.rackspace.com/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 16 (Rackspace) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                          echo Mirror 16 failed, trying mirror 17... >> logs/build.log
+                                          curl -L -o json.zip https://mirror.netcologne.de/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 17 (NetCologne) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                            echo Mirror 17 failed, trying mirror 18... >> logs/build.log
+                                            curl -L -o json.zip https://mirror.leaseweb.com/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 18 (Leaseweb) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                              echo Mirror 18 failed, trying mirror 19... >> logs/build.log
+                                              curl -L -o json.zip https://mirror.nexcess.net/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 19 (Nexcess) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                echo Mirror 19 failed, trying mirror 20... >> logs/build.log
+                                                curl -L -o json.zip https://mirror.umd.edu/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 20 (UMD) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                  echo Mirror 20 failed, trying mirror 21... >> logs/build.log
+                                                  curl -L -o json.zip https://mirror.csclub.uwaterloo.ca/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 21 (UWaterloo) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                    echo Mirror 21 failed, trying mirror 22... >> logs/build.log
+                                                    curl -L -o json.zip https://mirror.ox.ac.uk/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 22 (Oxford) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                      echo Mirror 22 failed, trying mirror 23... >> logs/build.log
+                                                      curl -L -o json.zip https://mirror.yandex.ru/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 23 (Yandex) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                        echo Mirror 23 failed, trying mirror 24... >> logs/build.log
+                                                        curl -L -o json.zip https://mirror.1und1.de/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 24 (1und1) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                          echo Mirror 24 failed, trying mirror 25... >> logs/build.log
+                                                          curl -L -o json.zip https://mirror.easyname.at/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 25 (Easyname) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                            echo Mirror 25 failed, trying mirror 26... >> logs/build.log
+                                                            curl -L -o json.zip https://mirror.hetzner.de/nlohmann/json/develop/json-develop.zip && echo nlohmann/json downloaded from mirror 26 (Hetzner) >> logs/build.log && unzip -t json.zip >> logs/build.log 2>&1 && echo nlohmann/json archive validated >> logs/build.log || (
+                                                              echo nlohmann/json download or validation failed from all sources >> logs/build.log
+                                                              exit 1
+                                                            )
+                                                          )
+                                                        )
+                                                      )
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
         )
-        $downloaded = $false
-        foreach ($url in $urls) {
-          try {
-            Invoke-WebRequest -Uri $url -OutFile json.zip
-            $downloaded = $true
-            Write-Output "Downloaded nlohmann/json from $url" | Out-File -FilePath logs/build.log -Append
-            break
-          } catch {
-            Write-Output "Failed to download nlohmann/json from $url" | Out-File -FilePath logs/build.log -Append
-          }
-        }
-        if (-not $downloaded) { Write-Output "Failed to download nlohmann/json from all URLs" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        if (-not (Test-Path json.zip)) { Write-Output "nlohmann/json zip not found after download" | Out-File -FilePath logs/build.log -Append; exit 1 }
-      shell: powershell
-
-    - name: Extract nlohmann/json
-      run: |
-        if (Test-Path json) { Remove-Item -Path json -Recurse -Force }
-        Expand-Archive -Path json.zip -DestinationPath json -Force
-        Start-Sleep -Seconds 2
-        Get-ChildItem -Path json -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
-        $jsonPaths = @(
-          "json/json-develop/single_include/nlohmann/json.hpp",
-          "json/json-3.11.3/single_include/nlohmann/json.hpp",
-          "json/json-develop/include/nlohmann/json.hpp"
-        )
-        $found = $false
-        foreach ($path in $jsonPaths) {
-          if (Test-Path $path) {
-            $found = $true
-            Write-Output "Found nlohmann/json at $path" | Out-File -FilePath logs/build.log -Append
-            break
-          }
-        }
-        if (-not $found) {
-          Write-Output "Failed to extract nlohmann/json: json.hpp not found in expected paths" | Out-File -FilePath logs/build.log -Append
-          exit 1
-        }
-        Write-Output "nlohmann/json extracted successfully" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
-
-    - name: Check RustAlkadCheat2588.cpp
-      run: |
-        if (-not (Test-Path RustAlkadCheat2588.cpp)) {
-          Write-Output "RustAlkadCheat2588.cpp not found in repository" | Out-File -FilePath logs/build.log -Append
-          exit 1
-        }
-        Write-Output "RustAlkadCheat2588.cpp found" | Out-File -FilePath logs/build.log -Append
-      shell: powershell
+        unzip -o json.zip
+        echo nlohmann/json unzipped >> logs/build.log
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Build DLL
       run: |
-        Write-Output "Building DLL..." | Out-File -FilePath logs/build.log -Append
-        cl /DUNICODE /D_UNICODE /MD /O2 /W4 /FeRustAlkadCheat.dll /Iimgui/imgui-master /Iminhook/minhook-master/include /Izlib/zlib-1.2.13 /Ijson/json-develop/single_include RustAlkadCheat2588.cpp /link /DLL /OUT:RustAlkadCheat.dll 2>> logs/build.log
-        if (-not (Test-Path RustAlkadCheat.dll)) { Write-Output "Build failed: DLL not created" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        Write-Output "DLL built successfully" | Out-File -FilePath logs/build.log -Append
+        echo Building DLL... >> logs/build.log
+        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
+        if %ERRORLEVEL% NEQ 0 (
+          echo Build failed >> logs/build.log
+          exit 1
+        )
+        echo Build successful >> logs/build.log
       shell: cmd
 
     - name: Upload logs
+      if: always()
       uses: actions/upload-artifact@v4
-      continue-on-error: true
       with:
-        name: build-logs
-        path: logs/
+        name: BuildLogs
+        path: logs/build.log
 
     - name: Upload DLL
-      if: success()
       uses: actions/upload-artifact@v4
-      continue-on-error: true
       with:
-        name: RustAlkadCheat
+        name: RustAlkadCheatDLL
         path: RustAlkadCheat.dll
