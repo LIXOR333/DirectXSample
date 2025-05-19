@@ -1,39 +1,37 @@
 #include <windows.h>
-#include <imgui.h>
-#include <imgui_impl_win32.h>
-#include <minhook.h>
-#include <nlohmann/json.hpp>
-#include <string>
+#include <d3d9.h>
 #include <vector>
+#include <string>
 #include <fstream>
-#include <iostream>
-#include <cmath>
-
-#pragma warning(disable: 4996)
+#include <ctime>
+#include "../json/single_include/nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
-// Оффсеты для Rust Alkad 2588 (будут найдены дампером)
+// Оффсеты (по умолчанию 0, обновляются автоматически)
 namespace Offsets {
     DWORD64 GWorld = 0x0;
     DWORD64 GNames = 0x0;
     DWORD64 LocalPlayer = 0x0;
     DWORD64 EntityList = 0x0;
-    DWORD64 ViewMatrix = 0x0;
     DWORD64 Health = 0x320;
     DWORD64 Position = 0x1A0;
     DWORD64 Name = 0x4B0;
-    DWORD64 BoneArray = 0x5A0; // Оффсет для костей (Aimbot)
+    bool needsUpdate = true;
 }
 
 // Глобальные переменные
 HMODULE hModule;
+bool bShowESP = false;
 bool bShowMenu = false;
-bool bESP = false;
-bool bAimbot = false;
-bool bNoRecoil = false;
+HWND hwndOverlay = NULL;
+HWND hwndMenu = NULL;
+LPDIRECT3D9 pD3D = NULL;
+LPDIRECT3DDEVICE9 pDevice = NULL;
+HFONT hFont = NULL;
+std::vector<Player> playerList;
 
-// Структура для игроков
+// Структура игрока
 struct Player {
     DWORD64 entity;
     float x, y, z;
@@ -42,133 +40,87 @@ struct Player {
     bool isVisible;
 };
 
-// Вектор для хранения игроков
-std::vector<Player> playerList;
-
-// Функция чтения памяти
+// Чтение памяти
 template<typename T>
 T ReadMemory(DWORD64 address) {
     if (!address) return T();
-    return *(T*)address;
+    T value;
+    ReadProcessMemory(GetCurrentProcess(), (LPCVOID)address, &value, sizeof(T), NULL);
+    return value;
 }
 
-// Функция записи в память
-template<typename T>
-void WriteMemory(DWORD64 address, T value) {
-    if (!address) return;
-    *(T*)address = value;
+// Расшифровщик строк (улучшенный)
+std::string DecryptString(DWORD64 address) {
+    if (!address) return "";
+    char encrypted[256];
+    SIZE_T bytesRead;
+    if (!ReadProcessMemory(GetCurrentProcess(), (LPCVOID)address, encrypted, sizeof(encrypted) - 1, &bytesRead)) return "";
+    encrypted[bytesRead] = '\0';
+
+    std::string decrypted;
+    srand(static_cast<unsigned>(time(0)));
+    int key = rand() % 255 + 1; // Динамический ключ
+    for (size_t i = 0; i < strlen(encrypted); i++) {
+        char c = encrypted[i] ^ key;
+        if (c >= 32 && c <= 126) decrypted += c; // Проверка валидности символа
+    }
+    if (decrypted.empty()) return "Unknown";
+    return decrypted;
 }
 
-// Сканирование памяти для поиска сигнатур
-DWORD64 FindPattern(const char* pattern, const char* mask) {
-    MODULEINFO modInfo;
-    GetModuleInformation(GetCurrentProcess(), GetModuleHandle(NULL), &modInfo, sizeof(MODULEINFO));
-    DWORD64 base = (DWORD64)modInfo.lpBaseOfDll;
-    DWORD size = modInfo.SizeOfImage;
-
-    size_t patternLength = strlen(mask);
-    for (DWORD i = 0; i < size - patternLength; i++) {
+// Поиск сигнатур (AOB-сканирование с несколькими вариантами)
+DWORD64 FindPattern(const char* pattern, const char* mask, DWORD64 start, DWORD64 end) {
+    size_t len = strlen(mask);
+    for (DWORD64 i = start; i < end - len; i++) {
         bool found = true;
-        for (DWORD j = 0; j < patternLength; j++) {
-            found &= mask[j] == '?' || pattern[j] == *(char*)(base + i + j);
+        for (size_t j = 0; j < len; j++) {
+            if (mask[j] != '?' && pattern[j] != *(char*)(i + j)) {
+                found = false;
+                break;
+            }
         }
-        if (found) {
-            return base + i;
-        }
+        if (found) return i;
     }
     return 0;
 }
 
-// Авто дампер оффсетов (улучшенный поиск)
-void DumpOffsets() {
-    const char* gWorldSig = "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x00\x48\x8B\x80";
-    const char* gWorldMask = "xxx????xxxx?xxx";
-    const char* gNamesSig = "\x4C\x8D\x0D\x00\x00\x00\x00\x48\x8D\x15\x00\x00\x00\x00\xE8";
-    const char* gNamesMask = "xxx????xxx????x";
-    const char* localPlayerSig = "\x48\x8B\x0D\x00\x00\x00\x00\x48\x85\xC9\x0F\x84\x00\x00\x00\x00";
-    const char* localPlayerMask = "xxx????xxxxxx????";
-    const char* entityListSig = "\x48\x8B\x15\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8";
-    const char* entityListMask = "xxx????xxx????x";
-    const char* viewMatrixSig = "\x48\x8D\x0D\x00\x00\x00\x00\x48\x89\x01\x48\x8D\x54\x24";
-    const char* viewMatrixMask = "xxx????xxxxxxx";
-    const char* boneArraySig = "\x48\x8B\x80\x00\x00\x00\x00\x48\x85\xC0\x74\x00\x48\x8B\x88";
-    const char* boneArrayMask = "xxx????xxxx?xxx";
+// Автодампер оффсетов
+void AutoDumpOffsets() {
+    static DWORD64 lastProcessId = 0;
+    DWORD64 currentProcessId = GetCurrentProcessId();
+    if (lastProcessId != currentProcessId || Offsets::needsUpdate) {
+        DWORD64 baseAddress = (DWORD64)GetModuleHandle(NULL);
+        DWORD64 endAddress = baseAddress + 0x10000000;
 
-    Offsets::GWorld = FindPattern(gWorldSig, gWorldMask);
-    Offsets::GNames = FindPattern(gNamesSig, gNamesMask);
-    Offsets::LocalPlayer = FindPattern(localPlayerSig, localPlayerMask);
-    Offsets::EntityList = FindPattern(entityListSig, entityListMask);
-    Offsets::ViewMatrix = FindPattern(viewMatrixSig, viewMatrixMask);
-    Offsets::BoneArray = FindPattern(boneArraySig, boneArrayMask);
+        // Несколько сигнатур для разных режимов (оффлайн/онлайн)
+        Offsets::GWorld = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x0F\x84", "xxx????xxxxx", baseAddress, endAddress);
+        if (!Offsets::GWorld) Offsets::GWorld = FindPattern("\x48\x8B\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00", "xxx????x????", baseAddress, endAddress);
 
-    std::ofstream file("offsets_dump.txt");
-    file << "GWorld: 0x" << std::hex << Offsets::GWorld << "\n";
-    file << "GNames: 0x" << std::hex << Offsets::GNames << "\n";
-    file << "LocalPlayer: 0x" << std::hex << Offsets::LocalPlayer << "\n";
-    file << "EntityList: 0x" << std::hex << Offsets::EntityList << "\n";
-    file << "ViewMatrix: 0x" << std::hex << Offsets::ViewMatrix << "\n";
-    file << "BoneArray: 0x" << std::hex << Offsets::BoneArray << "\n";
-    file.close();
-    std::cout << "[Auto Dumper] Offsets dumped to offsets_dump.txt\n";
-}
+        Offsets::GNames = FindPattern("\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xC8", "xxx????x????xxx", baseAddress, endAddress);
+        if (!Offsets::GNames) Offsets::GNames = FindPattern("\x48\x89\x1D\x00\x00\x00\x00\x48\x85\xDB", "xxx????xxx", baseAddress, endAddress);
 
-// Авто апдейтер оффсетов
-void UpdateOffsets() {
-    std::ifstream file("offsets_dump.txt");
-    if (!file.is_open()) {
-        DumpOffsets();
-        return;
+        Offsets::LocalPlayer = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x0E", "xxx????xxxxxx", baseAddress, endAddress);
+        if (!Offsets::LocalPlayer) Offsets::LocalPlayer = FindPattern("\x48\x8B\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00", "xxx????x????", baseAddress, endAddress);
+
+        Offsets::EntityList = FindPattern("\x4C\x8B\x0D\x00\x00\x00\x00\x4C\x8B\xC0", "xxx????xxx", baseAddress, endAddress);
+        if (!Offsets::EntityList) Offsets::EntityList = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x89\x04\xC8", "xxx????xxxxx", baseAddress, endAddress);
+
+        json offsets;
+        offsets["GWorld"] = Offsets::GWorld;
+        offsets["GNames"] = Offsets::GNames;
+        offsets["LocalPlayer"] = Offsets::LocalPlayer;
+        offsets["EntityList"] = Offsets::EntityList;
+        offsets["Health"] = Offsets::Health;
+        offsets["Position"] = Offsets::Position;
+        offsets["Name"] = Offsets::Name;
+
+        std::ofstream file("offsets_dump.json");
+        file << offsets.dump(4);
+        file.close();
+
+        Offsets::needsUpdate = false;
+        lastProcessId = currentProcessId;
     }
-
-    json oldOffsets;
-    file >> oldOffsets;
-    file.close();
-
-    DumpOffsets();
-
-    std::ifstream newFile("offsets_dump.txt");
-    json newOffsets;
-    newFile >> newOffsets;
-    newFile.close();
-
-    if (oldOffsets != newOffsets) {
-        std::cout << "[Auto Updater] Offsets updated!\n";
-    }
-    else {
-        std::cout << "[Auto Updater] Offsets unchanged.\n";
-    }
-}
-
-// Расшифровщик строк
-std::string DecryptString(DWORD64 address) {
-    if (!address) return "";
-    char encrypted[256];
-    strncpy(encrypted, (char*)address, sizeof(encrypted) - 1);
-    encrypted[sizeof(encrypted) - 1] = '\0';
-
-    std::string decrypted;
-    for (size_t i = 0; i < strlen(encrypted); i++) {
-        decrypted += encrypted[i] ^ 0x42; // Простой XOR, замени на реальный метод
-    }
-    return decrypted;
-}
-
-// Получение позиции локального игрока
-struct Vector3 {
-    float x, y, z;
-};
-
-Vector3 GetLocalPlayerPosition() {
-    Vector3 pos = { 0, 0, 0 };
-    if (!Offsets::LocalPlayer) return pos;
-
-    DWORD64 localPlayer = ReadMemory<DWORD64>(Offsets::LocalPlayer);
-    if (!localPlayer) return pos;
-
-    pos.x = ReadMemory<float>(localPlayer + Offsets::Position);
-    pos.y = ReadMemory<float>(localPlayer + Offsets::Position + 4);
-    pos.z = ReadMemory<float>(localPlayer + Offsets::Position + 8);
-    return pos;
 }
 
 // Обновление списка игроков
@@ -195,134 +147,159 @@ void UpdatePlayers() {
     }
 }
 
-// Aimbot: Наведение на ближайшего игрока
-void RunAimbot() {
-    if (!bAimbot || !Offsets::LocalPlayer || !Offsets::ViewMatrix || !Offsets::BoneArray) return;
-
-    Vector3 localPos = GetLocalPlayerPosition();
-    Player* target = nullptr;
-    float closestDist = FLT_MAX;
-
-    for (auto& player : playerList) {
-        if (!player.isVisible || player.health <= 0) continue;
-
-        float dist = sqrt(
-            pow(player.x - localPos.x, 2) +
-            pow(player.y - localPos.y, 2) +
-            pow(player.z - localPos.z, 2)
-        );
-
-        if (dist < closestDist) {
-            closestDist = dist;
-            target = &player;
-        }
-    }
-
-    if (!target) return;
-
-    // Получаем кости головы (пример)
-    DWORD64 boneArray = ReadMemory<DWORD64>(target->entity + Offsets::BoneArray);
-    if (boneArray) {
-        Vector3 headPos = { ReadMemory<float>(boneArray + 8 * 6), // Индекс кости головы (пример)
-                            ReadMemory<float>(boneArray + 8 * 6 + 4),
-                            ReadMemory<float>(boneArray + 8 * 6 + 8) };
-
-        // Простая логика наведения (нужна ViewMatrix для точности)
-        std::cout << "[Aimbot] Targeting head of " << target->name << " at distance: " << closestDist << "\n";
-    }
+// Проекция 3D->2D (упрощённая, нуждается в ViewMatrix)
+bool WorldToScreen(float x, float y, float z, float& screenX, float& screenY) {
+    screenX = x;
+    screenY = y;
+    return true;
 }
 
-// Window procedure для ImGui
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
+// Рендеринг текста через DirectX
+void DrawText(const char* text, float x, float y, DWORD color) {
+    if (!pDevice) return;
+    LPD3DXFONT pFont;
+    D3DXCreateFont(pDevice, 16, 0, FW_BOLD, 1, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Arial", &pFont);
+    RECT rect = { (LONG)x, (LONG)y, (LONG)(x + 200), (LONG)(y + 20) };
+    pFont->DrawTextA(NULL, text, -1, &rect, DT_LEFT | DT_NOCLIP, color);
+    pFont->Release();
+}
+
+// Рендеринг бокса через DirectX
+void DrawBox(float x, float y, float w, float h, DWORD color) {
+    struct Vertex { float x, y, z, rhw; DWORD color; };
+    Vertex vertices[] = {
+        { x, y, 0, 1, color },
+        { x + w, y, 0, 1, color },
+        { x, y + h, 0, 1, color },
+        { x + w, y + h, 0, 1, color }
+    };
+    pDevice->SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+    pDevice->DrawPrimitiveUP(D3DPT_LINESTRIP, 4, vertices, sizeof(Vertex));
+}
+
+// Window procedure для меню
+LRESULT CALLBACK MenuWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case 1000: // Чекбокс ESP
+            bShowESP = !bShowESP;
+            CheckDlgButton(hWnd, 1000, bShowESP ? BST_CHECKED : BST_UNCHECKED);
+            break;
+        case 1001: // Кнопка дампа оффсетов
+            Offsets::needsUpdate = true;
+            AutoDumpOffsets();
+            break;
+        case 1002: // Кнопка перезагрузки оффсетов
+            Offsets::needsUpdate = true;
+            break;
+        }
+        return 0;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// Hook для No Recoil
-typedef void (*OriginalRecoilFunction)();
-OriginalRecoilFunction oRecoilFunction = nullptr;
-
-void HookedRecoilFunction() {
-    if (bNoRecoil) {
-        return;
+// Window procedure для оверлея
+LRESULT CALLBACK OverlayWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
     }
-    oRecoilFunction();
+    return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// Основной поток чита
+// Инициализация DirectX
+bool InitD3D(HWND hWnd) {
+    pD3D = Direct3DCreate9(D3D_SDK_VERSION);
+    if (!pD3D) return false;
+
+    D3DPRESENT_PARAMETERS d3dpp = {};
+    d3dpp.Windowed = TRUE;
+    d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    d3dpp.hDeviceWindow = hWnd;
+    d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+
+    HRESULT hr = pD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &d3dpp, &pDevice);
+    if (FAILED(hr)) return false;
+
+    hFont = CreateFontA(16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Arial");
+    return true;
+}
+
+// Основной поток
 DWORD WINAPI MainThread(LPVOID lpParam) {
-    if (MH_Initialize() != MH_OK) return 1;
+    // Создаём оверлей
+    WNDCLASSEX wcOverlay = { sizeof(WNDCLASSEX), CS_CLASSDC, OverlayWndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"Overlay", NULL };
+    RegisterClassEx(&wcOverlay);
+    hwndOverlay = CreateWindow(wcOverlay.lpszClassName, L"Rust Alkad Overlay", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL, wcOverlay.hInstance, NULL);
+    SetWindowLong(hwndOverlay, GWL_EXSTYLE, GetWindowLong(hwndOverlay, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+    SetLayeredWindowAttributes(hwndOverlay, 0, 255, LWA_ALPHA);
+    ShowWindow(hwndOverlay, SW_SHOW);
+    UpdateWindow(hwndOverlay);
 
-    void* recoilTarget = (void*)0xDEADBEEF; // Замени на реальный адрес функции отдачи
-    if (MH_CreateHook(recoilTarget, &HookedRecoilFunction, reinterpret_cast<void**>(&oRecoilFunction)) != MH_OK) return 1;
-    if (MH_EnableHook(recoilTarget) != MH_OK) return 1;
+    // Инициализация DirectX
+    if (!InitD3D(hwndOverlay)) return 0;
 
-    DumpOffsets();
-    UpdateOffsets();
-
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"ImGui Cheat", NULL };
-    RegisterClassEx(&wc);
-    HWND hwnd = CreateWindow(wc.lpszClassName, L"Rust Alkad Cheat", WS_OVERLAPPEDWINDOW, 100, 100, 400, 600, NULL, NULL, wc.hInstance, NULL);
-    ShowWindow(hwnd, SW_SHOWDEFAULT);
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    ImGui::StyleColorsDark();
-    ImGui_ImplWin32_Init(hwnd);
+    // Создаём меню
+    WNDCLASSEX wcMenu = { sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, MenuWndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"Menu", NULL };
+    RegisterClassEx(&wcMenu);
+    hwndMenu = CreateWindow(wcMenu.lpszClassName, L"Rust Alkad Menu", WS_OVERLAPPEDWINDOW, 100, 100, 300, 200, NULL, NULL, wcMenu.hInstance, NULL);
+    CreateWindow(L"BUTTON", L"ESP", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 10, 10, 100, 30, hwndMenu, (HMENU)1000, wcMenu.hInstance, NULL);
+    CreateWindow(L"BUTTON", L"Dump Offsets", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 10, 50, 100, 30, hwndMenu, (HMENU)1001, wcMenu.hInstance, NULL);
+    CreateWindow(L"BUTTON", L"Reload Offsets", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 10, 90, 100, 30, hwndMenu, (HMENU)1002, wcMenu.hInstance, NULL);
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
 
+        // Показ/скрытие меню по клавише Insert
+        if (GetAsyncKeyState(VK_INSERT) & 1) {
+            bShowMenu = !bShowMenu;
+            ShowWindow(hwndMenu, bShowMenu ? SW_SHOW : SW_HIDE);
+        }
+
+        // Автообновление оффсетов каждые 5 секунд
+        static clock_t lastUpdate = 0;
+        if (clock() - lastUpdate > 5000) {
+            AutoDumpOffsets();
+            lastUpdate = clock();
+        }
+
+        // Обновление игроков
         UpdatePlayers();
-        if (bAimbot) RunAimbot();
 
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
+        // Рендеринг
+        if (pDevice) {
+            pDevice->Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_ARGB(0, 0, 0, 0), 1.0f, 0);
+            pDevice->BeginScene();
 
-        if (bShowMenu) {
-            ImGui::Begin("Rust Alkad Cheat 2588", &bShowMenu);
-            ImGui::Text("LIXOR333 Cheat Menu");
-
-            if (ImGui::CollapsingHeader("ESP")) {
-                ImGui::Checkbox("Enable ESP", &bESP);
-                if (bESP) {
-                    for (auto& player : playerList) {
+            if (bShowESP) {
+                for (const auto& player : playerList) {
+                    float screenX, screenY;
+                    if (WorldToScreen(player.x, player.y, player.z, screenX, screenY)) {
                         char label[64];
                         sprintf(label, "%s [HP: %d]", player.name.c_str(), player.health);
-                        ImGui::Text(label);
-                        ImGui::SameLine();
-                        ImGui::Checkbox("Visible", &player.isVisible);
+                        DrawText(label, screenX, screenY - 20, player.isVisible ? D3DCOLOR_ARGB(255, 0, 255, 0) : D3DCOLOR_ARGB(255, 255, 0, 0));
+                        DrawBox(screenX - 25, screenY - 50, 50, 100, player.isVisible ? D3DCOLOR_ARGB(255, 0, 255, 0) : D3DCOLOR_ARGB(255, 255, 0, 0));
                     }
                 }
             }
 
-            if (ImGui::CollapsingHeader("Aimbot")) {
-                ImGui::Checkbox("Enable Aimbot", &bAimbot);
-            }
-
-            if (ImGui::CollapsingHeader("Weapon")) {
-                ImGui::Checkbox("No Recoil", &bNoRecoil);
-            }
-
-            if (ImGui::CollapsingHeader("Tools")) {
-                if (ImGui::Button("Dump Offsets")) DumpOffsets();
-                if (ImGui::Button("Update Offsets")) UpdateOffsets();
-            }
-
-            ImGui::End();
+            pDevice->EndScene();
+            pDevice->Present(NULL, NULL, NULL, NULL);
         }
 
-        ImGui::Render();
+        Sleep(10);
     }
 
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-    MH_Uninitialize();
+    if (pDevice) pDevice->Release();
+    if (pD3D) pD3D->Release();
+    if (hFont) DeleteObject(hFont);
     return 0;
 }
 
