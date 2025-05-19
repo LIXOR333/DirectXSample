@@ -4,10 +4,26 @@ project(RustAlkadCheat2588 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Указываем MinGW (для совместимости с GitHub Actions)
+# Указываем MinGW для GitHub Actions (можно переопределить при сборке)
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
 set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
+
+# Проверяем наличие всех зависимостей
+find_file(IMGUI_H "imgui.h" PATHS "${CMAKE_SOURCE_DIR}/../imgui" NO_DEFAULT_PATH)
+if(NOT IMGUI_H)
+    message(FATAL_ERROR "imgui.h not found in ${CMAKE_SOURCE_DIR}/../imgui. Please ensure ImGui is placed in the correct directory.")
+endif()
+
+find_file(MINHOOK_H "MinHook.h" PATHS "${CMAKE_SOURCE_DIR}/../minhook/include" NO_DEFAULT_PATH)
+if(NOT MINHOOK_H)
+    message(FATAL_ERROR "MinHook.h not found in ${CMAKE_SOURCE_DIR}/../minhook/include. Please ensure MinHook is placed in the correct directory.")
+endif()
+
+find_file(JSON_HPP "json.hpp" PATHS "${CMAKE_SOURCE_DIR}/../json/single_include/nlohmann" NO_DEFAULT_PATH)
+if(NOT JSON_HPP)
+    message(FATAL_ERROR "json.hpp not found in ${CMAKE_SOURCE_DIR}/../json/single_include/nlohmann. Please ensure nlohmann-json is placed in the correct directory.")
+endif()
 
 # Добавляем исходники
 add_library(RustAlkadCheat2588 SHARED
