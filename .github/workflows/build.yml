@@ -118,9 +118,20 @@ jobs:
           )
         )
         unzip -o imgui.zip
+        dir imgui-master >> logs/build.log 2>&1
         if not exist imgui-master\imgui.h (
-          echo Error: imgui.h not found in imgui-master\ >> logs/build.log
-          exit 1
+          echo Warning: imgui.h not found in imgui-master, checking subdirectories... >> logs/build.log
+          if exist imgui-master\imgui\imgui.h (
+            echo Found imgui.h in imgui-master\imgui, copying files... >> logs/build.log
+            xcopy imgui-master\imgui\* imgui-master\ /E /Y /I >> logs/build.log 2>&1
+            rmdir imgui-master\imgui /S /Q >> logs/build.log 2>&1
+            echo Structure adjusted >> logs/build.log
+          ) else (
+            echo Error: imgui.h not found in imgui-master or imgui-master\imgui >> logs/build.log
+            exit 1
+          )
+        ) else (
+          echo imgui.h found in imgui-master >> logs/build.log
         )
         echo ImGui unzipped >> logs/build.log
       shell: cmd
