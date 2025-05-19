@@ -58,7 +58,7 @@ jobs:
       run: |
         dir
         dir DirectXSample
-        dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found"
+        dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
 
     - name: Configure CMake
       shell: cmd
