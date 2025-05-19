@@ -11,22 +11,20 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          imgui
-          minhook
-          zlib
-          json
-        key: ${{ runner.os }}-deps-${{ hashFiles('RustAlkadCheat2588.cpp') }}-v1
+      continue-on-error: true
+      shell: powershell
+      run: Write-Output "Checkout completed" | Out-File -FilePath logs/build.log -Append
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
+      continue-on-error: true
+      shell: powershell
+      run: Write-Output "MSVC setup completed" | Out-File -FilePath logs/build.log -Append
 
     - name: Create log directory
-      run: New-Item -ItemType Directory -Path logs -Force
+      run: |
+        New-Item -ItemType Directory -Path logs -Force
+        Write-Output "Log directory created" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Download ImGui
@@ -55,6 +53,7 @@ jobs:
       run: |
         Expand-Archive -Path imgui.zip -DestinationPath imgui -Force
         if (-not (Test-Path imgui/imgui-master/imgui.h)) { Write-Output "Failed to extract ImGui" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Write-Output "ImGui extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Download MinHook
@@ -83,6 +82,7 @@ jobs:
       run: |
         Expand-Archive -Path minhook.zip -DestinationPath minhook -Force
         if (-not (Test-Path minhook/minhook-master/include/MinHook.h)) { Write-Output "Failed to extract MinHook" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Write-Output "MinHook extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Download zlib
@@ -111,6 +111,7 @@ jobs:
       run: |
         Expand-Archive -Path zlib.zip -DestinationPath zlib -Force
         if (-not (Test-Path zlib/zlib-1.2.18/zlib.h)) { Write-Output "Failed to extract zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Write-Output "zlib extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Download nlohmann/json
@@ -139,6 +140,7 @@ jobs:
       run: |
         Expand-Archive -Path json.zip -DestinationPath json -Force
         if (-not (Test-Path json/json-develop/single_include/nlohmann/json.hpp)) { Write-Output "Failed to extract nlohmann/json" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Write-Output "nlohmann/json extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Build DLL
@@ -146,17 +148,20 @@ jobs:
         Write-Output "Building DLL..." | Out-File -FilePath logs/build.log -Append
         cl /DUNICODE /D_UNICODE /MD /O2 /W4 /FeRustAlkadCheat.dll /Iimgui/imgui-master /Iminhook/minhook-master/include /Izlib/zlib-1.2.18 /Ijson/json-develop/single_include RustAlkadCheat2588.cpp /link /DLL /OUT:RustAlkadCheat.dll 2>> logs/build.log
         if (-not (Test-Path RustAlkadCheat.dll)) { Write-Output "Build failed: DLL not created" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        Write-Output "DLL built successfully" | Out-File -FilePath logs/build.log -Append
       shell: cmd
 
     - name: Upload logs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: build-logs
         path: logs/
 
     - name: Upload DLL
       if: success()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: RustAlkadCheat
         path: RustAlkadCheat.dll
