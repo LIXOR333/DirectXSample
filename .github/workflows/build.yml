@@ -53,6 +53,12 @@ jobs:
         x86_64-w64-mingw32-gcc --version
         x86_64-w64-mingw32-g++ --version
 
+    - name: Debug Directory Structure
+      shell: cmd
+      run: |
+        dir
+        dir DirectXSample
+
     - name: Configure CMake
       shell: cmd
       run: |
