@@ -26,7 +26,7 @@ jobs:
             exit /b 1
           )
         )
-      # Проверяет доступность Chocolatey через curl с двумя попытками и альтернативным URL
+      # Проверяет доступность Chocolatey через curl
 
     - name: Check if Chocolatey is already installed
       shell: cmd
@@ -38,7 +38,7 @@ jobs:
         ) || (
           echo "Chocolatey not found, proceeding with installation..."
         )
-      # Проверяет, установлен ли Chocolatey, чтобы избежать повторной установки
+      # Проверяет, установлен ли Chocolatey
 
     - name: Install Chocolatey with retry
       shell: cmd
@@ -50,7 +50,7 @@ jobs:
             exit /b 1
           )
         )
-      # Устанавливает Chocolatey с двумя попытками и альтернативным URL
+      # Устанавливает Chocolatey с двумя попытками
 
     - name: Install MinGW with retry
       shell: cmd
@@ -63,7 +63,7 @@ jobs:
           )
         )
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
-      # Устанавливает MinGW с двумя попытками
+      # Устанавливает MinGW
 
     - name: Verify MinGW installation
       shell: cmd
@@ -86,19 +86,76 @@ jobs:
         if not exist build_msvc\Release mkdir build_msvc\Release
       # Создаёт директории для сборки
 
-    - name: Check for RustAlkadCheat2588.cpp
+    - name: Check for RustAlkadCheat2588.cpp with fallback
       shell: cmd
       run: |
         echo "Checking for RustAlkadCheat2588.cpp in DirectXSample..."
         if exist DirectXSample\RustAlkadCheat2588.cpp (
-          echo "RustAlkadCheat2588.cpp found."
+          echo "RustAlkadCheat2588.cpp found in DirectXSample."
           dir DirectXSample\RustAlkadCheat2588.cpp
         ) else (
-          echo "RustAlkadCheat2588.cpp not found in DirectXSample, listing directory contents..."
-          dir DirectXSample /s
-          exit /b 1
+          echo "RustAlkadCheat2588.cpp not found in DirectXSample, checking DirectXSample\DirectXSample..."
+          if exist DirectXSample\DirectXSample\RustAlkadCheat2588.cpp (
+            echo "Found RustAlkadCheat2588.cpp in DirectXSample\DirectXSample, moving to DirectXSample..."
+            move DirectXSample\DirectXSample\RustAlkadCheat2588.cpp DirectXSample\RustAlkadCheat2588.cpp
+            if exist DirectXSample\RustAlkadCheat2588.cpp (
+              echo "Moved successfully."
+              dir DirectXSample\RustAlkadCheat2588.cpp
+            ) else (
+              echo "Failed to move RustAlkadCheat2588.cpp, listing directory contents..."
+              dir DirectXSample /s
+              exit /b 1
+            )
+          ) else if exist DirectXSample\RustAlkadaCheat2588.cpp (
+            echo "Found RustAlkadaCheat2588.cpp in DirectXSample, renaming to RustAlkadCheat2588.cpp..."
+            ren DirectXSample\RustAlkadaCheat2588.cpp RustAlkadCheat2588.cpp
+            if exist DirectXSample\RustAlkadCheat2588.cpp (
+              echo "Renamed successfully."
+              dir DirectXSample\RustAlkadCheat2588.cpp
+            ) else (
+              echo "Renaming failed, listing directory contents..."
+              dir DirectXSample /s
+              exit /b 1
+            )
+          ) else if exist DirectXSample\DirectXSample\RustAlkadaCheat2588.cpp (
+            echo "Found RustAlkadaCheat2588.cpp in DirectXSample\DirectXSample, moving and renaming..."
+            move DirectXSample\DirectXSample\RustAlkadaCheat2588.cpp DirectXSample\RustAlkadCheat2588.cpp
+            if exist DirectXSample\RustAlkadCheat2588.cpp (
+              echo "Moved and renamed successfully."
+              dir DirectXSample\RustAlkadCheat2588.cpp
+            ) else (
+              echo "Moving/renaming failed, listing directory contents..."
+              dir DirectXSample /s
+              exit /b 1
+            )
+          ) else (
+            echo "RustAlkadCheat2588.cpp not found, searching for similar files..."
+            dir DirectXSample\*Cheat2588.cpp /b > temp.txt 2>nul
+            dir DirectXSample\DirectXSample\*Cheat2588.cpp /b >> temp.txt 2>nul
+            set /p SIMILAR_FILE=<temp.txt
+            if defined SIMILAR_FILE (
+              echo "Found similar file: !SIMILAR_FILE!"
+              if exist DirectXSample\!SIMILAR_FILE! (
+                ren DirectXSample\!SIMILAR_FILE! RustAlkadCheat2588.cpp
+              ) else if exist DirectXSample\DirectXSample\!SIMILAR_FILE! (
+                move DirectXSample\DirectXSample\!SIMILAR_FILE! DirectXSample\RustAlkadCheat2588.cpp
+              )
+              if exist DirectXSample\RustAlkadCheat2588.cpp (
+                echo "Renamed/moved successfully."
+                dir DirectXSample\RustAlkadCheat2588.cpp
+              ) else (
+                echo "Renaming/moving failed, listing directory contents..."
+                dir DirectXSample /s
+                exit /b 1
+              )
+            ) else (
+              echo "No similar files found, listing directory contents..."
+              dir DirectXSample /s
+              exit /b 1
+            )
+          )
         )
-      # Проверяет наличие основного файла
+      # Проверяет наличие файла, перемещает/переименовывает при необходимости
 
     - name: Compile with MinGW (First Attempt)
       shell: cmd
