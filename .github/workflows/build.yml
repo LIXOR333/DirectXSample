@@ -25,10 +25,103 @@ jobs:
         choco install mingw --force -y
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
 
+    - name: Install 7zip
+      shell: cmd
+      run: |
+        choco install 7zip --force -y
+
     - name: Install CMake
       uses: lukka/get-cmake@v3.29.0
       with:
         cmakeVersion: '3.29.0'
+
+    - name: Check for local ImGui
+      shell: cmd
+      run: |
+        if exist imgui\imgui.h (
+          echo "Local ImGui found, skipping download."
+        ) else (
+          echo "Local ImGui not found, downloading..."
+          curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/tags/v1.90.6.zip || (
+            echo "Failed to download ImGui v1.90.6, trying mirrors..."
+            curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip || (
+              curl -L -o imgui.zip https://github.com/mekhontsev/imgui/archive/refs/heads/master.zip || (
+                curl -L -o imgui.zip https://github.com/TheCherno/imgui/archive/refs/heads/master.zip || (
+                  curl -L -o imgui.zip https://github.com/cimgui/cimgui/archive/refs/heads/master.zip || (
+                    curl -L -o imgui.zip https://github.com/procedural/imgui/archive/refs/heads/master.zip || (
+                      curl -L -o imgui.zip https://gitlab.com/memononen/imgui/-/archive/master/imgui-master.zip || (
+                        echo "All ImGui download attempts failed, exiting..."
+                        exit /b 1
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+          7z x imgui.zip -oimgui
+          move imgui\imgui-1.90.6\* imgui\ 2> nul || move imgui\imgui-master\* imgui\ 2> nul || move imgui\cimgui-master\* imgui\ 2> nul
+          rmdir imgui\imgui-1.90.6 2> nul
+          rmdir imgui\imgui-master 2> nul
+          rmdir imgui\cimgui-master 2> nul
+        )
+
+    - name: Check for local MinHook
+      shell: cmd
+      run: |
+        if exist minhook\include\MinHook.h (
+          echo "Local MinHook found, skipping download."
+        ) else (
+          echo "Local MinHook not found, downloading..."
+          curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/tags/v1.3.3.zip || (
+            echo "Failed to download MinHook v1.3.3, trying mirrors..."
+            curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip || (
+              curl -L -o minhook.zip https://github.com/martell/minhook/archive/refs/heads/master.zip || (
+                curl -L -o minhook.zip https://github.com/Rebzzel/MinHook/archive/refs/heads/master.zip || (
+                  curl -L -o minhook.zip https://github.com/0x1CA3/minhook/archive/refs/heads/master.zip || (
+                    curl -L -o minhook.zip https://github.com/VladPetrushev/minhook/archive/refs/heads/master.zip || (
+                      echo "All MinHook download attempts failed, exiting..."
+                      exit /b 1
+                    )
+                  )
+                )
+              )
+            )
+          )
+          7z x minhook.zip -ominhook
+          move minhook\minhook-1.3.3\* minhook\ 2> nul || move minhook\minhook-master\* minhook\ 2> nul
+          rmdir minhook\minhook-1.3.3 2> nul
+          rmdir minhook\minhook-master 2> nul
+        )
+
+    - name: Check for local nlohmann-json
+      shell: cmd
+      run: |
+        if exist json\single_include\nlohmann\json.hpp (
+          echo "Local nlohmann-json found, skipping download."
+        ) else (
+          echo "Local nlohmann-json not found, downloading..."
+          curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip || (
+            echo "Failed to download nlohmann-json v3.11.3, trying mirrors..."
+            curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip || (
+              curl -L -o json.zip https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent/archive/refs/heads/master.zip || (
+                curl -L -o json.zip https://github.com/jarro2783/json/archive/refs/heads/master.zip || (
+                  curl -L -o json.zip https://github.com/axoloti/nlohmann_json/archive/refs/heads/master.zip || (
+                    curl -L -o json.zip https://github.com/pboettch/json-schema-validator/archive/refs/heads/master.zip || (
+                      echo "All nlohmann-json download attempts failed, exiting..."
+                      exit /b 1
+                    )
+                  )
+                )
+              )
+            )
+          )
+          7z x json.zip -ojson
+          move json\json-3.11.3\* json\ 2> nul || move json\json-develop\* json\ 2> nul || move json\nlohmann_json-master\* json\ 2> nul
+          rmdir json\json-3.11.3 2> nul
+          rmdir json\json-develop 2> nul
+          rmdir json\nlohmann_json-master 2> nul
+        )
 
     - name: Verify MinGW installation
       shell: cmd
