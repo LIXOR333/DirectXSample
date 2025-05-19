@@ -35,81 +35,12 @@ jobs:
       with:
         cmakeVersion: '3.29.0'
 
-    - name: Check for local ImGui
+    - name: Install DirectX SDK
       shell: cmd
       run: |
-        if exist imgui\imgui.h (
-          echo "Local ImGui found, skipping download."
-        ) else (
-          echo "Local ImGui not found, downloading..."
-          curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/tags/v1.90.6.zip || (
-            echo "Failed to download ImGui v1.90.6, trying mirrors..."
-            curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip || (
-              curl -L -o imgui.zip https://github.com/mekhontsev/imgui/archive/refs/heads/master.zip || (
-                curl -L -o imgui.zip https://github.com/TheCherno/imgui/archive/refs/heads/master.zip || (
-                  curl -L -o imgui.zip https://github.com/cimgui/cimgui/archive/refs/heads/master.zip || (
-                    curl -L -o imgui.zip https://github.com/procedural/imgui/archive/refs/heads/master.zip || (
-                      curl -L -o imgui.zip https://gitlab.com/memononen/imgui/-/archive/master/imgui-master.zip || (
-                        echo "All ImGui download attempts failed, exiting..."
-                        exit /b 1
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-          7z x imgui.zip -oimgui_temp
-          for /d %%i in (imgui_temp\*) do (
-            move "%%i" imgui
-          )
-          dir imgui
-          if exist imgui\imgui.h (
-            echo "ImGui successfully extracted."
-          ) else (
-            echo "Failed to extract ImGui, imgui.h not found."
-            exit /b 1
-          )
-          rmdir /s /q imgui_temp
-        )
+        choco install directx-sdk --force -y
 
-    - name: Check for local MinHook
-      shell: cmd
-      run: |
-        if exist minhook\include\MinHook.h (
-          echo "Local MinHook found, skipping download."
-        ) else (
-          echo "Local MinHook not found, downloading..."
-          curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/tags/v1.3.3.zip || (
-            echo "Failed to download MinHook v1.3.3, trying mirrors..."
-            curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip || (
-              curl -L -o minhook.zip https://github.com/martell/minhook/archive/refs/heads/master.zip || (
-                curl -L -o minhook.zip https://github.com/Rebzzel/MinHook/archive/refs/heads/master.zip || (
-                  curl -L -o minhook.zip https://github.com/0x1CA3/minhook/archive/refs/heads/master.zip || (
-                    curl -L -o minhook.zip https://github.com/VladPetrushev/minhook/archive/refs/heads/master.zip || (
-                      echo "All MinHook download attempts failed, exiting..."
-                      exit /b 1
-                    )
-                  )
-                )
-              )
-            )
-          )
-          7z x minhook.zip -ominhook_temp
-          for /d %%i in (minhook_temp\*) do (
-            move "%%i" minhook
-          )
-          dir minhook
-          if exist minhook\include\MinHook.h (
-            echo "MinHook successfully extracted."
-          ) else (
-            echo "Failed to extract MinHook, MinHook.h not found."
-            exit /b 1
-          )
-          rmdir /s /q minhook_temp
-        )
-
-    - name: Check for local nlohmann-json
+    - name: Download and extract nlohmann-json
       shell: cmd
       run: |
         if exist json\single_include\nlohmann\json.hpp (
@@ -123,8 +54,32 @@ jobs:
                 curl -L -o json.zip https://github.com/jarro2783/json/archive/refs/heads/master.zip || (
                   curl -L -o json.zip https://github.com/axoloti/nlohmann_json/archive/refs/heads/master.zip || (
                     curl -L -o json.zip https://github.com/pboettch/json-schema-validator/archive/refs/heads/master.zip || (
-                      echo "All nlohmann-json download attempts failed, exiting..."
-                      exit /b 1
+                      curl -L -o json.zip https://github.com/nlohmann/json/releases/download/v3.11.3/json-3.11.3.zip || (
+                        curl -L -o json.zip https://github.com/martinmoene/nlohmann_json_single/archive/refs/heads/master.zip || (
+                          curl -L -o json.zip https://github.com/Hydrazer/nlohmann-json/archive/refs/heads/master.zip || (
+                            curl -L -o json.zip https://github.com/tburette/nlohmann_json/archive/refs/heads/master.zip || (
+                              curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/v3.11.3/json-v3.11.3.zip || (
+                                curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/master/json-master.zip || (
+                                  curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/json-3.11.3.zip || (
+                                    curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/master.zip || (
+                                      curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/v3.11.3.zip || (
+                                        curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/master.zip || (
+                                          curl -L -o json.zip https://gitlab.com/martinmoene/nlohmann_json_single/-/archive/master/nlohmann_json_single-master.zip || (
+                                            curl -L -o json.zip https://github.com/nlohmann/json-mirror/archive/refs/tags/v3.11.3.zip || (
+                                              echo "All nlohmann-json download attempts failed, exiting..."
+                                              exit /b 1
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
                     )
                   )
                 )
@@ -132,8 +87,16 @@ jobs:
             )
           )
           7z x json.zip -ojson_temp
-          for /d %%i in (json_temp\*) do (
-            move "%%i" json
+          if exist json_temp\json-3.11.3 (
+            move json_temp\json-3.11.3\single_include json\
+          ) else if exist json_temp\json-develop (
+            move json_temp\json-develop\single_include json\
+          ) else if exist json_temp\json-master (
+            move json_temp\json-master\single_include json\
+          ) else (
+            for /d %%i in (json_temp\*) do (
+              move "%%i\single_include" json\
+            )
           )
           dir json
           if exist json\single_include\nlohmann\json.hpp (
@@ -158,10 +121,6 @@ jobs:
         dir DirectXSample 2> nul || echo "DirectXSample not found"
         dir DirectXSample\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
         dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
-        dir imgui 2> nul || echo "imgui not found"
-        dir imgui\imgui.h 2> nul || echo "imgui.h not found"
-        dir minhook 2> nul || echo "minhook not found"
-        dir minhook\include\MinHook.h 2> nul || echo "MinHook.h not found"
         dir json 2> nul || echo "json not found"
         dir json\single_include\nlohmann\json.hpp 2> nul || echo "json.hpp not found"
 
@@ -171,7 +130,7 @@ jobs:
         if exist DirectXSample\CMakeLists.txt (
           cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ || (
             echo "First attempt to configure CMake with MinGW failed, retrying..."
-            cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+            cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -CMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
           )
         ) else (
           echo "Could not find CMakeLists.txt, failing build"
