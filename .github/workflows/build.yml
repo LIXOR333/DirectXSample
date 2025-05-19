@@ -21,7 +21,7 @@ jobs:
         path: |
           imgui-master
           minhook-master
-          zlib-1.3.1
+          zlib
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('build.yml') }}
 
@@ -246,7 +246,7 @@ jobs:
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
-    - name: Download zlib
+    - name: Download and Build zlib
       run: |
         echo Downloading zlib... >> logs/build.log
         curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz && echo zlib downloaded from primary (zlib.net) >> logs/build.log && tar -tzf zlib.tar.gz >> logs/build.log 2>&1 && echo zlib archive validated >> logs/build.log || (
@@ -334,6 +334,21 @@ jobs:
         tar -xzf zlib.tar.gz
         ren zlib-1.3.1 zlib
         echo zlib unzipped and renamed >> logs/build.log
+        cd zlib
+        echo Building zlib... >> logs/build.log
+        nmake -f win32/Makefile.msc
+        if %ERRORLEVEL% NEQ 0 (
+          echo Failed to build zlib >> logs/build.log
+          dir /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        if not exist zlib.lib (
+          echo Error: zlib.lib not found after build >> logs/build.log
+          dir /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo zlib built successfully, zlib.lib created >> logs/build.log
+        cd ..
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
@@ -430,9 +445,21 @@ jobs:
     - name: Build DLL
       run: |
         echo Building DLL... >> logs/build.log
+        if not exist src\RustAlkadCheat2588.cpp (
+          echo Error: RustAlkadCheat2588.cpp not found in src/ directory >> logs/build.log
+          dir src /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo RustAlkadCheat2588.cpp found >> logs/build.log
+        if not exist zlib\zlib.lib (
+          echo Error: zlib.lib not found in zlib/ directory >> logs/build.log
+          dir zlib /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo zlib.lib found >> logs/build.log
         cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
         if %ERRORLEVEL% NEQ 0 (
-          echo Build failed >> logs/build.log
+          echo Build failed, check compiler output above >> logs/build.log
           exit 1
         )
         echo Build successful >> logs/build.log
