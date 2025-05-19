@@ -25,6 +25,17 @@ jobs:
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('.github/workflows/build.yml') }}
 
+    - name: Install Visual Studio 2019 Build Tools Components
+      run: |
+        echo Installing Visual Studio 2019 Build Tools components... >> logs/build.log
+        choco install visualstudio2019-workload-vctools --version 16.11.30.0 --yes
+        if %ERRORLEVEL% NEQ 0 (
+          echo Failed to install Visual Studio 2019 Build Tools components >> logs/build.log
+          exit 1
+        )
+        echo Visual Studio 2019 Build Tools components installed >> logs/build.log
+      shell: cmd
+
     - name: Set up MSVC for Visual Studio 2019
       run: |
         echo Setting up MSVC for Visual Studio 2019... >> logs/build.log
@@ -112,11 +123,12 @@ jobs:
           exit 1
         )
         echo Searching for MinHook library... >> ../logs/build.log
-        dir *MinHook*.lib /s /b >> ../logs/build.log 2>&1
+        dir *MinHook*.lib /s /b 2>> ../logs/build.log || echo No MinHook library found >> ../logs/build.log
         set "MINHOOK_LIB_PATH="
-        for /f "tokens=*" %%i in ('dir *MinHook*.lib /s /b') do set "MINHOOK_LIB_PATH=%%i"
+        for /f "tokens=*" %%i in ('dir *MinHook*.lib /s /b 2^>nul') do set "MINHOOK_LIB_PATH=%%i"
         if not defined MINHOOK_LIB_PATH (
           echo Error: MinHook library file not found after build >> ../logs/build.log
+          dir /s /b >> ../logs/build.log 2>&1
           exit 1
         )
         echo Found MinHook library at %MINHOOK_LIB_PATH% >> ../logs/build.log
