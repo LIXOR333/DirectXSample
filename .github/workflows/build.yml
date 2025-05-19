@@ -32,9 +32,9 @@ jobs:
         .\vcpkg\vcpkg integrate install
 
     - name: Install CMake
-      uses: lukka/get-cmake@v3
+      uses: lukka/get-cmake@v3.29.0
       with:
-        cmakeVersion: 'latest'
+        cmakeVersion: '3.29.0'
 
     - name: Configure CMake
       shell: cmd
