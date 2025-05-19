@@ -495,43 +495,43 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
             g_espColorR = std::min(255, g_espColorR + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP R: %d", g_espColorR);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD2) & 1) {
             g_espColorG = std::min(255, g_espColorG + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP G: %d", g_espColorG);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD3) & 1) {
             g_espColorB = std::min(255, g_espColorB + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP B: %d", g_espColorB);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD4) & 1) {
             g_aimbotFOV = std::min(90.0f, g_aimbotFOV + 5.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot FOV: %.1f", g_aimbotFOV);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD5) & 1) {
             g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth - 1.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot Smooth: %.1f", g_aimbotSmooth);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD6) & 1) {
             g_espDistanceMax += 50.0f;
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP Distance: %.1f", g_espDistanceMax);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD7) & 1) {
             g_aimbotPriority = (g_aimbotPriority + 1) % 2;
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot Priority: %d", g_aimbotPriority);
-            PrintConsoleMessage("Settings", buffer + " (изменён)");
+            PrintConsoleMessage("Settings", std::string(buffer) + " (изменён)");
         }
 
         Aimbot();
