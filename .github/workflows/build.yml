@@ -111,16 +111,18 @@ jobs:
           type build.log >> ../logs/build.log
           exit 1
         )
-        echo Searching for MinHook.x64.lib... >> ../logs/build.log
-        dir build /s /b >> ../logs/build.log 2>&1
-        for /f "tokens=*" %%i in ('dir build\MinHook.x64.lib /s /b') do set "MINHOOK_LIB_PATH=%%i"
+        echo Searching for MinHook library... >> ../logs/build.log
+        dir *MinHook*.lib /s /b >> ../logs/build.log 2>&1
+        set "MINHOOK_LIB_PATH="
+        for /f "tokens=*" %%i in ('dir *MinHook*.lib /s /b') do set "MINHOOK_LIB_PATH=%%i"
         if not defined MINHOOK_LIB_PATH (
-          echo Error: MinHook.x64.lib not found after build >> ../logs/build.log
+          echo Error: MinHook library file not found after build >> ../logs/build.log
           exit 1
         )
+        echo Found MinHook library at %MINHOOK_LIB_PATH% >> ../logs/build.log
         copy "%MINHOOK_LIB_PATH%" MinHook.lib
         if %ERRORLEVEL% NEQ 0 (
-          echo Error: Failed to copy MinHook.x64.lib to MinHook.lib >> ../logs/build.log
+          echo Error: Failed to copy MinHook library to MinHook.lib >> ../logs/build.log
           exit 1
         )
         cd ..
