@@ -14,10 +14,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install MinGW
+    - name: Install Chocolatey
+      shell: cmd
       run: |
-        choco install mingw -y
-        echo "C:\ProgramData\mingw64\mingw64\bin" >> $env:GITHUB_PATH
+        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+
+    - name: Install MinGW
+      shell: cmd
+      run: |
+        choco install mingw --force -y
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
+
+    - name: Install DirectX SDK
+      shell: cmd
+      run: |
+        choco install directx-sdk -y
 
     - name: Install vcpkg
       shell: cmd
@@ -28,7 +39,7 @@ jobs:
     - name: Install dependencies via vcpkg
       shell: cmd
       run: |
-        .\vcpkg\vcpkg install imgui[dx11,win32]:x64-mingw-static minhook:x64-mingw-static nlohmann-json:x64-mingw-static zlib:x64-mingw-static --recurse
+        .\vcpkg\vcpkg install imgui[dx11,win32]:x64-mingw-static minhook:x64-mingw-static nlohmann-json:x64-mingw-static zlib:x64-mingw-static --recurse --clean-after-build
         .\vcpkg\vcpkg integrate install
 
     - name: Install CMake
@@ -36,10 +47,16 @@ jobs:
       with:
         cmakeVersion: '3.29.0'
 
+    - name: Verify MinGW installation
+      shell: cmd
+      run: |
+        x86_64-w64-mingw32-gcc --version
+        x86_64-w64-mingw32-g++ --version
+
     - name: Configure CMake
       shell: cmd
       run: |
-        cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+        cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
 
     - name: Build
       shell: cmd
