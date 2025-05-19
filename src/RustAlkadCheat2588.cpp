@@ -18,6 +18,9 @@
 #include <zlib.h>
 #include <filesystem>
 #include <iostream>
+#include <Psapi.h> // Добавлено для GetModuleInformation
+
+#pragma comment(lib, "Psapi.lib") // Линкуем Psapi.lib
 
 using json = nlohmann::json;
 
@@ -98,17 +101,20 @@ bool ValidateOffset(const std::string& name, DWORD64 offset) {
         DWORD64 listAddr;
         if (!ReadMemory(addr, &listAddr, sizeof(DWORD64)) || !listAddr) return false;
         DWORD count;
-        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 5000) return false; // Увеличил лимит до 5000
+        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 5000) return false;
         return true;
-    } else if (name == "Base") {
+    }
+    else if (name == "Base") {
         DWORD64 baseAddr;
         if (!ReadMemory(addr, &baseAddr, sizeof(DWORD64)) || !baseAddr) return false;
         return true;
-    } else if (name == "Camera" || name == "Input" || name == "Angles") {
+    }
+    else if (name == "Camera" || name == "Input" || name == "Angles") {
         float value;
         if (!ReadMemory(addr, &value, sizeof(float))) return false;
         return true;
-    } else if (name == "Item") {
+    }
+    else if (name == "Item") {
         DWORD64 itemAddr;
         if (!ReadMemory(addr, &itemAddr, sizeof(DWORD64)) || !itemAddr) return false;
         return true;
@@ -121,7 +127,6 @@ void AutoDumpOffsets() {
     static time_t lastDump = 0;
     if (time(nullptr) - lastDump < 300) return;
 
-    // Signatures for key offsets
     struct Signature {
         std::string name;
         const char* pattern;
@@ -136,43 +141,45 @@ void AutoDumpOffsets() {
     std::ofstream file("offsets_dump.txt", std::ios::app);
     std::ofstream updateFile("offsets_update.txt", std::ios::app);
     std::ofstream validFile("offsets_validation.txt", std::ios::app);
-    if (file.is_open() && updateFile.is_open() && validFile.is_open()) {
-        time_t now = time(nullptr);
-        file << "Dump at " << std::ctime(&now) << "\n";
-        updateFile << "Update check at " << std::ctime(&now) << "\n";
-        validFile << "Validation at " << std::ctime(&now) << "\n";
 
-        // Check signatures
-        for (const auto& sig : signatures) {
-            DWORD64 foundOffset = FindOffsetBySignature(sig.pattern, sig.mask);
-            if (foundOffset) {
-                for (auto& offset : g_offsets) {
-                    if (offset.name == sig.name && offset.value != foundOffset) {
-                        updateFile << "Updated " << sig.name << ": 0x" << std::hex << foundOffset 
-                                   << " (was 0x" << offset.value << ")\n";
-                        offset.value = foundOffset;
-                    }
+    if (!file.is_open() || !updateFile.is_open() || !validFile.is_open()) {
+        g_updateStatus = "Failed to open dump files (check permissions)";
+        return;
+    }
+
+    time_t now = time(nullptr);
+    file << "Dump at " << std::ctime(&now) << "\n";
+    updateFile << "Update check at " << std::ctime(&now) << "\n";
+    validFile << "Validation at " << std::ctime(&now) << "\n";
+
+    for (const auto& sig : signatures) {
+        DWORD64 foundOffset = FindOffsetBySignature(sig.pattern, sig.mask);
+        if (foundOffset) {
+            for (auto& offset : g_offsets) {
+                if (offset.name == sig.name && offset.value != foundOffset) {
+                    updateFile << "Updated " << sig.name << ": 0x" << std::hex << foundOffset
+                               << " (was 0x" << offset.value << ")\n";
+                    offset.value = foundOffset;
                 }
             }
         }
-
-        // Validate all offsets
-        for (const auto& offset : g_offsets) {
-            bool isValid = ValidateOffset(offset.name, offset.value);
-            validFile << offset.name << ": 0x" << std::hex << offset.value 
-                      << (isValid ? " [VALID]" : " [INVALID]") << "\n";
-            file << offset.name << ": 0x" << std::hex << offset.value << "\n";
-        }
-        file.close();
-        updateFile.close();
-        validFile.close();
-
-        // Обновляем g_updateStatus с временем последнего дампа
-        g_lastDumpTime = now;
-        char timeBuf[64];
-        ctime_s(timeBuf, sizeof(timeBuf), &g_lastDumpTime);
-        g_updateStatus = "Offline mode (last dump: " + std::string(timeBuf, strlen(timeBuf) - 1) + ")";
     }
+
+    for (const auto& offset : g_offsets) {
+        bool isValid = ValidateOffset(offset.name, offset.value);
+        validFile << offset.name << ": 0x" << std::hex << offset.value
+                  << (isValid ? " [VALID]" : " [INVALID]") << "\n";
+        file << offset.name << ": 0x" << std::hex << offset.value << "\n";
+    }
+
+    file.close();
+    updateFile.close();
+    validFile.close();
+
+    g_lastDumpTime = now;
+    char timeBuf[64];
+    ctime_s(timeBuf, sizeof(timeBuf), &g_lastDumpTime);
+    g_updateStatus = "Offline mode (last dump: " + std::string(timeBuf, strlen(timeBuf) - 1) + ")";
     lastDump = time(nullptr);
 }
 
@@ -187,16 +194,31 @@ bool InitD3D11(HWND hwnd) {
     scd.Windowed = TRUE;
     scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-    D3D11CreateDeviceAndSwapChain(
+    HRESULT hr = D3D11CreateDeviceAndSwapChain(
         nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
         nullptr, 0, D3D11_SDK_VERSION, &scd,
         &g_pSwapChain, &g_pd3dDevice, nullptr, &g_pd3dDeviceContext
     );
+    if (FAILED(hr)) {
+        char errorMsg[256];
+        sprintf_s(errorMsg, "D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x%lX", hr);
+        MessageBoxA(nullptr, errorMsg, "DirectX Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
 
     ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_pRenderTargetView);
+    hr = g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+    if (FAILED(hr)) {
+        MessageBoxA(nullptr, "Failed to get back buffer", "DirectX Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
+    hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_pRenderTargetView);
     pBackBuffer->Release();
+    if (FAILED(hr)) {
+        MessageBoxA(nullptr, "Failed to create render target view", "DirectX Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
 
     ImGui::CreateContext();
     ImGui_ImplWin32_Init(hwnd);
@@ -238,10 +260,9 @@ Vector3 ReadVector3(DWORD64 address) {
         ReadMemory(address + 0x30, &v.x, sizeof(float));
         ReadMemory(address + 0x34, &v.y, sizeof(float));
         ReadMemory(address + 0x38, &v.z, sizeof(float));
-        // Проверка на валидность координат
         if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z) ||
-            std::abs(v.x) > 1000000.0f || std::abs(v.y) > 1000000.0f || std::abs(v.z) > 1000000.0f) {
-            v = {0, 0, 0}; // Сбрасываем на нули, если координаты некорректны
+            std::abs(v.x) > 50000.0f || std::abs(v.y) > 50000.0f || std::abs(v.z) > 50000.0f) { // Снизил порог до 50000
+            v = {0, 0, 0};
         }
     }
     return v;
@@ -256,8 +277,7 @@ std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
     DWORD count;
     if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD))) return entities;
 
-    // Убрал жёсткий лимит в 200, но добавил проверку на разумное количество
-    if (count > 5000) count = 5000; // Ограничение на 5000, чтобы избежать зависаний
+    if (count > 5000) count = 5000;
 
     for (DWORD i = 0; i < count; ++i) {
         DWORD64 entityAddr;
@@ -377,9 +397,7 @@ void RenderLoop() {
 
     if (g_features.esp_players || g_features.esp_items || g_features.esp_npcs) {
         for (const auto& entity : entities) {
-            // Преобразуем мировые координаты в экранные
             Vector2 screenPos = WorldToScreen(entity.pos, cameraPos, 90.0f, 1920, 1080);
-            // Проверяем, что координаты в пределах экрана
             if (screenPos.x > 0 && screenPos.x < 1920 && screenPos.y > 0 && screenPos.y < 1080) {
                 ImGui::GetBackgroundDrawList()->AddRectFilled(
                     ImVec2(screenPos.x - 10, screenPos.y - 20),
@@ -403,8 +421,32 @@ void RenderLoop() {
     g_pSwapChain->Present(1, 0);
 }
 
+// Window procedure (добавлено для корректной обработки сообщений ImGui)
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam)) {
+        return true;
+    }
+    switch (msg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
 // Main thread
 void MainThread() {
+    // Регистрируем класс окна
+    WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = "STATIC";
+    if (!RegisterClassExA(&wc)) {
+        MessageBoxA(nullptr, "Failed to register window class", "Error", MB_OK | MB_ICONERROR);
+        return;
+    }
+
     g_hwnd = CreateWindowExA(
         WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED,
         "STATIC",
@@ -414,7 +456,11 @@ void MainThread() {
         nullptr, nullptr, GetModuleHandle(nullptr), nullptr
     );
 
-    if (!g_hwnd) return;
+    if (!g_hwnd) {
+        MessageBoxA(nullptr, "Failed to create window", "Error", MB_OK | MB_ICONERROR);
+        return;
+    }
+
     SetLayeredWindowAttributes(g_hwnd, 0, 255, LWA_ALPHA);
     ShowWindow(g_hwnd, SW_SHOW);
     if (!InitD3D11(g_hwnd)) {
