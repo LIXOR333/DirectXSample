@@ -35,13 +35,56 @@ jobs:
       with:
         cmakeVersion: '3.29.0'
 
-    - name: Download ImGui
+    - name: Download ImGui (Main)
       shell: cmd
       run: |
-        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip
+        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip || (
+          echo "Failed to download ImGui master, trying v1.90.6..."
+          curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/tags/v1.90.6.zip || (
+            echo "Failed to download ImGui v1.90.6, trying mirrors..."
+            curl -L -o imgui.zip https://github.com/mekhontsev/imgui/archive/refs/heads/master.zip || (
+              curl -L -o imgui.zip https://github.com/aiekick/ImGuiFileDialog/archive/refs/heads/master.zip || (
+                curl -L -o imgui.zip https://github.com/TheCherno/imgui/archive/refs/heads/master.zip || (
+                  curl -L -o imgui.zip https://github.com/cimgui/cimgui/archive/refs/heads/master.zip || (
+                    curl -L -o imgui.zip https://github.com/procedural/imgui/archive/refs/heads/master.zip || (
+                      curl -L -o imgui.zip https://github.com/BalazsJako/ImGuiColorTextEdit/archive/refs/heads/master.zip || (
+                        curl -L -o imgui.zip https://github.com/pthom/imgui_bundle/archive/refs/heads/main.zip || (
+                          curl -L -o imgui.zip https://github.com/sammyfreg/imgui/archive/refs/heads/master.zip || (
+                            curl -L -o imgui.zip https://github.com/dougbinks/imgui/archive/refs/heads/master.zip || (
+                              curl -L -o imgui.zip https://github.com/simongeilfus/imgui/archive/refs/heads/master.zip || (
+                                curl -L -o imgui.zip https://github.com/BrutPitt/imgui/archive/refs/heads/master.zip || (
+                                  curl -L -o imgui.zip https://github.com/memononen/imgui/archive/refs/heads/master.zip || (
+                                    curl -L -o imgui.zip https://github.com/ggerganov/imgui/archive/refs/heads/master.zip || (
+                                      curl -L -o imgui.zip https://github.com/timo/imgui/archive/refs/heads/master.zip || (
+                                        curl -L -o imgui.zip https://github.com/rokups/imgui/archive/refs/heads/master.zip || (
+                                          curl -L -o imgui.zip https://gitlab.com/memononen/imgui/-/archive/master/imgui-master.zip || (
+                                            echo "All ImGui download attempts failed, exiting..."
+                                            exit /b 1
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
         7z x imgui.zip -oimgui
-        move imgui\imgui-master\* imgui\
-        rmdir imgui\imgui-master
+        move imgui\imgui-master\* imgui\ 2> nul || move imgui\imgui-1.90.6\* imgui\ 2> nul || move imgui\ImGuiFileDialog-master\* imgui\ 2> nul || move imgui\cimgui-master\* imgui\ 2> nul || move imgui\imgui_bundle-main\* imgui\ 2> nul
+        rmdir imgui\imgui-master 2> nul
+        rmdir imgui\imgui-1.90.6 2> nul
+        rmdir imgui\ImGuiFileDialog-master 2> nul
+        rmdir imgui\cimgui-master 2> nul
+        rmdir imgui\imgui_bundle-main 2> nul
 
     - name: Download MinHook
       shell: cmd
