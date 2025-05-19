@@ -1,64 +1,32 @@
-name: Build Rust Alkad Cheat 2588
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: windows-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Install Chocolatey
-      shell: cmd
-      run: |
-        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-
-    - name: Install MinGW
-      shell: cmd
-      run: |
-        choco install mingw --force -y
-        echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
-
-    - name: Install Archivers
-      shell: cmd
-      run: |
-        echo "Using built-in Windows Archive (no installation needed)"
-
-    - name: Download and extract nlohmann-json
+- name: Download and extract nlohmann-json
       shell: cmd
       run: |
         if exist json\single_include\nlohmann\json.hpp (
           echo "Local nlohmann-json found, skipping download."
-        ) else (
-          echo "Local nlohmann-json not found, downloading..."
-          curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip || (
-            echo "Failed to download nlohmann-json v3.11.3, trying mirrors..."
-            curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip || (
-              curl -L -o json.zip https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent/archive/refs/heads/master.zip || (
-                curl -L -o json.zip https://github.com/jarro2783/json/archive/refs/heads/master.zip || (
-                  curl -L -o json.zip https://github.com/axoloti/nlohmann_json/archive/refs/heads/master.zip || (
-                    curl -L -o json.zip https://github.com/pboettch/json-schema-validator/archive/refs/heads/master.zip || (
-                      curl -L -o json.zip https://github.com/nlohmann/json/releases/download/v3.11.3/json-3.11.3.zip || (
-                        curl -L -o json.zip https://github.com/martinmoene/nlohmann_json_single/archive/refs/heads/master.zip || (
-                          curl -L -o json.zip https://github.com/Hydrazer/nlohmann-json/archive/refs/heads/master.zip || (
-                            curl -L -o json.zip https://github.com/tburette/nlohmann_json/archive/refs/heads/master.zip || (
-                              curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/v3.11.3/json-v3.11.3.zip || (
-                                curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/master/json-master.zip || (
-                                  curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/json-3.11.3.zip || (
-                                    curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/master.zip || (
-                                      curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/v3.11.3.zip || (
-                                        curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/master.zip || (
-                                          curl -L -o json.zip https://gitlab.com/martinmoene/nlohmann_json_single/-/archive/master/nlohmann_json_single-master.zip || (
-                                            curl -L -o json.zip https://github.com/nlohmann/json-mirror/archive/refs/tags/v3.11.3.zip || (
-                                              echo "All nlohmann-json download attempts failed, exiting..."
-                                              exit /b 1
-                                            )
+          goto :json_extracted
+        )
+        echo "Local nlohmann-json not found, downloading..."
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip || (
+          echo "Failed to download nlohmann-json v3.11.3, trying mirrors..."
+          curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip || (
+            curl -L -o json.zip https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent/archive/refs/heads/master.zip || (
+              curl -L -o json.zip https://github.com/jarro2783/json/archive/refs/heads/master.zip || (
+                curl -L -o json.zip https://github.com/axoloti/nlohmann_json/archive/refs/heads/master.zip || (
+                  curl -L -o json.zip https://github.com/pboettch/json-schema-validator/archive/refs/heads/master.zip || (
+                    curl -L -o json.zip https://github.com/nlohmann/json/releases/download/v3.11.3/json-3.11.3.zip || (
+                      curl -L -o json.zip https://github.com/martinmoene/nlohmann_json_single/archive/refs/heads/master.zip || (
+                        curl -L -o json.zip https://github.com/Hydrazer/nlohmann-json/archive/refs/heads/master.zip || (
+                          curl -L -o json.zip https://github.com/tburette/nlohmann_json/archive/refs/heads/master.zip || (
+                            curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/v3.11.3/json-v3.11.3.zip || (
+                              curl -L -o json.zip https://gitlab.com/nlohmann/json/-/archive/master/json-master.zip || (
+                                curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/json-3.11.3.zip || (
+                                  curl -L -o json.zip https://bitbucket.org/nlohmann/json/downloads/master.zip || (
+                                    curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/v3.11.3.zip || (
+                                      curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/master.zip || (
+                                        curl -L -o json.zip https://gitlab.com/martinmoene/nlohmann_json_single/-/archive/master/nlohmann_json_single-master.zip || (
+                                          curl -L -o json.zip https://github.com/nlohmann/json-mirror/archive/refs/tags/v3.11.3.zip || (
+                                            echo "All nlohmann-json download attempts failed, exiting..."
+                                            exit /b 1
                                           )
                                         )
                                       )
@@ -76,69 +44,48 @@ jobs:
               )
             )
           )
-          echo "Extracting json.zip..."
-          powershell -Command "Expand-Archive -Path json.zip -DestinationPath json_temp -Force" && (
-            echo "Extracted with Windows Archive"
-            goto :json_extracted
-          ) || (
-            echo "Failed to extract with Windows Archive, exiting..."
-            exit /b 1
-          )
         )
-        :json_extracted
+        echo "Extracting json.zip..."
+        powershell -Command "Expand-Archive -Path json.zip -DestinationPath json_temp -Force" || (
+          echo "Failed to extract with Windows Archive, exiting..."
+          exit /b 1
+        )
+        echo "Extracted with Windows Archive"
+        echo "Checking extracted contents..."
         dir json_temp
         if exist json_temp\json-3.11.3\single_include (
+          echo "Found json-3.11.3, moving single_include..."
           move json_temp\json-3.11.3\single_include json\
         ) else if exist json_temp\json-develop\single_include (
+          echo "Found json-develop, moving single_include..."
           move json_temp\json-develop\single_include json\
         ) else if exist json_temp\json-master\single_include (
+          echo "Found json-master, moving single_include..."
           move json_temp\json-master\single_include json\
         ) else if exist json_temp\nlohmann-json-v3.11.3\single_include (
+          echo "Found nlohmann-json-v3.11.3, moving single_include..."
           move json_temp\nlohmann-json-v3.11.3\single_include json\
         ) else (
+          echo "Searching for single_include in json_temp..."
           for /d %%i in (json_temp\*) do (
             if exist "%%i\single_include" (
+              echo "Found single_include in %%i, moving..."
               move "%%i\single_include" json\
-            ) else (
-              echo "No single_include folder found in %%i"
+              goto :move_done
             )
           )
+          echo "No single_include folder found in json_temp, failing..."
+          dir json_temp /s
+          exit /b 1
         )
+        :move_done
+        echo "Checking moved contents..."
         dir json
-        if exist json\single_include\nlohmann\json.hpp (
-          echo "nlohmann-json successfully extracted."
-        ) else (
+        if not exist json\single_include\nlohmann\json.hpp (
           echo "Failed to extract nlohmann-json, json.hpp not found. Checking contents..."
           dir json /s
           exit /b 1
         )
+        echo "nlohmann-json successfully extracted."
+        :json_extracted
         rmdir /s /q json_temp
-
-    - name: Verify MinGW installation
-      shell: cmd
-      run: |
-        x86_64-w64-mingw32-gcc --version
-        x86_64-w64-mingw32-g++ --version
-
-    - name: Create directories if needed
-      shell: cmd
-      run: |
-        if not exist build mkdir build
-        if not exist build_msvc\Release mkdir build_msvc\Release
-
-    - name: Compile with MinGW (First Attempt)
-      shell: cmd
-      run: |
-        if exist DirectXSample\RustAlkadCheat2588.cpp (
-          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
-            echo "First attempt to compile with MinGW failed, retrying..."
-            x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
-              echo "Second attempt to compile with MinGW failed, failing build..."
-              exit /b 1
-            )
-          )
-        ) else (
-          echo "Could not find RustAlkadCheat2588.cpp, failing build"
-          dir DirectXSample /s
-          exit /b 1
-        )
