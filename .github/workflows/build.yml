@@ -86,23 +86,32 @@ jobs:
               )
             )
           )
+          echo "Extracting json.zip..."
           7z x json.zip -ojson_temp
-          if exist json_temp\json-3.11.3 (
+          dir json_temp
+          if exist json_temp\json-3.11.3\single_include (
             move json_temp\json-3.11.3\single_include json\
-          ) else if exist json_temp\json-develop (
+          ) else if exist json_temp\json-develop\single_include (
             move json_temp\json-develop\single_include json\
-          ) else if exist json_temp\json-master (
+          ) else if exist json_temp\json-master\single_include (
             move json_temp\json-master\single_include json\
+          ) else if exist json_temp\nlohmann-json-v3.11.3\single_include (
+            move json_temp\nlohmann-json-v3.11.3\single_include json\
           ) else (
             for /d %%i in (json_temp\*) do (
-              move "%%i\single_include" json\
+              if exist "%%i\single_include" (
+                move "%%i\single_include" json\
+              ) else (
+                echo "No single_include folder found in %%i"
+              )
             )
           )
           dir json
           if exist json\single_include\nlohmann\json.hpp (
             echo "nlohmann-json successfully extracted."
           ) else (
-            echo "Failed to extract nlohmann-json, json.hpp not found."
+            echo "Failed to extract nlohmann-json, json.hpp not found. Checking contents..."
+            dir json /s
             exit /b 1
           )
           rmdir /s /q json_temp
