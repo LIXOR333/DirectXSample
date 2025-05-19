@@ -25,10 +25,32 @@ jobs:
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('.github/workflows/build.yml') }}
 
-    - name: Set up MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+    - name: Install Visual Studio 2019 Build Tools
+      run: |
+        echo Installing Visual Studio 2019 Build Tools... >> logs/build.log
+        choco install visualstudio2019buildtools --version 16.11.30.0 --yes
+        if %ERRORLEVEL% NEQ 0 (
+          echo Failed to install Visual Studio 2019 Build Tools >> logs/build.log
+          exit 1
+        )
+        echo Visual Studio 2019 Build Tools installed >> logs/build.log
+      shell: cmd
+
+    - name: Set up MSVC for Visual Studio 2019
+      run: |
+        echo Setting up MSVC for Visual Studio 2019... >> logs/build.log
+        for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -version 16 -property installationPath') do set "VS2019_PATH=%%i"
+        if not defined VS2019_PATH (
+          echo Error: Visual Studio 2019 not found >> logs/build.log
+          exit 1
+        )
+        call "%VS2019_PATH%\VC\Auxiliary\Build\vcvars64.bat"
+        if %ERRORLEVEL% NEQ 0 (
+          echo Failed to set up MSVC for Visual Studio 2019 >> logs/build.log
+          exit 1
+        )
+        echo MSVC for Visual Studio 2019 set up successfully >> logs/build.log
+      shell: cmd
 
     - name: Create log directory
       run: |
@@ -100,12 +122,12 @@ jobs:
           type build.log >> ../logs/build.log
           exit 1
         )
-        if not exist build\VC17\Release\MinHook.x64.lib (
+        if not exist build\VC16\Release\MinHook.x64.lib (
           echo Error: MinHook.x64.lib not found after build >> logs/build.log
           dir build /s /b >> logs/build.log 2>&1
           exit 1
         )
-        copy build\VC17\Release\MinHook.x64.lib MinHook.lib
+        copy build\VC16\Release\MinHook.x64.lib MinHook.lib
         cd ..
         echo MinHook downloaded, built, and verified >> logs/build.log
       shell: cmd
