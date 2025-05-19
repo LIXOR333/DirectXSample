@@ -4,8 +4,11 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <cmath> // Добавлено для sqrt
+#include <cmath>
+#include <cfloat> // Добавлено для FLT_MAX
+#include <psapi.h> // Добавлено для MODULEINFO и GetModuleInformation
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "psapi.lib") // Линковка Psapi.lib
 
 // Глобальные переменные
 bool g_showMenu = false;
@@ -24,22 +27,22 @@ DWORD g_viewMatrixOffset = 0x4D6F890;
 HANDLE g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
 // Функция поиска сигнатуры в памяти
-DWORD FindPattern(const char* moduleName, const char* pattern, const char* mask) {
+uintptr_t FindPattern(const char* moduleName, const char* pattern, const char* mask) {
     HMODULE hModule = GetModuleHandleA(moduleName);
     if (!hModule) return 0;
 
     MODULEINFO modInfo;
     GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(MODULEINFO));
 
-    DWORD base = (DWORD)hModule;
-    DWORD size = modInfo.SizeOfImage;
+    uintptr_t base = reinterpret_cast<uintptr_t>(hModule); // Безопасное приведение
+    size_t size = modInfo.SizeOfImage;
 
-    DWORD patternLength = (DWORD)strlen(mask);
+    size_t patternLength = strlen(mask);
 
-    for (DWORD i = 0; i < size - patternLength; i++) {
+    for (size_t i = 0; i < size - patternLength; i++) {
         bool found = true;
-        for (DWORD j = 0; j < patternLength; j++) {
-            found &= mask[j] == '?' || pattern[j] == *(char*)(base + i + j);
+        for (size_t j = 0; j < patternLength; j++) {
+            found &= mask[j] == '?' || pattern[j] == *reinterpret_cast<char*>(base + i + j);
         }
         if (found) {
             return base + i;
@@ -53,16 +56,16 @@ bool FindOffsets() {
     const char* pattern = "\x48\x8B\x00\x00\x00\x00\x00\xF6\x80\x2F\x01\x00\x00";
     const char* mask = "xx?????xxxxxx";
 
-    DWORD baseAddr = FindPattern("GameAssembly.dll", pattern, mask);
+    uintptr_t baseAddr = FindPattern("GameAssembly.dll", pattern, mask);
     if (!baseAddr) {
         return false;
     }
 
     baseAddr += 0x10; // Примерное смещение после сигнатуры
 
-    g_entityListOffset = *(DWORD*)(baseAddr + 0x100); // Примерное смещение
-    g_localPlayerOffset = *(DWORD*)(baseAddr + 0x200);
-    g_viewMatrixOffset = *(DWORD*)(baseAddr + 0x300);
+    g_entityListOffset = *reinterpret_cast<DWORD*>(baseAddr + 0x100); // Безопасное приведение
+    g_localPlayerOffset = *reinterpret_cast<DWORD*>(baseAddr + 0x200);
+    g_viewMatrixOffset = *reinterpret_cast<DWORD*>(baseAddr + 0x300);
 
     if (g_entityListOffset < 0x400000 || g_localPlayerOffset < 0x400000 || g_viewMatrixOffset < 0x400000) {
         return false;
@@ -134,8 +137,8 @@ bool UpdateOffsets() {
 void DrawESP() {
     if (!g_enableESP) return;
 
-    DWORD baseAddr = 0x400000; // Базовый адрес игры (нужно найти)
-    DWORD entityList = *(DWORD*)(baseAddr + g_entityListOffset);
+    uintptr_t baseAddr = 0x400000; // Базовый адрес игры (нужно найти)
+    DWORD entityList = *reinterpret_cast<DWORD*>(baseAddr + g_entityListOffset);
     if (!entityList) return;
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -143,12 +146,12 @@ void DrawESP() {
     COORD pos = { 0, (SHORT)(csbi.dwCursorPosition.Y + 1) };
 
     for (int i = 0; i < 32; i++) {
-        DWORD entityAddr = baseAddr + g_entityListOffset + (i * 0x4); // Корректное вычисление адреса
-        DWORD entity = *(DWORD*)((uintptr_t)entityAddr); // Приведение с использованием uintptr_t
+        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x4); // Корректное вычисление адреса
+        DWORD entity = *reinterpret_cast<DWORD*>(entityAddr); // Безопасное приведение
         if (!entity) continue;
 
-        float x = *(float*)((uintptr_t)(entity + 0x4)); // Корректное приведение
-        float y = *(float*)((uintptr_t)(entity + 0x8)); // Корректное приведение
+        float x = *reinterpret_cast<float*>(entity + 0x4); // Безопасное приведение
+        float y = *reinterpret_cast<float*>(entity + 0x8); // Безопасное приведение
 
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Player %d: X=%.1f Y=%.1f", i, x, y);
@@ -163,26 +166,26 @@ void DrawESP() {
 void Aimbot() {
     if (!g_enableAimbot) return;
 
-    DWORD baseAddr = 0x400000;
-    DWORD localPlayerAddr = baseAddr + g_localPlayerOffset;
-    DWORD localPlayer = *(DWORD*)((uintptr_t)localPlayerAddr);
+    uintptr_t baseAddr = 0x400000;
+    uintptr_t localPlayerAddr = baseAddr + g_localPlayerOffset;
+    DWORD localPlayer = *reinterpret_cast<DWORD*>(localPlayerAddr);
     if (!localPlayer) return;
 
-    DWORD entityList = *(DWORD*)((uintptr_t)(baseAddr + g_entityListOffset));
+    DWORD entityList = *reinterpret_cast<DWORD*>(baseAddr + g_entityListOffset);
     if (!entityList) return;
 
     float closestDist = FLT_MAX;
     float targetX = 0, targetY = 0;
 
     for (int i = 0; i < 32; i++) {
-        DWORD entityAddr = baseAddr + g_entityListOffset + (i * 0x4);
-        DWORD entity = *(DWORD*)((uintptr_t)entityAddr);
+        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x4);
+        DWORD entity = *reinterpret_cast<DWORD*>(entityAddr);
         if (!entity) continue;
 
-        float x = *(float*)((uintptr_t)(entity + 0x4));
-        float y = *(float*)((uintptr_t)(entity + 0x8));
+        float x = *reinterpret_cast<float*>(entity + 0x4);
+        float y = *reinterpret_cast<float*>(entity + 0x8);
 
-        float dist = std::sqrt(x * x + y * y); // Используем std::sqrt
+        float dist = std::sqrt(x * x + y * y);
         if (dist < closestDist && dist < g_aimbotFOV) {
             closestDist = dist;
             targetX = x;
