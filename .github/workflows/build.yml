@@ -20,7 +20,7 @@ jobs:
       with:
         path: |
           imgui
-          minhook-master
+          minhook
           zlib
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('.github/workflows/build.yml') }}
@@ -64,7 +64,7 @@ jobs:
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
-    - name: Download MinHook
+    - name: Download and Build MinHook
       run: |
         echo Downloading MinHook... >> logs/build.log
         curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip
@@ -79,13 +79,23 @@ jobs:
           dir temp_minhook /s /b >> logs/build.log 2>&1
           exit 1
         )
-        move temp_minhook\minhook-master .\minhook-master
-        if not exist minhook-master\include\MinHook.h (
-          echo Error: MinHook.h not found in minhook-master >> logs/build.log
-          dir minhook-master /s /b >> logs/build.log 2>&1
+        move temp_minhook\minhook-master minhook
+        if not exist minhook\include\MinHook.h (
+          echo Error: MinHook.h not found in minhook >> logs/build.log
+          dir minhook /s /b >> logs/build.log 2>&1
           exit 1
         )
-        echo MinHook downloaded and verified >> logs/build.log
+        echo Building MinHook... >> logs/build.log
+        cd minhook
+        msbuild /p:Configuration=Release /p:Platform=x64
+        if not exist build\VC17\Release\MinHook.x64.lib (
+          echo Error: MinHook.x64.lib not found after build >> logs/build.log
+          dir build /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        copy build\VC17\Release\MinHook.x64.lib MinHook.lib
+        cd ..
+        echo MinHook downloaded, built, and verified >> logs/build.log
       shell: cmd
       if: steps.cache.outputs.cache-hit != 'true'
 
@@ -158,7 +168,13 @@ jobs:
           exit 1
         )
         echo zlib.lib found >> logs/build.log
-        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui /I imgui/backends /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib Psapi.lib
+        if not exist minhook\MinHook.lib (
+          echo Error: MinHook.lib not found in minhook/ directory >> logs/build.log
+          dir minhook /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo MinHook.lib found >> logs/build.log
+        cl /std:c++17 /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui /I imgui/backends /I minhook/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib /LIBPATH:minhook zlib.lib MinHook.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib Psapi.lib
         if %ERRORLEVEL% NEQ 0 (
           echo Build failed, check compiler output above >> logs/build.log
           exit 1
