@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <cmath> // Добавлено для sqrt
 #pragma comment(lib, "wininet.lib")
 
 // Глобальные переменные
@@ -52,21 +53,17 @@ bool FindOffsets() {
     const char* pattern = "\x48\x8B\x00\x00\x00\x00\x00\xF6\x80\x2F\x01\x00\x00";
     const char* mask = "xx?????xxxxxx";
 
-    // Ищем базовый адрес в GameAssembly.dll
     DWORD baseAddr = FindPattern("GameAssembly.dll", pattern, mask);
     if (!baseAddr) {
         return false;
     }
 
-    // Смещение от сигнатуры (примерное, нужно уточнить через реверс-инжиниринг)
     baseAddr += 0x10; // Примерное смещение после сигнатуры
 
-    // Читаем адрес entityList
     g_entityListOffset = *(DWORD*)(baseAddr + 0x100); // Примерное смещение
     g_localPlayerOffset = *(DWORD*)(baseAddr + 0x200);
     g_viewMatrixOffset = *(DWORD*)(baseAddr + 0x300);
 
-    // Проверка валидности (пример)
     if (g_entityListOffset < 0x400000 || g_localPlayerOffset < 0x400000 || g_viewMatrixOffset < 0x400000) {
         return false;
     }
@@ -146,15 +143,15 @@ void DrawESP() {
     COORD pos = { 0, (SHORT)(csbi.dwCursorPosition.Y + 1) };
 
     for (int i = 0; i < 32; i++) {
-        DWORD entity = *(DWORD*)(entityList + i * 0x4);
+        DWORD entityAddr = baseAddr + g_entityListOffset + (i * 0x4); // Корректное вычисление адреса
+        DWORD entity = *(DWORD*)((uintptr_t)entityAddr); // Приведение с использованием uintptr_t
         if (!entity) continue;
 
-        float x = *(float*)(entity + 0x4); // Пример координат
-        float y = *(float*)(entity + 0x8);
-        float z = *(float*)(entity + 0xC);
+        float x = *(float*)((uintptr_t)(entity + 0x4)); // Корректное приведение
+        float y = *(float*)((uintptr_t)(entity + 0x8)); // Корректное приведение
 
         char buffer[64];
-        snprintf(buffer, sizeof(buffer), "Player %d: X=%.1f Y=%.1f Z=%.1f", i, x, y, z);
+        snprintf(buffer, sizeof(buffer), "Player %d: X=%.1f Y=%.1f", i, x, y);
         SetConsoleCursorPosition(g_hConsole, pos);
         SetConsoleTextAttribute(g_hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
         WriteConsoleA(g_hConsole, buffer, strlen(buffer), NULL, NULL);
@@ -167,24 +164,25 @@ void Aimbot() {
     if (!g_enableAimbot) return;
 
     DWORD baseAddr = 0x400000;
-    DWORD localPlayer = *(DWORD*)(baseAddr + g_localPlayerOffset);
+    DWORD localPlayerAddr = baseAddr + g_localPlayerOffset;
+    DWORD localPlayer = *(DWORD*)((uintptr_t)localPlayerAddr);
     if (!localPlayer) return;
 
-    DWORD entityList = *(DWORD*)(baseAddr + g_entityListOffset);
+    DWORD entityList = *(DWORD*)((uintptr_t)(baseAddr + g_entityListOffset));
     if (!entityList) return;
 
     float closestDist = FLT_MAX;
     float targetX = 0, targetY = 0;
 
     for (int i = 0; i < 32; i++) {
-        DWORD entity = *(DWORD*)(entityList + i * 0x4);
+        DWORD entityAddr = baseAddr + g_entityListOffset + (i * 0x4);
+        DWORD entity = *(DWORD*)((uintptr_t)entityAddr);
         if (!entity) continue;
 
-        float x = *(float*)(entity + 0x4);
-        float y = *(float*)(entity + 0x8);
-        float z = *(float*)(entity + 0xC);
+        float x = *(float*)((uintptr_t)(entity + 0x4));
+        float y = *(float*)((uintptr_t)(entity + 0x8));
 
-        float dist = sqrt(x * x + y * y);
+        float dist = std::sqrt(x * x + y * y); // Используем std::sqrt
         if (dist < closestDist && dist < g_aimbotFOV) {
             closestDist = dist;
             targetX = x;
@@ -233,7 +231,7 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
             if (FindOffsets()) {
                 SetConsoleCursorPosition(g_hConsole, { 0, 0 });
                 char buffer[128];
-                snprintf(buffer, sizeof(buffer), "Offsets found: entityList=0x%X, localPlayer=0x%X, viewMatrix=0x%X\n", 
+                snprintf(buffer, sizeof(buffer), "Offsets found: entityList=0x%lX, localPlayer=0x%lX, viewMatrix=0x%lX\n",
                          g_entityListOffset, g_localPlayerOffset, g_viewMatrixOffset);
                 WriteConsoleA(g_hConsole, buffer, strlen(buffer), NULL, NULL);
             }
