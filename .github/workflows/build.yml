@@ -29,22 +29,30 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Create log directory
-      run: mkdir logs
+      run: |
+        if not exist logs mkdir logs
+        echo Created logs directory >> logs/build.log
       shell: cmd
 
     - name: Download ImGui
       run: |
         echo Downloading ImGui... >> logs/build.log
-        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip || (
+        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip
+        if %ERRORLEVEL% NEQ 0 (
           echo Failed to download ImGui from primary source >> logs/build.log
           exit 1
         )
-        unzip -o imgui.zip
-        ren imgui-master imgui-master || (
-          for /f "delims=" %%i in ('dir /b /ad ^| findstr imgui-') do ren "%%i" imgui-master
+        echo Unzipping ImGui... >> logs/build.log
+        powershell -command "Expand-Archive -Path imgui.zip -DestinationPath temp_imgui -Force"
+        if not exist temp_imgui\imgui-master\imgui.h (
+          echo Error: imgui.h not found after unzip >> logs/build.log
+          dir temp_imgui /s /b >> logs/build.log 2>&1
+          exit 1
         )
+        move temp_imgui\imgui-master .\imgui-master
         if not exist imgui-master\imgui.h (
-          echo Error: imgui.h not found in imgui-master >> logs/build.log
+          echo Error: Failed to move imgui-master or imgui.h not found >> logs/build.log
+          dir imgui-master /s /b >> logs/build.log 2>&1
           exit 1
         )
         echo ImGui downloaded and verified >> logs/build.log
@@ -54,16 +62,22 @@ jobs:
     - name: Download MinHook
       run: |
         echo Downloading MinHook... >> logs/build.log
-        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip || (
+        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip
+        if %ERRORLEVEL% NEQ 0 (
           echo Failed to download MinHook from primary source >> logs/build.log
           exit 1
         )
-        unzip -o minhook.zip
-        ren minhook-master minhook-master || (
-          for /f "delims=" %%i in ('dir /b /ad ^| findstr minhook-') do ren "%%i" minhook-master
+        echo Unzipping MinHook... >> logs/build.log
+        powershell -command "Expand-Archive -Path minhook.zip -DestinationPath temp_minhook -Force"
+        if not exist temp_minhook\minhook-master (
+          echo Error: MinHook directory not found after unzip >> logs/build.log
+          dir temp_minhook /s /b >> logs/build.log 2>&1
+          exit 1
         )
+        move temp_minhook\minhook-master .\minhook-master
         if not exist minhook-master\include\MinHook.h (
           echo Error: MinHook.h not found in minhook-master >> logs/build.log
+          dir minhook-master /s /b >> logs/build.log 2>&1
           exit 1
         )
         echo MinHook downloaded and verified >> logs/build.log
@@ -73,17 +87,25 @@ jobs:
     - name: Download and Build zlib
       run: |
         echo Downloading zlib... >> logs/build.log
-        curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz || (
+        curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
+        if %ERRORLEVEL% NEQ 0 (
           echo Failed to download zlib from primary source >> logs/build.log
           exit 1
         )
+        echo Extracting zlib... >> logs/build.log
         tar -xzf zlib.tar.gz
+        if not exist zlib-1.3.1 (
+          echo Error: zlib-1.3.1 directory not found after extraction >> logs/build.log
+          dir . /s /b >> logs/build.log 2>&1
+          exit 1
+        )
         ren zlib-1.3.1 zlib
         cd zlib
         echo Building zlib... >> logs/build.log
         nmake -f win32/Makefile.msc
         if not exist zlib.lib (
           echo Error: zlib.lib not found after build >> logs/build.log
+          dir . /s /b >> logs/build.log 2>&1
           exit 1
         )
         echo zlib built successfully >> logs/build.log
@@ -94,16 +116,22 @@ jobs:
     - name: Download nlohmann-json
       run: |
         echo Downloading nlohmann/json... >> logs/build.log
-        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip || (
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip
+        if %ERRORLEVEL% NEQ 0 (
           echo Failed to download nlohmann/json from primary source >> logs/build.log
           exit 1
         )
-        unzip -o json.zip
-        ren json-develop json-develop || (
-          for /f "delims=" %%i in ('dir /b /ad ^| findstr json-') do ren "%%i" json-develop
+        echo Unzipping nlohmann/json... >> logs/build.log
+        powershell -command "Expand-Archive -Path json.zip -DestinationPath temp_json -Force"
+        if not exist temp_json\json-develop (
+          echo Error: json-develop directory not found after unzip >> logs/build.log
+          dir temp_json /s /b >> logs/build.log 2>&1
+          exit 1
         )
+        move temp_json\json-develop .\json-develop
         if not exist json-develop\single_include\nlohmann\json.hpp (
           echo Error: json.hpp not found in json-develop >> logs/build.log
+          dir json-develop /s /b >> logs/build.log 2>&1
           exit 1
         )
         echo nlohmann/json downloaded and verified >> logs/build.log
@@ -125,7 +153,7 @@ jobs:
           exit 1
         )
         echo zlib.lib found >> logs/build.log
-        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib
+        cl /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui-master /I minhook-master/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib zlib.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib Psapi.lib
         if %ERRORLEVEL% NEQ 0 (
           echo Build failed, check compiler output above >> logs/build.log
           exit 1
