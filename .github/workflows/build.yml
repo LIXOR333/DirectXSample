@@ -59,11 +59,18 @@ jobs:
               )
             )
           )
-          7z x imgui.zip -oimgui
-          move imgui\imgui-1.90.6\* imgui\ 2> nul || move imgui\imgui-master\* imgui\ 2> nul || move imgui\cimgui-master\* imgui\ 2> nul
-          rmdir imgui\imgui-1.90.6 2> nul
-          rmdir imgui\imgui-master 2> nul
-          rmdir imgui\cimgui-master 2> nul
+          7z x imgui.zip -oimgui_temp
+          for /d %%i in (imgui_temp\*) do (
+            move "%%i" imgui
+          )
+          dir imgui
+          if exist imgui\imgui.h (
+            echo "ImGui successfully extracted."
+          ) else (
+            echo "Failed to extract ImGui, imgui.h not found."
+            exit /b 1
+          )
+          rmdir /s /q imgui_temp
         )
 
     - name: Check for local MinHook
@@ -88,10 +95,18 @@ jobs:
               )
             )
           )
-          7z x minhook.zip -ominhook
-          move minhook\minhook-1.3.3\* minhook\ 2> nul || move minhook\minhook-master\* minhook\ 2> nul
-          rmdir minhook\minhook-1.3.3 2> nul
-          rmdir minhook\minhook-master 2> nul
+          7z x minhook.zip -ominhook_temp
+          for /d %%i in (minhook_temp\*) do (
+            move "%%i" minhook
+          )
+          dir minhook
+          if exist minhook\include\MinHook.h (
+            echo "MinHook successfully extracted."
+          ) else (
+            echo "Failed to extract MinHook, MinHook.h not found."
+            exit /b 1
+          )
+          rmdir /s /q minhook_temp
         )
 
     - name: Check for local nlohmann-json
@@ -116,11 +131,18 @@ jobs:
               )
             )
           )
-          7z x json.zip -ojson
-          move json\json-3.11.3\* json\ 2> nul || move json\json-develop\* json\ 2> nul || move json\nlohmann_json-master\* json\ 2> nul
-          rmdir json\json-3.11.3 2> nul
-          rmdir json\json-develop 2> nul
-          rmdir json\nlohmann_json-master 2> nul
+          7z x json.zip -ojson_temp
+          for /d %%i in (json_temp\*) do (
+            move "%%i" json
+          )
+          dir json
+          if exist json\single_include\nlohmann\json.hpp (
+            echo "nlohmann-json successfully extracted."
+          ) else (
+            echo "Failed to extract nlohmann-json, json.hpp not found."
+            exit /b 1
+          )
+          rmdir /s /q json_temp
         )
 
     - name: Verify MinGW installation
@@ -137,25 +159,34 @@ jobs:
         dir DirectXSample\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
         dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
         dir imgui 2> nul || echo "imgui not found"
+        dir imgui\imgui.h 2> nul || echo "imgui.h not found"
         dir minhook 2> nul || echo "minhook not found"
+        dir minhook\include\MinHook.h 2> nul || echo "MinHook.h not found"
         dir json 2> nul || echo "json not found"
+        dir json\single_include\nlohmann\json.hpp 2> nul || echo "json.hpp not found"
 
-    - name: Configure CMake with MinGW
+    - name: Configure CMake with MinGW (First Attempt)
       shell: cmd
       run: |
         if exist DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ || (
+            echo "First attempt to configure CMake with MinGW failed, retrying..."
+            cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          )
         ) else (
           echo "Could not find CMakeLists.txt, failing build"
           exit /b 1
         )
 
-    - name: Build with MinGW
+    - name: Build with MinGW (First Attempt)
       shell: cmd
       run: |
-        cmake --build build --config Release --parallel
+        cmake --build build --config Release --parallel || (
+          echo "First attempt to build with MinGW failed, retrying..."
+          cmake --build build --config Release --parallel
+        )
 
-    - name: Configure CMake with MSVC (fallback)
+    - name: Configure CMake with MSVC (Fallback)
       if: failure()
       shell: cmd
       run: |
@@ -166,7 +197,7 @@ jobs:
           exit /b 1
         )
 
-    - name: Build with MSVC
+    - name: Build with MSVC (Fallback)
       if: failure()
       shell: cmd
       run: |
