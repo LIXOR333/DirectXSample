@@ -18,27 +18,39 @@ jobs:
     - name: Set up network diagnostics
       shell: cmd
       run: |
-        echo "Checking network connectivity..."
-        ping -n 4 community.chocolatey.org || (
-          echo "Network error: Cannot reach Chocolatey server, retrying..."
-          ping -n 4 community.chocolatey.org || (
-            echo "Network error: Failed to reach Chocolatey server, failing build..."
+        echo "Checking network connectivity to community.chocolatey.org..."
+        curl -I https://community.chocolatey.org --connect-timeout 10 --retry 2 --retry-delay 5 --retry-max-time 30 || (
+          echo "Network error: Cannot reach Chocolatey server, trying alternative URL..."
+          curl -I https://chocolatey.org --connect-timeout 10 --retry 2 --retry-delay 5 --retry-max-time 30 || (
+            echo "Network error: Failed to reach Chocolatey server after all attempts, failing build..."
             exit /b 1
           )
         )
-      # Проверяет доступность Chocolatey перед установкой
+      # Проверяет доступность Chocolatey через curl с двумя попытками и альтернативным URL
+
+    - name: Check if Chocolatey is already installed
+      shell: cmd
+      run: |
+        echo "Checking if Chocolatey is already installed..."
+        choco --version && (
+          echo "Chocolatey is already installed, skipping installation..."
+          exit /b 0
+        ) || (
+          echo "Chocolatey not found, proceeding with installation..."
+        )
+      # Проверяет, установлен ли Chocolatey, чтобы избежать повторной установки
 
     - name: Install Chocolatey with retry
       shell: cmd
       run: |
         powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" || (
-          echo "First attempt to install Chocolatey failed, retrying..."
-          powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" || (
+          echo "First attempt to install Chocolatey failed, retrying with alternative URL..."
+          powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" || (
             echo "Second attempt to install Chocolatey failed, failing build..."
             exit /b 1
           )
         )
-      # Устанавливает Chocolatey с двумя попытками
+      # Устанавливает Chocolatey с двумя попытками и альтернативным URL
 
     - name: Install MinGW with retry
       shell: cmd
@@ -51,7 +63,7 @@ jobs:
           )
         )
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
-      # Устанавливает MinGW с двумя попытками и добавляет в PATH
+      # Устанавливает MinGW с двумя попытками
 
     - name: Verify MinGW installation
       shell: cmd
@@ -65,7 +77,7 @@ jobs:
           )
         )
         x86_64-w64-mingw32-g++ --version
-      # Проверяет, что MinGW установлен корректно, с попыткой переустановки
+      # Проверяет установку MinGW
 
     - name: Create directories if needed
       shell: cmd
@@ -100,4 +112,4 @@ jobs:
           )
         )
         echo "Compilation successful, DLL created at build\RustAlkadCheat2588.dll"
-      # Компилирует с двумя попытками, добавлены флаги -static-libgcc и -static-libstdc++ для надёжной линковки
+      # Компилирует с двумя попытками
