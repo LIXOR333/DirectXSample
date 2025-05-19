@@ -31,7 +31,7 @@ float g_viewMatrix[16] = { 0 };
 // Console handle
 HANDLE g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-// Function prototype
+// Function prototypes
 bool ExtractViewMatrix();
 
 // Logging to file
@@ -47,13 +47,28 @@ void LogToFile(const std::string& message) {
     }
 }
 
-// Print message to console with status
-void PrintConsoleMessage(const std::string& message, const std::string& status = "") {
+// Update and display all statuses in the console
+void UpdateConsoleDisplay() {
     SetConsoleCursorPosition(g_hConsole, { 0, 0 });
-    std::string fullMessage = message + (status.empty() ? "" : ": " + status);
+    std::string display;
+
+    // Build the display string with all feature statuses
+    display += "Aim: " + std::string(g_enableAimbot ? "On" : "Off") + "\n";
+    display += "Wallhack: " + std::string(g_enableWallhack ? "On" : "Off") + "\n";
+    display += "ESP: " + std::string(g_enableESP ? "On" : "Off") + "\n";
+    display += "Settings: On NumPad\n";
+
+    // Write to console
+    WriteConsoleA(g_hConsole, display.c_str(), display.length(), NULL, NULL);
+    LogToFile("Console updated: \n" + display);
+}
+
+// Print message to console (used for dynamic updates like Offsets or Settings)
+void PrintConsoleMessage(const std::string& message, const std::string& status = "") {
+    std::string fullMessage = message + (status.empty() ? "" : ": " + status) + "\n";
     WriteConsoleA(g_hConsole, fullMessage.c_str(), fullMessage.length(), NULL, NULL);
-    WriteConsoleA(g_hConsole, "\n", 1, NULL, NULL);
     LogToFile(fullMessage);
+    UpdateConsoleDisplay(); // Update the entire display after each message
 }
 
 // Check if memory is readable
@@ -444,12 +459,8 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
     g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleTitleA("RustAlkadCheat2588 Console");
 
-    // Initial console display
-    PrintConsoleMessage("Aim", g_enableAimbot ? "On" : "Off");
-    PrintConsoleMessage("Settings");
-    PrintConsoleMessage("Wallhack", g_enableWallhack ? "On" : "Off");
-    PrintConsoleMessage("Settings");
-    PrintConsoleMessage("On NumPad");
+    // Initial console display with all statuses
+    UpdateConsoleDisplay();
 
     if (!FindOffsets()) {
         PrintConsoleMessage("Offsets", "Finished (Error)");
@@ -461,19 +472,25 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
     }
 
     while (true) {
-        if (GetAsyncKeyState(VK_F1) & 1) {
+        // Toggle features
+        if (GetAsyncKeyState(VK_F1) & 0x8000) {
             g_enableAimbot = !g_enableAimbot;
-            PrintConsoleMessage("Aim", g_enableAimbot ? "On" : "Off");
+            UpdateConsoleDisplay();
+            Sleep(200); // Debounce to prevent rapid toggling
         }
-        if (GetAsyncKeyState(VK_F2) & 1) {
+        if (GetAsyncKeyState(VK_F2) & 0x8000) {
             g_enableWallhack = !g_enableWallhack;
-            PrintConsoleMessage("Wallhack", g_enableWallhack ? "On" : "Off");
+            UpdateConsoleDisplay();
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_F10) & 1) {
+        if (GetAsyncKeyState(VK_F10) & 0x8000) {
             AutoDumpOffsets();
             DecryptGameFiles();
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD0) & 1) {
+
+        // Settings via NumPad
+        if (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) {
             std::ofstream config("config.txt");
             if (config.is_open()) {
                 config << "esp_enabled=" << (g_enableESP ? "true" : "false") << "\n";
@@ -489,52 +506,61 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
                 config.close();
                 PrintConsoleMessage("Settings", "Saved");
             }
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD1) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) {
             g_enableESP = !g_enableESP;
             PrintConsoleMessage("Settings", std::string("ESP ") + (g_enableESP ? "On" : "Off"));
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD2) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) {
             g_espColorR = std::min(255, g_espColorR + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP R: %d", g_espColorR);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD3) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) {
             g_espColorG = std::min(255, g_espColorG + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP G: %d", g_espColorG);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD4) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) {
             g_espColorB = std::min(255, g_espColorB + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP B: %d", g_espColorB);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD5) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD5) & 0x8000) {
             g_aimbotFOV = std::min(90.0f, g_aimbotFOV + 5.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot FOV: %.1f", g_aimbotFOV);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD6) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD6) & 0x8000) {
             g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth - 1.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot Smooth: %.1f", g_aimbotSmooth);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD7) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD7) & 0x8000) {
             g_espDistanceMax += 50.0f;
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP Distance: %.1f", g_espDistanceMax);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_NUMPAD8) & 1) {
+        if (GetAsyncKeyState(VK_NUMPAD8) & 0x8000) {
             g_aimbotPriority = (g_aimbotPriority + 1) % 2;
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot Priority: %d", g_aimbotPriority);
             PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            Sleep(200);
         }
 
         Aimbot();
