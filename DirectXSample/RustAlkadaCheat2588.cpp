@@ -30,6 +30,9 @@ float g_viewMatrix[16] = { 0 };
 // Консоль
 HANDLE g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
+// Прототип функции
+bool ExtractViewMatrix();
+
 // Логирование
 void LogToFile(const std::string& message) {
     std::ofstream logFile("cheat_log.txt", std::ios::app);
@@ -43,12 +46,13 @@ void LogToFile(const std::string& message) {
     }
 }
 
-// Вывод сообщения в консоль
-void PrintConsoleMessage(const std::string& message) {
+// Вывод сообщения в консоль с состоянием
+void PrintConsoleMessage(const std::string& message, const std::string& status = "") {
     SetConsoleCursorPosition(g_hConsole, { 0, 0 });
-    WriteConsoleA(g_hConsole, message.c_str(), message.length(), NULL, NULL);
+    std::string fullMessage = message + (status.empty() ? "" : " - " + status);
+    WriteConsoleA(g_hConsole, fullMessage.c_str(), fullMessage.length(), NULL, NULL);
     WriteConsoleA(g_hConsole, "\n", 1, NULL, NULL);
-    LogToFile(message);
+    LogToFile(fullMessage);
 }
 
 // Проверка памяти
@@ -170,13 +174,24 @@ bool DecryptFile(const std::string& inputFile, const std::string& outputFile) {
 
 // Поиск и расшифровка файлов
 void DecryptGameFiles() {
+    PrintConsoleMessage("DecryptGameFiles", "Начато");
     LogToFile("Starting decryption of game files...");
 
     std::vector<std::string> possibleFiles = {
         "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rust\\gameconfig.dat",
         "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rust\\data\\settings.bin",
         "C:\\Rust\\config.dat",
-        "C:\\Rust\\data.bin"
+        "C:\\Rust\\data.bin",
+        "C:\\Games\\gameconfig.dat",
+        "C:\\Games\\settings.bin",
+        "C:\\Games\\data.dat",
+        "C:\\Games\\Rust\\config.dat",
+        "C:\\Games\\Rust\\data.bin",
+        "C:\\games\\gameconfig.dat",
+        "C:\\games\\settings.bin",
+        "C:\\games\\data.dat",
+        "C:\\games\\Rust\\config.dat",
+        "C:\\games\\Rust\\data.bin"
     };
 
     for (const auto& file : possibleFiles) {
@@ -185,13 +200,14 @@ void DecryptGameFiles() {
             DecryptFile(file, outputFile);
         }
     }
+
+    PrintConsoleMessage("DecryptGameFiles", "Завершено");
 }
 
 // Оптимизированный поиск оффсетов
 bool FindOffsets() {
     LogToFile("Starting optimized offset search for Rust 2588 Jungle Update (Alkad)...");
 
-    // Кэширование оффсетов
     std::ifstream cacheFile("offset_cache.txt");
     if (cacheFile.is_open()) {
         std::string line;
@@ -218,7 +234,6 @@ bool FindOffsets() {
         }
     }
 
-    // Расширенные сигнатуры для Rust 2588 (с учётом джунглей и новых монументов)
     std::vector<std::pair<const char*, const char*>> patterns = {
         {"\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x0F\x84", "xxx????xxxxx"}, // entityList
         {"\x48\x8B\x15\x00\x00\x00\x00\x48\x85\xD2\x74", "xxx????xxxx"},     // localPlayer
@@ -228,7 +243,7 @@ bool FindOffsets() {
         {"\x48\x8B\x0D\x00\x00\x00\x00\x48\x89\x7C\x24", "xxx????xxxx"},     // localPlayer (альтернатива)
     };
 
-    for (int i = 0; i < patterns.size(); i++) {
+    for (size_t i = 0; i < patterns.size(); i++) {
         uintptr_t baseAddr = FindPattern("GameAssembly.dll", patterns[i].first, patterns[i].second);
         if (baseAddr) {
             DWORD offset = *reinterpret_cast<DWORD*>(baseAddr + 3);
@@ -252,7 +267,6 @@ bool FindOffsets() {
                   ", viewMatrix=0x" + std::to_string(g_viewMatrixOffset) +
                   ", health=0x" + std::to_string(g_healthOffset));
 
-        // Сохраняем в кэш
         std::ofstream cacheFileOut("offset_cache.txt");
         if (cacheFileOut.is_open()) {
             cacheFileOut << "entity_list=0x" << std::hex << g_entityListOffset << "\n";
@@ -270,19 +284,16 @@ bool FindOffsets() {
 
 // Авто-дампер (F10)
 void AutoDumpOffsets() {
-    PrintConsoleMessage("F10: Началось");
+    PrintConsoleMessage("AutoDumpOffsets", "Начато");
 
-    // Поиск всех оффсетов
     FindOffsets();
 
-    // Извлечение углов
     if (ExtractViewMatrix()) {
         LogToFile("View angles extracted: Pitch=" + std::to_string(g_viewPitch) + ", Yaw=" + std::to_string(g_viewYaw));
     } else {
         LogToFile("Failed to extract view matrix.");
     }
 
-    // Дамп в файл
     std::ofstream dumpFile("offset_dump.txt");
     if (dumpFile.is_open()) {
         dumpFile << "entityList=0x" << std::hex << g_entityListOffset << "\n";
@@ -295,7 +306,7 @@ void AutoDumpOffsets() {
         LogToFile("Offsets dumped to offset_dump.txt");
     }
 
-    PrintConsoleMessage("F10: Завершено");
+    PrintConsoleMessage("AutoDumpOffsets", "Завершено");
 }
 
 // Извлечение view matrix
@@ -431,26 +442,34 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
     g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleTitleA("RustAlkadCheat2588 Console");
 
+    // Инициализация консоли с отображением всех функций
+    PrintConsoleMessage("Menu", g_showMenu ? "включён" : "выключен");
+    PrintConsoleMessage("ESP", g_enableESP ? "включён" : "выключен");
+    PrintConsoleMessage("Aimbot", g_enableAimbot ? "включён" : "выключен");
+    PrintConsoleMessage("Settings", "доступны");
+
     if (!FindOffsets()) {
-        PrintConsoleMessage("Failed to find offsets!");
+        PrintConsoleMessage("FindOffsets", "Завершено (ошибка)");
     } else if (!ExtractViewMatrix()) {
-        PrintConsoleMessage("Failed to extract view matrix!");
+        PrintConsoleMessage("ExtractViewMatrix", "Завершено (ошибка)");
     } else {
+        PrintConsoleMessage("FindOffsets", "Завершено");
+        PrintConsoleMessage("ExtractViewMatrix", "Завершено");
         PrintConsoleMessage("Offsets and view matrix initialized successfully!");
     }
 
     while (true) {
         if (GetAsyncKeyState(VK_INSERT) & 1) {
             g_showMenu = !g_showMenu;
-            PrintConsoleMessage(g_showMenu ? "Insert: Началось" : "Insert: Завершено");
+            PrintConsoleMessage("Menu", g_showMenu ? "включён" : "выключен");
         }
         if (GetAsyncKeyState(VK_F1) & 1) {
             g_enableAimbot = !g_enableAimbot;
-            PrintConsoleMessage(g_enableAimbot ? "F1: Началось" : "F1: Завершено");
+            PrintConsoleMessage("Aimbot", g_enableAimbot ? "включён" : "выключен");
         }
         if (GetAsyncKeyState(VK_F2) & 1) {
             g_enableESP = !g_enableESP;
-            PrintConsoleMessage(g_enableESP ? "F2: Началось" : "F2: Завершено");
+            PrintConsoleMessage("ESP", g_enableESP ? "включён" : "выключен");
         }
         if (GetAsyncKeyState(VK_F10) & 1) {
             AutoDumpOffsets();
@@ -469,50 +488,50 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
                 config << "esp_distance_max=" << g_espDistanceMax << "\n";
                 config << "aimbot_priority=" << g_aimbotPriority << "\n";
                 config.close();
-                PrintConsoleMessage("Num0: Изменено (Настройки сохранены)");
+                PrintConsoleMessage("Settings", "доступны (сохранены)");
             }
         }
         if (GetAsyncKeyState(VK_NUMPAD1) & 1) {
             g_espColorR = std::min(255, g_espColorR + 10);
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num1: Изменено (ESP R: %d)", g_espColorR);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "ESP R: %d", g_espColorR);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD2) & 1) {
             g_espColorG = std::min(255, g_espColorG + 10);
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num2: Изменено (ESP G: %d)", g_espColorG);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "ESP G: %d", g_espColorG);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD3) & 1) {
             g_espColorB = std::min(255, g_espColorB + 10);
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num3: Изменено (ESP B: %d)", g_espColorB);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "ESP B: %d", g_espColorB);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD4) & 1) {
             g_aimbotFOV = std::min(90.0f, g_aimbotFOV + 5.0f);
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num4: Изменено (Aimbot FOV: %.1f)", g_aimbotFOV);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "Aimbot FOV: %.1f", g_aimbotFOV);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD5) & 1) {
             g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth - 1.0f);
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num5: Изменено (Aimbot Smooth: %.1f)", g_aimbotSmooth);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "Aimbot Smooth: %.1f", g_aimbotSmooth);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD6) & 1) {
             g_espDistanceMax += 50.0f;
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num6: Изменено (ESP Distance: %.1f)", g_espDistanceMax);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "ESP Distance: %.1f", g_espDistanceMax);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
         if (GetAsyncKeyState(VK_NUMPAD7) & 1) {
             g_aimbotPriority = (g_aimbotPriority + 1) % 2;
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Num7: Изменено (Aimbot Priority: %d)", g_aimbotPriority);
-            PrintConsoleMessage(buffer);
+            snprintf(buffer, sizeof(buffer), "Aimbot Priority: %d", g_aimbotPriority);
+            PrintConsoleMessage("Settings", buffer + " (изменён)");
         }
 
         Aimbot();
