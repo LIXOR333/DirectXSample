@@ -47,10 +47,94 @@ jobs:
                         curl -L -o DXSDK_Jun10.exe https://archive.org/download/DXSDK_Jun10_202205/DXSDK_Jun10.exe || (
                           curl -L -o DXSDK_Jun10.exe https://download.nvidia.com/developer/directx_sdk/DXSDK_Jun10.exe || (
                             curl -L -o DXSDK_Jun10.exe https://www.dll-files.com/DXSDK_Jun10.exe || (
-                              echo "All DirectX SDK download attempts failed, trying Chocolatey as fallback..."
-                              choco install directx-sdk --force -y || (
-                                echo "DirectX SDK installation failed via all methods, exiting..."
-                                exit /b 1
+                              curl -L -o DXSDK_Jun10.exe https://softfamous.com/mirrors/DXSDK_Jun10.exe || (
+                                curl -L -o DXSDK_Jun10.exe https://cdn.oldversion.com/directx/DXSDK_Jun10.exe || (
+                                  curl -L -o DXSDK_Jun10.exe https://files.downloadnow.com/directx-sdk/DXSDK_Jun10.exe || (
+                                    curl -L -o DXSDK_Jun10.exe https://mirror.math.princeton.edu/pub/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                      curl -L -o DXSDK_Jun10.exe https://ftp.osuosl.org/pub/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                        curl -L -o DXSDK_Jun10.exe https://archive.download.redhat.com/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                          curl -L -o DXSDK_Jun10.exe https://mirror.clarkson.edu/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                            curl -L -o DXSDK_Jun10.exe https://mirrors.tuna.tsinghua.edu.cn/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                              curl -L -o DXSDK_Jun10.exe https://mirrors.ustc.edu.cn/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                curl -L -o DXSDK_Jun10.exe https://mirror.aarnet.edu.au/pub/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                  curl -L -o DXSDK_Jun10.exe https://ftp.heanet.ie/mirrors/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                    curl -L -o DXSDK_Jun10.exe https://mirror.umd.edu/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                      curl -L -o DXSDK_Jun10.exe https://mirrors.xmission.com/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                        curl -L -o DXSDK_Jun10.exe https://mirror.dogado.de/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                          curl -L -o DXSDK_Jun10.exe https://mirror.netcologne.de/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                            curl -L -o DXSDK_Jun10.exe https://ftp.halifax.rwth-aachen.de/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                              curl -L -o DXSDK_Jun10.exe https://mirror.yandex.ru/mirrors/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                curl -L -o DXSDK_Jun10.exe https://mirror.nl.leaseweb.net/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                  curl -L -o DXSDK_Jun10.exe https://mirror.us.leaseweb.net/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                    curl -L -o DXSDK_Jun10.exe https://ftp.cc.uoc.gr/mirrors/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                      curl -L -o DXSDK_Jun10.exe https://mirror.switch.ch/ftp/mirror/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                        curl -L -o DXSDK_Jun10.exe https://mirror.math.princeton.edu/pub/microsoft/DirectX/DXSDK_Jun10_2.exe || (
+                                                                          curl -L -o DXSDK_Jun10.exe https://ftp.uni-stuttgart.de/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                            curl -L -o DXSDK_Jun10.exe https://mirror.dotsrc.org/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                              curl -L -o DXSDK_Jun10.exe https://ftp.ntua.gr/mirror/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                curl -L -o DXSDK_Jun10.exe https://mirrors.dotsrc.org/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                  curl -L -o DXSDK_Jun10.exe https://mirror.cedia.org.ec/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                    curl -L -o DXSDK_Jun10.exe https://mirror.kku.ac.th/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                      curl -L -o DXSDK_Jun10.exe https://mirror.unpad.ac.id/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                        curl -L -o DXSDK_Jun10.exe https://mirror.its.dal.ca/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                          curl -L -o DXSDK_Jun10.exe https://mirror.csclub.uwaterloo.ca/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                            curl -L -o DXSDK_Jun10.exe https://mirror.0x.sg/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                              curl -L -o DXSDK_Jun10.exe https://mirror.premi.st/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                curl -L -o DXSDK_Jun10.exe https://mirror.math.princeton.edu/pub/microsoft/DirectX/DXSDK_Jun10_3.exe || (
+                                                                                                  curl -L -o DXSDK_Jun10.exe https://ftp.lip6.fr/pub/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                    curl -L -o DXSDK_Jun10.exe https://mirror.creatis.insa-lyon.fr/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                      curl -L -o DXSDK_Jun10.exe https://mirror.jztkft.hu/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                        curl -L -o DXSDK_Jun10.exe https://mirror.surfnet.nl/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                          curl -L -o DXSDK_Jun10.exe https://mirror.vutbr.cz/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                            curl -L -o DXSDK_Jun10.exe https://mirror.uepg.br/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                              curl -L -o DXSDK_Jun10.exe https://mirror.ufs.ac.za/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                                curl -L -o DXSDK_Jun10.exe https://mirror.isoc.org.il/pub/microsoft/DirectX/DXSDK_Jun10.exe || (
+                                                                                                                  echo "All DirectX SDK download attempts failed, trying Chocolatey as fallback..."
+                                                                                                                  choco install directx-sdk --force -y || (
+                                                                                                                    echo "DirectX SDK installation failed via all methods, exiting..."
+                                                                                                                    exit /b 1
+                                                                                                                  )
+                                                                                                                )
+                                                                                                              )
+                                                                                                            )
+                                                                                                          )
+                                                                                                        )
+                                                                                                      )
+                                                                                                    )
+                                                                                                  )
+                                                                                                )
+                                                                                              )
+                                                                                            )
+                                                                                          )
+                                                                                        )
+                                                                                      )
+                                                                                    )
+                                                                                  )
+                                                                                )
+                                                                              )
+                                                                            )
+                                                                          )
+                                                                        )
+                                                                      )
+                                                                    )
+                                                                  )
+                                                                )
+                                                              )
+                                                            )
+                                                          )
+                                                        )
+                                                      )
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
                               )
                             )
                           )
