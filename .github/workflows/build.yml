@@ -58,17 +58,12 @@ jobs:
       run: |
         dir
         dir DirectXSample
-        dir DirectXSample\DirectXSample 2> nul || echo "DirectXSample\DirectXSample not found"
-        dir DirectXSample\DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found"
+        dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found"
 
     - name: Configure CMake
       shell: cmd
       run: |
-        if exist DirectXSample\DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample\DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
-        ) else (
-          cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -CMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
-        )
+        cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
 
     - name: Build
       shell: cmd
