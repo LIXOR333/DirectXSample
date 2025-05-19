@@ -18,9 +18,10 @@
 #include <zlib.h>
 #include <filesystem>
 #include <iostream>
-#include <Psapi.h> // Добавлено для GetModuleInformation
+#include <Psapi.h>
 
-#pragma comment(lib, "Psapi.lib") // Линкуем Psapi.lib
+#pragma comment(lib, "Psapi.lib")
+#pragma comment(lib, "MinHook.lib") // Добавлено для линковки MinHook
 
 using json = nlohmann::json;
 
@@ -75,7 +76,12 @@ DWORD64 DecryptOffset(DWORD64 offset) { return offset ^ XOR_KEY; }
 // Signature scanning
 DWORD64 FindOffsetBySignature(const char* pattern, const char* mask) {
     MODULEINFO modInfo;
-    GetModuleInformation(GetCurrentProcess(), GetModuleHandle(nullptr), &modInfo, sizeof(MODULEINFO));
+    if (!GetModuleInformation(GetCurrentProcess(), GetModuleHandle(nullptr), &modInfo, sizeof(MODULEINFO))) {
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to get module information\n";
+        log.close();
+        return 0;
+    }
     BYTE* base = (BYTE*)modInfo.lpBaseOfDll;
     SIZE_T size = modInfo.SizeOfImage;
 
@@ -101,7 +107,7 @@ bool ValidateOffset(const std::string& name, DWORD64 offset) {
         DWORD64 listAddr;
         if (!ReadMemory(addr, &listAddr, sizeof(DWORD64)) || !listAddr) return false;
         DWORD count;
-        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 5000) return false;
+        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 10000) return false; // Увеличил лимит до 10000
         return true;
     }
     else if (name == "Base") {
@@ -144,6 +150,9 @@ void AutoDumpOffsets() {
 
     if (!file.is_open() || !updateFile.is_open() || !validFile.is_open()) {
         g_updateStatus = "Failed to open dump files (check permissions)";
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to open dump files at " << std::ctime(&lastDump) << "\n";
+        log.close();
         return;
     }
 
@@ -203,6 +212,9 @@ bool InitD3D11(HWND hwnd) {
         char errorMsg[256];
         sprintf_s(errorMsg, "D3D11CreateDeviceAndSwapChain failed with HRESULT: 0x%lX", hr);
         MessageBoxA(nullptr, errorMsg, "DirectX Error", MB_OK | MB_ICONERROR);
+        std::ofstream log("error.log", std::ios::app);
+        log << errorMsg << "\n";
+        log.close();
         return false;
     }
 
@@ -210,6 +222,9 @@ bool InitD3D11(HWND hwnd) {
     hr = g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
     if (FAILED(hr)) {
         MessageBoxA(nullptr, "Failed to get back buffer", "DirectX Error", MB_OK | MB_ICONERROR);
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to get back buffer\n";
+        log.close();
         return false;
     }
 
@@ -217,12 +232,25 @@ bool InitD3D11(HWND hwnd) {
     pBackBuffer->Release();
     if (FAILED(hr)) {
         MessageBoxA(nullptr, "Failed to create render target view", "DirectX Error", MB_OK | MB_ICONERROR);
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to create render target view\n";
+        log.close();
         return false;
     }
 
     ImGui::CreateContext();
-    ImGui_ImplWin32_Init(hwnd);
-    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+    if (!ImGui_ImplWin32_Init(hwnd)) {
+        std::ofstream log("error.log", std::ios::app);
+        log << "ImGui_ImplWin32_Init failed\n";
+        log.close();
+        return false;
+    }
+    if (!ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext)) {
+        std::ofstream log("error.log", std::ios::app);
+        log << "ImGui_ImplDX11_Init failed\n";
+        log.close();
+        return false;
+    }
     return true;
 }
 
@@ -231,10 +259,10 @@ void CleanupD3D11() {
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
-    if (g_pRenderTargetView) g_pRenderTargetView->Release();
-    if (g_pSwapChain) g_pSwapChain->Release();
-    if (g_pd3dDeviceContext) g_pd3dDeviceContext->Release();
-    if (g_pd3dDevice) g_pd3dDevice->Release();
+    if (g_pRenderTargetView) { g_pRenderTargetView->Release(); g_pRenderTargetView = nullptr; }
+    if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
+    if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
+    if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
 }
 
 // Memory read/write
@@ -261,7 +289,7 @@ Vector3 ReadVector3(DWORD64 address) {
         ReadMemory(address + 0x34, &v.y, sizeof(float));
         ReadMemory(address + 0x38, &v.z, sizeof(float));
         if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z) ||
-            std::abs(v.x) > 50000.0f || std::abs(v.y) > 50000.0f || std::abs(v.z) > 50000.0f) { // Снизил порог до 50000
+            std::abs(v.x) > 10000.0f || std::abs(v.y) > 10000.0f || std::abs(v.z) > 10000.0f) { // Снизил порог до 10000
             v = {0, 0, 0};
         }
     }
@@ -277,7 +305,7 @@ std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
     DWORD count;
     if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD))) return entities;
 
-    if (count > 5000) count = 5000;
+    if (count > 10000) count = 10000; // Увеличил лимит до 10000
 
     for (DWORD i = 0; i < count; ++i) {
         DWORD64 entityAddr;
@@ -421,7 +449,7 @@ void RenderLoop() {
     g_pSwapChain->Present(1, 0);
 }
 
-// Window procedure (добавлено для корректной обработки сообщений ImGui)
+// Window procedure
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam)) {
@@ -437,13 +465,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 // Main thread
 void MainThread() {
-    // Регистрируем класс окна
     WNDCLASSEXA wc = { sizeof(WNDCLASSEXA) };
     wc.lpfnWndProc = WndProc;
     wc.hInstance = GetModuleHandle(nullptr);
     wc.lpszClassName = "STATIC";
     if (!RegisterClassExA(&wc)) {
         MessageBoxA(nullptr, "Failed to register window class", "Error", MB_OK | MB_ICONERROR);
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to register window class\n";
+        log.close();
         return;
     }
 
@@ -458,6 +488,9 @@ void MainThread() {
 
     if (!g_hwnd) {
         MessageBoxA(nullptr, "Failed to create window", "Error", MB_OK | MB_ICONERROR);
+        std::ofstream log("error.log", std::ios::app);
+        log << "Failed to create window\n";
+        log.close();
         return;
     }
 
