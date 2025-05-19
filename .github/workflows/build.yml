@@ -114,32 +114,29 @@ jobs:
           dir minhook /s /b >> logs/build.log 2>&1
           exit 1
         )
-        if not exist minhook\minhook.sln (
-          echo Error: minhook.sln not found in minhook >> logs/build.log
-          dir minhook /s /b >> logs/build.log 2>&1
-          exit 1
-        )
         echo Building MinHook... >> logs/build.log
         cd minhook
-        msbuild minhook.sln /p:Configuration=Release /p:Platform=x64 /v:d > build.log 2>&1
+        cd src
+        nmake /f Makefile.msc
         if %ERRORLEVEL% NEQ 0 (
-          echo Error: Failed to build MinHook with msbuild >> logs/build.log
-          type build.log >> ../logs/build.log
-          exit 1
-        )
-        echo Searching for MinHook library... >> ../logs/build.log
-        dir *MinHook*.lib /s /b 2>> ../logs/build.log || echo No MinHook library found >> ../logs/build.log
-        set "MINHOOK_LIB_PATH="
-        for /f "tokens=*" %%i in ('dir *MinHook*.lib /s /b 2^>nul') do set "MINHOOK_LIB_PATH=%%i"
-        if not defined MINHOOK_LIB_PATH (
-          echo Error: MinHook library file not found after build >> ../logs/build.log
+          echo Error: Failed to build MinHook with nmake >> logs/build.log
           dir /s /b >> ../logs/build.log 2>&1
           exit 1
         )
-        echo Found MinHook library at %MINHOOK_LIB_PATH% >> ../logs/build.log
+        cd ..
+        echo Searching for MinHook library... >> logs/build.log
+        dir *MinHook*.lib /s /b >> logs/build.log 2>&1
+        set "MINHOOK_LIB_PATH="
+        for /f "tokens=*" %%i in ('dir *MinHook*.lib /s /b 2^>nul') do set "MINHOOK_LIB_PATH=%%i"
+        if not defined MINHOOK_LIB_PATH (
+          echo Error: MinHook library file not found after build >> logs/build.log
+          dir /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo Found MinHook library at %MINHOOK_LIB_PATH% >> logs/build.log
         copy "%MINHOOK_LIB_PATH%" MinHook.lib
         if %ERRORLEVEL% NEQ 0 (
-          echo Error: Failed to copy MinHook library to MinHook.lib >> ../logs/build.log
+          echo Error: Failed to copy MinHook library to MinHook.lib >> logs/build.log
           exit 1
         )
         cd ..
@@ -156,4 +153,90 @@ jobs:
           exit 1
         )
         echo Extracting zlib... >> logs/build.log
-        tar
+        tar -xzf zlib.tar.gz
+        if not exist zlib-1.3.1 (
+          echo Error: zlib-1.3.1 directory not found after extraction >> logs/build.log
+          dir . /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        ren zlib-1.3.1 zlib
+        cd zlib
+        echo Building zlib... >> logs/build.log
+        nmake -f win32/Makefile.msc
+        if not exist zlib.lib (
+          echo Error: zlib.lib not found after build >> logs/build.log
+          dir . /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo zlib built successfully >> logs/build.log
+        cd ..
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
+
+    - name: Download nlohmann-json
+      run: |
+        echo Downloading nlohmann/json... >> logs/build.log
+        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip
+        if %ERRORLEVEL% NEQ 0 (
+          echo Failed to download nlohmann/json from primary source >> logs/build.log
+          exit 1
+        )
+        echo Unzipping nlohmann/json... >> logs/build.log
+        powershell -command "Expand-Archive -Path json.zip -DestinationPath temp_json -Force"
+        if not exist temp_json\json-develop (
+          echo Error: json-develop directory not found after unzip >> logs/build.log
+          dir temp_json /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        move temp_json\json-develop .\json-develop
+        if not exist json-develop\single_include\nlohmann\json.hpp (
+          echo Error: json.hpp not found in json-develop >> logs/build.log
+          dir json-develop /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo nlohmann/json downloaded and verified >> logs/build.log
+      shell: cmd
+      if: steps.cache.outputs.cache-hit != 'true'
+
+    - name: Build DLL
+      run: |
+        echo Building DLL... >> logs/build.log
+        if not exist src\RustAlkadCheat2588.cpp (
+          echo Error: RustAlkadCheat2588.cpp not found in src/ directory >> logs/build.log
+          dir src /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo RustAlkadCheat2588.cpp found >> logs/build.log
+        if not exist zlib\zlib.lib (
+          echo Error: zlib.lib not found in zlib/ directory >> logs/build.log
+          dir zlib /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo zlib.lib found >> logs/build.log
+        if not exist minhook\MinHook.lib (
+          echo Error: MinHook.lib not found in minhook/ directory >> logs/build.log
+          dir minhook /s /b >> logs/build.log 2>&1
+          exit 1
+        )
+        echo MinHook.lib found >> logs/build.log
+        cl /std:c++17 /D UNICODE /D _UNICODE /EHsc /Zi /Fe:RustAlkadCheat.dll /LD src/RustAlkadCheat2588.cpp /I imgui /I imgui/backends /I minhook/include /I zlib /I json-develop/single_include /link /LIBPATH:zlib /LIBPATH:minhook zlib.lib MinHook.lib user32.lib d3d11.lib dxgi.lib shell32.lib ws2_32.lib Psapi.lib
+        if %ERRORLEVEL% NEQ 0 (
+          echo Build failed, check compiler output above >> logs/build.log
+          exit 1
+        )
+        echo Build successful >> logs/build.log
+      shell: cmd
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: BuildLogs
+        path: logs/build.log
+
+    - name: Upload DLL
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: RustAlkadCheatDLL
+        path: RustAlkadCheat.dll
