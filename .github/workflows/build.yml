@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2019 # Используем runner с предустановленным Visual Studio 2019
 
     steps:
     - name: Checkout repository
@@ -24,17 +24,6 @@ jobs:
           zlib
           json-develop
         key: ${{ runner.os }}-deps-${{ hashFiles('.github/workflows/build.yml') }}
-
-    - name: Install Visual Studio 2019 Build Tools
-      run: |
-        echo Installing Visual Studio 2019 Build Tools... >> logs/build.log
-        choco install visualstudio2019buildtools --version 16.11.30.0 --yes
-        if %ERRORLEVEL% NEQ 0 (
-          echo Failed to install Visual Studio 2019 Build Tools >> logs/build.log
-          exit 1
-        )
-        echo Visual Studio 2019 Build Tools installed >> logs/build.log
-      shell: cmd
 
     - name: Set up MSVC for Visual Studio 2019
       run: |
