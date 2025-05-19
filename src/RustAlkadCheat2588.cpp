@@ -161,9 +161,9 @@ void AutoDumpOffsets() {
     }
 
     time_t now = time(nullptr);
-    file << "Dump at " << std::ctime(&now);
-    updateFile << "Update check at " << std::ctime(&now);
-    validFile << "Validation at " << std::ctime(&now);
+    file << "Dump at " << std::ctime(&now) << std::endl;
+    updateFile << "Update check at " << std::ctime(&now) << std::endl;
+    validFile << "Validation at " << std::ctime(&now) << std::endl;
 
     for (const auto& sig : signatures) {
         DWORD64 foundOffset = FindOffsetBySignature(sig.pattern, sig.mask);
