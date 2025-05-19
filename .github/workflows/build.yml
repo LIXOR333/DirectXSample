@@ -1,9 +1,8 @@
 name: Build Rust Alkad 2588 Cheat DLL
 
 on:
-  push:
-    paths:
-      - 'RustAlkadCheat2588.cpp'
+  push: # Запускаем при изменении любых файлов
+  workflow_dispatch: # Добавляем ручной запуск
 
 jobs:
   build:
@@ -17,78 +16,72 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          ~/.vcpkg
-          build
           imgui
           minhook
           zlib
           json
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}-v2
+        key: ${{ runner.os }}-deps-${{ hashFiles('RustAlkadCheat2588.cpp') }}-v1
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Create log directory
-      run: mkdir logs
-      shell: cmd
-
-    - name: Install 7zip
-      run: choco install 7zip -y
-      shell: cmd
+      run: New-Item -ItemType Directory -Path logs -Force
+      shell: powershell
 
     - name: Download ImGui
       run: |
-        curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip
-        if not exist imgui.zip (echo Failed to download ImGui >> logs/build.log && exit 1)
-      shell: cmd
+        Invoke-WebRequest -Uri https://github.com/ocornut/imgui/archive/refs/heads/master.zip -OutFile imgui.zip
+        if (-not (Test-Path imgui.zip)) { Write-Output "Failed to download ImGui" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Extract ImGui
       run: |
-        7z x imgui.zip -oimgui -y
-        if not exist imgui\imgui-master\imgui.h (echo Failed to extract ImGui >> logs/build.log && exit 1)
-      shell: cmd
+        Expand-Archive -Path imgui.zip -DestinationPath imgui -Force
+        if (-not (Test-Path imgui/imgui-master/imgui.h)) { Write-Output "Failed to extract ImGui" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Download MinHook
       run: |
-        curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip
-        if not exist minhook.zip (echo Failed to download MinHook >> logs/build.log && exit 1)
-      shell: cmd
+        Invoke-WebRequest -Uri https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip -OutFile minhook.zip
+        if (-not (Test-Path minhook.zip)) { Write-Output "Failed to download MinHook" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Extract MinHook
       run: |
-        7z x minhook.zip -ominhook -y
-        if not exist minhook\minhook-master\include\MinHook.h (echo Failed to extract MinHook >> logs/build.log && exit 1)
-      shell: cmd
+        Expand-Archive -Path minhook.zip -DestinationPath minhook -Force
+        if (-not (Test-Path minhook/minhook-master/include/MinHook.h)) { Write-Output "Failed to extract MinHook" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Download zlib
       run: |
-        curl -L -o zlib.zip https://zlib.net/zlib1218.zip
-        if not exist zlib.zip (echo Failed to download zlib >> logs/build.log && exit 1)
-      shell: cmd
+        Invoke-WebRequest -Uri https://zlib.net/zlib1218.zip -OutFile zlib.zip
+        if (-not (Test-Path zlib.zip)) { Write-Output "Failed to download zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Extract zlib
       run: |
-        7z x zlib.zip -ozlib -y
-        if not exist zlib\zlib-1.2.18\zlib.h (echo Failed to extract zlib >> logs/build.log && exit 1)
-      shell: cmd
+        Expand-Archive -Path zlib.zip -DestinationPath zlib -Force
+        if (-not (Test-Path zlib/zlib-1.2.18/zlib.h)) { Write-Output "Failed to extract zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Download nlohmann/json
       run: |
-        curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip
-        if not exist json.zip (echo Failed to download nlohmann/json >> logs/build.log && exit 1)
-      shell: cmd
+        Invoke-WebRequest -Uri https://github.com/nlohmann/json/archive/refs/heads/develop.zip -OutFile json.zip
+        if (-not (Test-Path json.zip)) { Write-Output "Failed to download nlohmann/json" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Extract nlohmann/json
       run: |
-        7z x json.zip -ojson -y
-        if not exist json\json-develop\single_include\nlohmann\json.hpp (echo Failed to extract nlohmann/json >> logs/build.log && exit 1)
-      shell: cmd
+        Expand-Archive -Path json.zip -DestinationPath json -Force
+        if (-not (Test-Path json/json-develop/single_include/nlohmann/json.hpp)) { Write-Output "Failed to extract nlohmann/json" | Out-File -FilePath logs/build.log -Append; exit 1 }
+      shell: powershell
 
     - name: Build DLL
       run: |
-        echo Building DLL... >> logs/build.log
+        Write-Output "Building DLL..." | Out-File -FilePath logs/build.log -Append
         cl /DUNICODE /D_UNICODE /MD /O2 /W4 /FeRustAlkadCheat.dll /Iimgui/imgui-master /Iminhook/minhook-master/include /Izlib/zlib-1.2.18 /Ijson/json-develop/single_include RustAlkadCheat2588.cpp /link /DLL /OUT:RustAlkadCheat.dll 2>> logs/build.log
-        if not exist RustAlkadCheat.dll (echo Build failed: DLL not created >> logs/build.log && exit 1)
+        if (-not (Test-Path RustAlkadCheat.dll)) { Write-Output "Build failed: DLL not created" | Out-File -FilePath logs/build.log -Append; exit 1 }
       shell: cmd
 
     - name: Upload logs
