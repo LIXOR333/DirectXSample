@@ -21,13 +21,17 @@
 #include <Psapi.h>
 
 #pragma comment(lib, "Psapi.lib")
-#pragma comment(lib, "MinHook.lib") // Добавлено для линковки MinHook
+#pragma comment(lib, "MinHook.lib")
 
 using json = nlohmann::json;
 
 // Vector structs
 struct Vector2 { float x, y; };
 struct Vector3 { float x, y, z; };
+
+// Function declarations
+bool ReadMemory(DWORD64 address, void* buffer, SIZE_T size);
+bool WriteMemory(DWORD64 address, const void* value, SIZE_T size);
 
 // Global variables
 static HWND g_hwnd = nullptr;
@@ -42,7 +46,7 @@ static std::string g_updateStatus = "Offline mode (no updates)";
 static time_t g_lastDumpTime = 0;
 static json g_config;
 
-// Feature toggles (100+ features)
+// Feature toggles
 struct Features {
     bool esp_players = false, esp_items = false, esp_npcs = false;
     bool aimbot = false, silent_aim = false, no_recoil = false;
@@ -58,7 +62,7 @@ struct Features {
     bool esp_health = false, esp_boxes = false, esp_snaplines = false;
 } g_features;
 
-// Offsets for Alkad 2588 (Jungle Update)
+// Offsets
 struct Offsets {
     std::string name;
     DWORD64 value;
@@ -100,14 +104,14 @@ DWORD64 FindOffsetBySignature(const char* pattern, const char* mask) {
     return 0;
 }
 
-// Validate offset by reading memory
+// Validate offset
 bool ValidateOffset(const std::string& name, DWORD64 offset) {
     DWORD64 addr = g_baseAddr + DecryptOffset(offset);
     if (name == "EntityList" || name == "Projectile") {
         DWORD64 listAddr;
         if (!ReadMemory(addr, &listAddr, sizeof(DWORD64)) || !listAddr) return false;
         DWORD count;
-        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 10000) return false; // Увеличил лимит до 10000
+        if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD)) || count > 10000) return false;
         return true;
     }
     else if (name == "Base") {
@@ -128,7 +132,7 @@ bool ValidateOffset(const std::string& name, DWORD64 offset) {
     return false;
 }
 
-// Auto-dumper with signature scanning and validation
+// Auto-dumper
 void AutoDumpOffsets() {
     static time_t lastDump = 0;
     if (time(nullptr) - lastDump < 300) return;
@@ -157,9 +161,9 @@ void AutoDumpOffsets() {
     }
 
     time_t now = time(nullptr);
-    file << "Dump at " << std::ctime(&now) << "\n";
-    updateFile << "Update check at " << std::ctime(&now) << "\n";
-    validFile << "Validation at " << std::ctime(&now) << "\n";
+    file << "Dump at " << std::ctime(&now);
+    updateFile << "Update check at " << std::ctime(&now);
+    validFile << "Validation at " << std::ctime(&now);
 
     for (const auto& sig : signatures) {
         DWORD64 foundOffset = FindOffsetBySignature(sig.pattern, sig.mask);
@@ -289,7 +293,7 @@ Vector3 ReadVector3(DWORD64 address) {
         ReadMemory(address + 0x34, &v.y, sizeof(float));
         ReadMemory(address + 0x38, &v.z, sizeof(float));
         if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z) ||
-            std::abs(v.x) > 10000.0f || std::abs(v.y) > 10000.0f || std::abs(v.z) > 10000.0f) { // Снизил порог до 10000
+            std::abs(v.x) > 10000.0f || std::abs(v.y) > 10000.0f || std::abs(v.z) > 10000.0f) {
             v = {0, 0, 0};
         }
     }
@@ -305,7 +309,7 @@ std::vector<Entity> GetEntities(DWORD64 baseAddr, DWORD64 offset, bool isItem) {
     DWORD count;
     if (!ReadMemory(listAddr + 0x4, &count, sizeof(DWORD))) return entities;
 
-    if (count > 10000) count = 10000; // Увеличил лимит до 10000
+    if (count > 10000) count = 10000;
 
     for (DWORD i = 0; i < count; ++i) {
         DWORD64 entityAddr;
