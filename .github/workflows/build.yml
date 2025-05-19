@@ -142,9 +142,18 @@ jobs:
 
     - name: Extract nlohmann/json
       run: |
+        # Очистка папки перед распаковкой
+        if (Test-Path json) { Remove-Item -Path json -Recurse -Force }
         Expand-Archive -Path json.zip -DestinationPath json -Force
-        if (-not (Test-Path json/json-develop/single_include/nlohmann/json.hpp)) { Write-Output "Failed to extract nlohmann/json" | Out-File -FilePath logs/build.log -Append; exit 1 }
-        Write-Output "nlohmann/json extracted" | Out-File -FilePath logs/build.log -Append
+        # Отладка: проверка структуры папок
+        Get-ChildItem -Path json -Recurse | ForEach-Object { Write-Output $_.FullName | Out-File -FilePath logs/build.log -Append }
+        # Проверка наличия файла
+        $jsonPath = "json/json-develop/single_include/nlohmann/json.hpp"
+        if (-not (Test-Path $jsonPath)) {
+          Write-Output "Failed to extract nlohmann/json: $jsonPath not found" | Out-File -FilePath logs/build.log -Append
+          exit 1
+        }
+        Write-Output "nlohmann/json extracted successfully" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
     - name: Build DLL
