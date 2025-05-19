@@ -52,14 +52,20 @@ jobs:
       shell: cmd
       run: |
         dir
-        dir DirectXSample
+        dir DirectXSample 2> nul || echo "DirectXSample not found"
         dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
+        dir DirectXSample\DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample\DirectXSample"
         dir DirectXSample\src\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
 
     - name: Configure CMake
       shell: cmd
       run: |
-        cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+        if exist DirectXSample\CMakeLists.txt (
+          cmake -S DirectXSample -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+        ) else (
+          echo "Could not find CMakeLists.txt, failing build"
+          exit /b 1
+        )
 
     - name: Build
       shell: cmd
