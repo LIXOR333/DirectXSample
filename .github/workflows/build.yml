@@ -12,14 +12,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       continue-on-error: true
-      shell: powershell
-      run: Write-Output "Checkout completed" | Out-File -FilePath logs/build.log -Append
 
     - name: Set up MSVC
       uses: ilammy/msvc-dev-cmd@v1
       continue-on-error: true
-      shell: powershell
-      run: Write-Output "MSVC setup completed" | Out-File -FilePath logs/build.log -Append
 
     - name: Create log directory
       run: |
