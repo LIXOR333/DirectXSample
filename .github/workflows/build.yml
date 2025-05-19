@@ -15,32 +15,64 @@ jobs:
       uses: actions/checkout@v4
       # Клонирует репозиторий на виртуальную машину
 
-    - name: Install Chocolatey
+    - name: Set up network diagnostics
       shell: cmd
       run: |
-        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-      # Устанавливает Chocolatey для управления пакетами
+        echo "Checking network connectivity..."
+        ping -n 4 community.chocolatey.org || (
+          echo "Network error: Cannot reach Chocolatey server, retrying..."
+          ping -n 4 community.chocolatey.org || (
+            echo "Network error: Failed to reach Chocolatey server, failing build..."
+            exit /b 1
+          )
+        )
+      # Проверяет доступность Chocolatey перед установкой
 
-    - name: Install MinGW
+    - name: Install Chocolatey with retry
       shell: cmd
       run: |
-        choco install mingw --force -y
+        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" || (
+          echo "First attempt to install Chocolatey failed, retrying..."
+          powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" || (
+            echo "Second attempt to install Chocolatey failed, failing build..."
+            exit /b 1
+          )
+        )
+      # Устанавливает Chocolatey с двумя попытками
+
+    - name: Install MinGW with retry
+      shell: cmd
+      run: |
+        choco install mingw --force -y || (
+          echo "First attempt to install MinGW failed, retrying..."
+          choco install mingw --force -y || (
+            echo "Second attempt to install MinGW failed, failing build..."
+            exit /b 1
+          )
+        )
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
-      # Устанавливает MinGW (компилятор g++) и добавляет его в PATH
+      # Устанавливает MinGW с двумя попытками и добавляет в PATH
 
     - name: Verify MinGW installation
       shell: cmd
       run: |
-        x86_64-w64-mingw32-gcc --version
+        x86_64-w64-mingw32-gcc --version || (
+          echo "MinGW installation failed, attempting to fix..."
+          choco install mingw --force -y
+          x86_64-w64-mingw32-gcc --version || (
+            echo "MinGW verification failed, failing build..."
+            exit /b 1
+          )
+        )
         x86_64-w64-mingw32-g++ --version
-      # Проверяет, что MinGW установлен корректно
+      # Проверяет, что MinGW установлен корректно, с попыткой переустановки
 
     - name: Create directories if needed
       shell: cmd
       run: |
         if not exist build mkdir build
         if not exist build_msvc\Release mkdir build_msvc\Release
-      # Создаёт директории для сборки (build для MinGW, build_msvc для возможной сборки через MSVC)
+      # Создаёт директории для сборки
 
     - name: Check for RustAlkadCheat2588.cpp
       shell: cmd
@@ -54,19 +86,18 @@ jobs:
           dir DirectXSample /s
           exit /b 1
         )
-      # Проверяет наличие основного файла RustAlkadCheat2588.cpp
+      # Проверяет наличие основного файла
 
     - name: Compile with MinGW (First Attempt)
       shell: cmd
       run: |
         echo "Starting compilation of RustAlkadCheat2588.cpp..."
-        x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+        x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -static -Wall -Wno-unknown-pragmas -static-libgcc -static-libstdc++ || (
           echo "First attempt to compile with MinGW failed, retrying..."
-          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -static -Wall -Wno-unknown-pragmas -static-libgcc -static-libstdc++ || (
             echo "Second attempt to compile with MinGW failed, failing build..."
             exit /b 1
           )
         )
         echo "Compilation successful, DLL created at build\RustAlkadCheat2588.dll"
-      # Компилирует RustAlkadCheat2588.cpp в DLL с двумя попытками
-      # Флаги: -lwininet (для HTTP-запросов), -lgdi32 (для mouse_event), -static (для статической линковки)
+      # Компилирует с двумя попытками, добавлены флаги -static-libgcc и -static-libstdc++ для надёжной линковки
