@@ -29,6 +29,7 @@ jobs:
       shell: cmd
       run: |
         echo "Installing archivers..."
+        echo "Using built-in Windows Archive (no installation needed)"
         choco install 7zip --force -y || echo "Failed to install 7zip, continuing..."
         choco install winrar --force -y || echo "Failed to install winrar, continuing..."
         choco install unzip --force -y || echo "Failed to install unzip, continuing..."
@@ -52,68 +53,6 @@ jobs:
         choco install universalextractor --force -y || echo "Failed to install universalextractor, continuing..."
         choco install freearc --force -y || echo "Failed to install freearc, continuing..."
         choco install quickzip --force -y || echo "Failed to install quickzip, continuing..."
-        choco install zipware --force -y || echo "Failed to install zipware, continuing..."
-        choco install nanozip --force -y || echo "Failed to install nanozip, continuing..."
-        choco install betterzip --force -y || echo "Failed to install betterzip, continuing..."
-        choco install zipeg --force -y || echo "Failed to install zipeg, continuing..."
-        choco install unarchiver --force -y || echo "Failed to install unarchiver, continuing..."
-        choco install stuffit --force -y || echo "Failed to install stuffit, continuing..."
-        choco install archiver --force -y || echo "Failed to install archiver, continuing..."
-        choco install winace --force -y || echo "Failed to install winace, continuing..."
-        choco install unrar --force -y || echo "Failed to install unrar, continuing..."
-        choco install expander --force -y || echo "Failed to install expander, continuing..."
-        choco install pkzip --force -y || echo "Failed to install pkzip, continuing..."
-        choco install zipit --force -y || echo "Failed to install zipit, continuing..."
-        choco install 7zxa --force -y || echo "Failed to install 7zxa, continuing..."
-        choco install zipx --force -y || echo "Failed to install zipx, continuing..."
-        choco install arc --force -y || echo "Failed to install arc, continuing..."
-        choco install zlib --force -y || echo "Failed to install zlib, continuing..."
-        choco install gzip --force -y || echo "Failed to install gzip, continuing..."
-        choco install bzip2 --force -y || echo "Failed to install bzip2, continuing..."
-        choco install xz --force -y || echo "Failed to install xz, continuing..."
-        choco install lzip --force -y || echo "Failed to install lzip, continuing..."
-        choco install lzma --force -y || echo "Failed to install lzma, continuing..."
-        choco install tar --force -y || echo "Failed to install tar, continuing..."
-        choco install cabextract --force -y || echo "Failed to install cabextract, continuing..."
-        choco install unshield --force -y || echo "Failed to install unshield, continuing..."
-        choco install isobuster --force -y || echo "Failed to install isobuster, continuing..."
-        choco install uniso --force -y || echo "Failed to install uniso, continuing..."
-        choco install daemontools --force -y || echo "Failed to install daemontools, continuing..."
-        choco install virtualclonedrive --force -y || echo "Failed to install virtualclonedrive, continuing..."
-        choco install ultraiso --force -y || echo "Failed to install ultraiso, continuing..."
-        choco install poweriso --force -y || echo "Failed to install poweriso, continuing..."
-        choco install magiciso --force -y || echo "Failed to install magiciso, continuing..."
-        choco install isopeazip --force -y || echo "Failed to install isopeazip, continuing..."
-        choco install winmount --force -y || echo "Failed to install winmount, continuing..."
-        choco install winarchiver --force -y || echo "Failed to install winarchiver, continuing..."
-        choco install zipper --force -y || echo "Failed to install zipper, continuing..."
-        choco install ez7z --force -y || echo "Failed to install ez7z, continuing..."
-        choco install archivetool --force -y || echo "Failed to install archivetool, continuing..."
-        choco install zipmagic --force -y || echo "Failed to install zipmagic, continuing..."
-        choco install ziprepair --force -y || echo "Failed to install ziprepair, continuing..."
-        choco install zipfix --force -y || echo "Failed to install zipfix, continuing..."
-        choco install unzipper --force -y || echo "Failed to install unzipper, continuing..."
-        choco install zipmaster --force -y || echo "Failed to install zipmaster, continuing..."
-        choco install zipcommander --force -y || echo "Failed to install zipcommander, continuing..."
-        choco install zipstar --force -y || echo "Failed to install zipstar, continuing..."
-        choco install zippy --force -y || echo "Failed to install zippy, continuing..."
-        choco install zipplus --force -y || echo "Failed to install zipplus, continuing..."
-        choco install zipultra --force -y || echo "Failed to install zipultra, continuing..."
-        choco install zipstorm --force -y || echo "Failed to install zipstorm, continuing..."
-        choco install zipbolt --force -y || echo "Failed to install zipbolt, continuing..."
-        choco install zipforce --force -y || echo "Failed to install zipforce, continuing..."
-        choco install zipcrusher --force -y || echo "Failed to install zipcrusher, continuing..."
-        choco install zipblaster --force -y || echo "Failed to install zipblaster, continuing..."
-        choco install zipforge --force -y || echo "Failed to install zipforge, continuing..."
-        choco install zipstream --force -y || echo "Failed to install zipstream, continuing..."
-        choco install zipwave --force -y || echo "Failed to install zipwave, continuing..."
-        choco install zipfire --force -y || echo "Failed to install zipfire, continuing..."
-        choco install zipnova --force -y || echo "Failed to install zipnova, continuing..."
-        choco install zipspark --force -y || echo "Failed to install zipspark, continuing..."
-        choco install zipvortex --force -y || echo "Failed to install zipvortex, continuing..."
-        choco install zipmatrix --force -y || echo "Failed to install zipmatrix, continuing..."
-        choco install zipgalaxy --force -y || echo "Failed to install zipgalaxy, continuing..."
-        choco install zipnebula --force -y || echo "Failed to install zipnebula, continuing..."
         echo "Archiver installation complete."
 
     - name: Download and extract nlohmann-json
@@ -142,44 +81,8 @@ jobs:
                                         curl -L -o json.zip https://codeberg.org/nlohmann/json/archive/master.zip || (
                                           curl -L -o json.zip https://gitlab.com/martinmoene/nlohmann_json_single/-/archive/master/nlohmann_json_single-master.zip || (
                                             curl -L -o json.zip https://github.com/nlohmann/json-mirror/archive/refs/tags/v3.11.3.zip || (
-                                              curl -L -o json.zip https://mirrors.tuna.tsinghua.edu.cn/github/nlohmann/json/v3.11.3.zip || (
-                                                curl -L -o json.zip https://mirrors.ustc.edu.cn/github/nlohmann/json/v3.11.3.zip || (
-                                                  curl -L -o json.zip https://mirror.aarnet.edu.au/pub/github/nlohmann/json/v3.11.3.zip || (
-                                                    curl -L -o json.zip https://ftp.heanet.ie/mirrors/github/nlohmann/json/v3.11.3.zip || (
-                                                      curl -L -o json.zip https://mirror.umd.edu/github/nlohmann/json/v3.11.3.zip || (
-                                                        curl -L -o json.zip https://mirrors.xmission.com/github/nlohmann/json/v3.11.3.zip || (
-                                                          curl -L -o json.zip https://mirror.dogado.de/github/nlohmann/json/v3.11.3.zip || (
-                                                            curl -L -o json.zip https://mirror.netcologne.de/github/nlohmann/json/v3.11.3.zip || (
-                                                              curl -L -o json.zip https://ftp.halifax.rwth-aachen.de/github/nlohmann/json/v3.11.3.zip || (
-                                                                curl -L -o json.zip https://mirror.yandex.ru/mirrors/github/nlohmann/json/v3.11.3.zip || (
-                                                                  curl -L -o json.zip https://mirror.nl.leaseweb.net/github/nlohmann/json/v3.11.3.zip || (
-                                                                    curl -L -o json.zip https://mirror.us.leaseweb.net/github/nlohmann/json/v3.11.3.zip || (
-                                                                      curl -L -o json.zip https://ftp.cc.uoc.gr/mirrors/github/nlohmann/json/v3.11.3.zip || (
-                                                                        curl -L -o json.zip https://mirror.switch.ch/ftp/mirror/github/nlohmann/json/v3.11.3.zip || (
-                                                                          curl -L -o json.zip https://ftp.uni-stuttgart.de/github/nlohmann/json/v3.11.3.zip || (
-                                                                            curl -L -o json.zip https://mirror.dotsrc.org/github/nlohmann/json/v3.11.3.zip || (
-                                                                              curl -L -o json.zip https://ftp.ntua.gr/mirror/github/nlohmann/json/v3.11.3.zip || (
-                                                                                curl -L -o json.zip https://mirrors.dotsrc.org/github/nlohmann/json/v3.11.3.zip || (
-                                                                                  echo "All nlohmann-json download attempts failed, exiting..."
-                                                                                  exit /b 1
-                                                                                )
-                                                                              )
-                                                                            )
-                                                                          )
-                                                                        )
-                                                                      )
-                                                                    )
-                                                                  )
-                                                                )
-                                                              )
-                                                            )
-                                                          )
-                                                        )
-                                                      )
-                                                    )
-                                                  )
-                                                )
-                                              )
+                                              echo "All nlohmann-json download attempts failed, exiting..."
+                                              exit /b 1
                                             )
                                           )
                                         )
@@ -199,488 +102,122 @@ jobs:
             )
           )
           echo "Extracting json.zip..."
-          7z x json.zip -ojson_temp -y && (
-            echo "Extracted with 7zip"
+          powershell -Command "Expand-Archive -Path json.zip -DestinationPath json_temp -Force" && (
+            echo "Extracted with Windows Archive"
             goto :json_extracted
           ) || (
-            echo "Failed with 7zip, trying winrar..."
-            rar x json.zip -ojson_temp -y && (
-              echo "Extracted with winrar"
+            echo "Failed with Windows Archive, trying 7zip..."
+            7z x json.zip -ojson_temp -y && (
+              echo "Extracted with 7zip"
               goto :json_extracted
             ) || (
-              echo "Failed with winrar, trying unzip..."
-              unzip json.zip -d json_temp -o && (
-                echo "Extracted with unzip"
+              echo "Failed with 7zip, trying winrar..."
+              rar x json.zip -ojson_temp -y && (
+                echo "Extracted with winrar"
                 goto :json_extracted
               ) || (
-                echo "Failed with unzip, trying peazip..."
-                peazip -ext2here json.zip -ojson_temp && (
-                  echo "Extracted with peazip"
+                echo "Failed with winrar, trying unzip..."
+                unzip json.zip -d json_temp -o && (
+                  echo "Extracted with unzip"
                   goto :json_extracted
                 ) || (
-                  echo "Failed with peazip, trying bandizip..."
-                  bandizip x -o:json_temp -y json.zip && (
-                    echo "Extracted with bandizip"
+                  echo "Failed with unzip, trying peazip..."
+                  peazip -ext2here json.zip -ojson_temp && (
+                    echo "Extracted with peazip"
                     goto :json_extracted
                   ) || (
-                    echo "Failed with bandizip, trying winzip..."
-                    winzip -e -o json_temp json.zip && (
-                      echo "Extracted with winzip"
+                    echo "Failed with peazip, trying bandizip..."
+                    bandizip x -o:json_temp -y json.zip && (
+                      echo "Extracted with bandizip"
                       goto :json_extracted
                     ) || (
-                      echo "Failed with winzip, trying keka..."
-                      keka --extract json.zip --output json_temp && (
-                        echo "Extracted with keka"
+                      echo "Failed with bandizip, trying winzip..."
+                      winzip -e -o json_temp json.zip && (
+                        echo "Extracted with winzip"
                         goto :json_extracted
                       ) || (
-                        echo "Failed with keka, trying b1freearchiver..."
-                        b1freearchiver --extract json.zip --output json_temp && (
-                          echo "Extracted with b1freearchiver"
+                        echo "Failed with winzip, trying keka..."
+                        keka --extract json.zip --output json_temp && (
+                          echo "Extracted with keka"
                           goto :json_extracted
                         ) || (
-                          echo "Failed with b1freearchiver, trying extractnow..."
-                          extractnow -x json.zip -o json_temp && (
-                            echo "Extracted with extractnow"
+                          echo "Failed with keka, trying b1freearchiver..."
+                          b1freearchiver --extract json.zip --output json_temp && (
+                            echo "Extracted with b1freearchiver"
                             goto :json_extracted
                           ) || (
-                            echo "Failed with extractnow, trying izarc..."
-                            izarc -x json.zip -d json_temp && (
-                              echo "Extracted with izarc"
+                            echo "Failed with b1freearchiver, trying extractnow..."
+                            extractnow -x json.zip -o json_temp && (
+                              echo "Extracted with extractnow"
                               goto :json_extracted
                             ) || (
-                              echo "Failed with izarc, trying freecommander..."
-                              freecommander /extract json.zip json_temp && (
-                                echo "Extracted with freecommander"
+                              echo "Failed with extractnow, trying izarc..."
+                              izarc -x json.zip -d json_temp && (
+                                echo "Extracted with izarc"
                                 goto :json_extracted
                               ) || (
-                                echo "Failed with freecommander, trying archivarius..."
-                                archivarius -extract json.zip -o json_temp && (
-                                  echo "Extracted with archivarius"
+                                echo "Failed with izarc, trying freecommander..."
+                                freecommander /extract json.zip json_temp && (
+                                  echo "Extracted with freecommander"
                                   goto :json_extracted
                                 ) || (
-                                  echo "Failed with archivarius, trying hamsterzip..."
-                                  hamsterzip extract json.zip -o json_temp && (
-                                    echo "Extracted with hamsterzip"
+                                  echo "Failed with freecommander, trying archivarius..."
+                                  archivarius -extract json.zip -o json_temp && (
+                                    echo "Extracted with archivarius"
                                     goto :json_extracted
                                   ) || (
-                                    echo "Failed with hamsterzip, trying powerarchiver..."
-                                    powerarchiver extract json.zip -d json_temp && (
-                                      echo "Extracted with powerarchiver"
+                                    echo "Failed with archivarius, trying hamsterzip..."
+                                    hamsterzip extract json.zip -o json_temp && (
+                                      echo "Extracted with hamsterzip"
                                       goto :json_extracted
                                     ) || (
-                                      echo "Failed with powerarchiver, trying tugzip..."
-                                      tugzip -x json.zip -o json_temp && (
-                                        echo "Extracted with tugzip"
+                                      echo "Failed with hamsterzip, trying powerarchiver..."
+                                      powerarchiver extract json.zip -d json_temp && (
+                                        echo "Extracted with powerarchiver"
                                         goto :json_extracted
                                       ) || (
-                                        echo "Failed with tugzip, trying zipgenius..."
-                                        zipgenius x json.zip -d json_temp && (
-                                          echo "Extracted with zipgenius"
+                                        echo "Failed with powerarchiver, trying tugzip..."
+                                        tugzip -x json.zip -o json_temp && (
+                                          echo "Extracted with tugzip"
                                           goto :json_extracted
                                         ) || (
-                                          echo "Failed with zipgenius, trying alzip..."
-                                          alzip -x json.zip -o json_temp && (
-                                            echo "Extracted with alzip"
+                                          echo "Failed with tugzip, trying zipgenius..."
+                                          zipgenius x json.zip -d json_temp && (
+                                            echo "Extracted with zipgenius"
                                             goto :json_extracted
                                           ) || (
-                                            echo "Failed with alzip, trying ashampoozip..."
-                                            ashampoozip e json.zip -o json_temp && (
-                                              echo "Extracted with ashampoozip"
+                                            echo "Failed with zipgenius, trying alzip..."
+                                            alzip -x json.zip -o json_temp && (
+                                              echo "Extracted with alzip"
                                               goto :json_extracted
                                             ) || (
-                                              echo "Failed with ashampoozip, trying bitser..."
-                                              bitser -x json.zip -o json_temp && (
-                                                echo "Extracted with bitser"
+                                              echo "Failed with alzip, trying ashampoozip..."
+                                              ashampoozip e json.zip -o json_temp && (
+                                                echo "Extracted with ashampoozip"
                                                 goto :json_extracted
                                               ) || (
-                                                echo "Failed with bitser, trying universalextractor..."
-                                                uniextract json.zip json_temp && (
-                                                  echo "Extracted with universalextractor"
+                                                echo "Failed with ashampoozip, trying bitser..."
+                                                bitser -x json.zip -o json_temp && (
+                                                  echo "Extracted with bitser"
                                                   goto :json_extracted
                                                 ) || (
-                                                  echo "Failed with universalextractor, trying freearc..."
-                                                  freearc x json.zip -o json_temp && (
-                                                    echo "Extracted with freearc"
+                                                  echo "Failed with bitser, trying universalextractor..."
+                                                  uniextract json.zip json_temp && (
+                                                    echo "Extracted with universalextractor"
                                                     goto :json_extracted
                                                   ) || (
-                                                    echo "Failed with freearc, trying quickzip..."
-                                                    quickzip -x json.zip -o json_temp && (
-                                                      echo "Extracted with quickzip"
+                                                    echo "Failed with universalextractor, trying freearc..."
+                                                    freearc x json.zip -o json_temp && (
+                                                      echo "Extracted with freearc"
                                                       goto :json_extracted
                                                     ) || (
-                                                      echo "Failed with quickzip, trying zipware..."
-                                                      zipware x json.zip -o json_temp && (
-                                                        echo "Extracted with zipware"
+                                                      echo "Failed with freearc, trying quickzip..."
+                                                      quickzip -x json.zip -o json_temp && (
+                                                        echo "Extracted with quickzip"
                                                         goto :json_extracted
                                                       ) || (
-                                                        echo "Failed with zipware, trying nanozip..."
-                                                        nanozip x json.zip -o json_temp && (
-                                                          echo "Extracted with nanozip"
-                                                          goto :json_extracted
-                                                        ) || (
-                                                          echo "Failed with nanozip, trying betterzip..."
-                                                          betterzip --extract json.zip -o json_temp && (
-                                                            echo "Extracted with betterzip"
-                                                            goto :json_extracted
-                                                          ) || (
-                                                            echo "Failed with betterzip, trying zipeg..."
-                                                            zipeg -x json.zip -o json_temp && (
-                                                              echo "Extracted with zipeg"
-                                                              goto :json_extracted
-                                                            ) || (
-                                                              echo "Failed with zipeg, trying unarchiver..."
-                                                              unarchiver -x json.zip -o json_temp && (
-                                                                echo "Extracted with unarchiver"
-                                                                goto :json_extracted
-                                                              ) || (
-                                                                echo "Failed with unarchiver, trying stuffit..."
-                                                                stuffit -x json.zip -o json_temp && (
-                                                                  echo "Extracted with stuffit"
-                                                                  goto :json_extracted
-                                                                ) || (
-                                                                  echo "Failed with stuffit, trying archiver..."
-                                                                  archiver -x json.zip -o json_temp && (
-                                                                    echo "Extracted with archiver"
-                                                                    goto :json_extracted
-                                                                  ) || (
-                                                                    echo "Failed with archiver, trying winace..."
-                                                                    winace x json.zip -o json_temp && (
-                                                                      echo "Extracted with winace"
-                                                                      goto :json_extracted
-                                                                    ) || (
-                                                                      echo "Failed with winace, trying unrar..."
-                                                                      unrar x json.zip -o json_temp && (
-                                                                        echo "Extracted with unrar"
-                                                                        goto :json_extracted
-                                                                      ) || (
-                                                                        echo "Failed with unrar, trying expander..."
-                                                                        expander -x json.zip -o json_temp && (
-                                                                          echo "Extracted with expander"
-                                                                          goto :json_extracted
-                                                                        ) || (
-                                                                          echo "Failed with expander, trying pkzip..."
-                                                                          pkzip -x json.zip -o json_temp && (
-                                                                            echo "Extracted with pkzip"
-                                                                            goto :json_extracted
-                                                                          ) || (
-                                                                            echo "Failed with pkzip, trying zipit..."
-                                                                            zipit -x json.zip -o json_temp && (
-                                                                              echo "Extracted with zipit"
-                                                                              goto :json_extracted
-                                                                            ) || (
-                                                                              echo "Failed with zipit, trying 7zxa..."
-                                                                              7zxa x json.zip -o json_temp && (
-                                                                                echo "Extracted with 7zxa"
-                                                                                goto :json_extracted
-                                                                              ) || (
-                                                                                echo "Failed with 7zxa, trying zipx..."
-                                                                                zipx -x json.zip -o json_temp && (
-                                                                                  echo "Extracted with zipx"
-                                                                                  goto :json_extracted
-                                                                                ) || (
-                                                                                  echo "Failed with zipx, trying arc..."
-                                                                                  arc x json.zip -o json_temp && (
-                                                                                    echo "Extracted with arc"
-                                                                                    goto :json_extracted
-                                                                                  ) || (
-                                                                                    echo "Failed with arc, trying zlib..."
-                                                                                    zlib -x json.zip -o json_temp && (
-                                                                                      echo "Extracted with zlib"
-                                                                                      goto :json_extracted
-                                                                                    ) || (
-                                                                                      echo "Failed with zlib, trying gzip..."
-                                                                                      gzip -d json.zip -o json_temp && (
-                                                                                        echo "Extracted with gzip"
-                                                                                        goto :json_extracted
-                                                                                      ) || (
-                                                                                        echo "Failed with gzip, trying bzip2..."
-                                                                                        bzip2 -d json.zip -o json_temp && (
-                                                                                          echo "Extracted with bzip2"
-                                                                                          goto :json_extracted
-                                                                                        ) || (
-                                                                                          echo "Failed with bzip2, trying xz..."
-                                                                                          xz -d json.zip -o json_temp && (
-                                                                                            echo "Extracted with xz"
-                                                                                            goto :json_extracted
-                                                                                          ) || (
-                                                                                            echo "Failed with xz, trying lzip..."
-                                                                                            lzip -d json.zip -o json_temp && (
-                                                                                              echo "Extracted with lzip"
-                                                                                              goto :json_extracted
-                                                                                            ) || (
-                                                                                              echo "Failed with lzip, trying lzma..."
-                                                                                              lzma -d json.zip -o json_temp && (
-                                                                                                echo "Extracted with lzma"
-                                                                                                goto :json_extracted
-                                                                                              ) || (
-                                                                                                echo "Failed with lzma, trying tar..."
-                                                                                                tar -xvf json.zip -C json_temp && (
-                                                                                                  echo "Extracted with tar"
-                                                                                                  goto :json_extracted
-                                                                                                ) || (
-                                                                                                  echo "Failed with tar, trying cabextract..."
-                                                                                                  cabextract json.zip -d json_temp && (
-                                                                                                    echo "Extracted with cabextract"
-                                                                                                    goto :json_extracted
-                                                                                                  ) || (
-                                                                                                    echo "Failed with cabextract, trying unshield..."
-                                                                                                    unshield x json.zip -d json_temp && (
-                                                                                                      echo "Extracted with unshield"
-                                                                                                      goto :json_extracted
-                                                                                                    ) || (
-                                                                                                      echo "Failed with unshield, trying isobuster..."
-                                                                                                      isobuster /extract json.zip /output:json_temp && (
-                                                                                                        echo "Extracted with isobuster"
-                                                                                                        goto :json_extracted
-                                                                                                      ) || (
-                                                                                                        echo "Failed with isobuster, trying uniso..."
-                                                                                                        uniso -x json.zip -o json_temp && (
-                                                                                                          echo "Extracted with uniso"
-                                                                                                          goto :json_extracted
-                                                                                                        ) || (
-                                                                                                          echo "Failed with uniso, trying daemontools..."
-                                                                                                          daemontools -extract json.zip -o json_temp && (
-                                                                                                            echo "Extracted with daemontools"
-                                                                                                            goto :json_extracted
-                                                                                                          ) || (
-                                                                                                            echo "Failed with daemontools, trying virtualclonedrive..."
-                                                                                                            virtualclonedrive -extract json.zip -o json_temp && (
-                                                                                                              echo "Extracted with virtualclonedrive"
-                                                                                                              goto :json_extracted
-                                                                                                            ) || (
-                                                                                                              echo "Failed with virtualclonedrive, trying ultraiso..."
-                                                                                                              ultraiso -extract json.zip -o json_temp && (
-                                                                                                                echo "Extracted with ultraiso"
-                                                                                                                goto :json_extracted
-                                                                                                              ) || (
-                                                                                                                echo "Failed with ultraiso, trying poweriso..."
-                                                                                                                poweriso -extract json.zip -o json_temp && (
-                                                                                                                  echo "Extracted with poweriso"
-                                                                                                                  goto :json_extracted
-                                                                                                                ) || (
-                                                                                                                  echo "Failed with poweriso, trying magiciso..."
-                                                                                                                  magiciso -extract json.zip -o json_temp && (
-                                                                                                                    echo "Extracted with magiciso"
-                                                                                                                    goto :json_extracted
-                                                                                                                  ) || (
-                                                                                                                    echo "Failed with magiciso, trying isopeazip..."
-                                                                                                                    isopeazip -extract json.zip -o json_temp && (
-                                                                                                                      echo "Extracted with isopeazip"
-                                                                                                                      goto :json_extracted
-                                                                                                                    ) || (
-                                                                                                                      echo "Failed with isopeazip, trying winmount..."
-                                                                                                                      winmount -extract json.zip -o json_temp && (
-                                                                                                                        echo "Extracted with winmount"
-                                                                                                                        goto :json_extracted
-                                                                                                                      ) || (
-                                                                                                                        echo "Failed with winmount, trying winarchiver..."
-                                                                                                                        winarchiver -extract json.zip -o json_temp && (
-                                                                                                                          echo "Extracted with winarchiver"
-                                                                                                                          goto :json_extracted
-                                                                                                                        ) || (
-                                                                                                                          echo "Failed with winarchiver, trying zipper..."
-                                                                                                                          zipper -x json.zip -o json_temp && (
-                                                                                                                            echo "Extracted with zipper"
-                                                                                                                            goto :json_extracted
-                                                                                                                          ) || (
-                                                                                                                            echo "Failed with zipper, trying ez7z..."
-                                                                                                                            ez7z -x json.zip -o json_temp && (
-                                                                                                                              echo "Extracted with ez7z"
-                                                                                                                              goto :json_extracted
-                                                                                                                            ) || (
-                                                                                                                              echo "Failed with ez7z, trying archivetool..."
-                                                                                                                              archivetool -x json.zip -o json_temp && (
-                                                                                                                                echo "Extracted with archivetool"
-                                                                                                                                goto :json_extracted
-                                                                                                                              ) || (
-                                                                                                                                echo "Failed with archivetool, trying zipmagic..."
-                                                                                                                                zipmagic -x json.zip -o json_temp && (
-                                                                                                                                  echo "Extracted with zipmagic"
-                                                                                                                                  goto :json_extracted
-                                                                                                                                ) || (
-                                                                                                                                  echo "Failed with zipmagic, trying ziprepair..."
-                                                                                                                                  ziprepair -x json.zip -o json_temp && (
-                                                                                                                                    echo "Extracted with ziprepair"
-                                                                                                                                    goto :json_extracted
-                                                                                                                                  ) || (
-                                                                                                                                    echo "Failed with ziprepair, trying zipfix..."
-                                                                                                                                    zipfix -x json.zip -o json_temp && (
-                                                                                                                                      echo "Extracted with zipfix"
-                                                                                                                                      goto :json_extracted
-                                                                                                                                    ) || (
-                                                                                                                                      echo "Failed with zipfix, trying unzipper..."
-                                                                                                                                      unzipper -x json.zip -o json_temp && (
-                                                                                                                                        echo "Extracted with unzipper"
-                                                                                                                                        goto :json_extracted
-                                                                                                                                      ) || (
-                                                                                                                                        echo "Failed with unzipper, trying zipmaster..."
-                                                                                                                                        zipmaster -x json.zip -o json_temp && (
-                                                                                                                                          echo "Extracted with zipmaster"
-                                                                                                                                          goto :json_extracted
-                                                                                                                                        ) || (
-                                                                                                                                          echo "Failed with zipmaster, trying zipcommander..."
-                                                                                                                                          zipcommander -x json.zip -o json_temp && (
-                                                                                                                                            echo "Extracted with zipcommander"
-                                                                                                                                            goto :json_extracted
-                                                                                                                                          ) || (
-                                                                                                                                            echo "Failed with zipcommander, trying zipstar..."
-                                                                                                                                            zipstar -x json.zip -o json_temp && (
-                                                                                                                                              echo "Extracted with zipstar"
-                                                                                                                                              goto :json_extracted
-                                                                                                                                            ) || (
-                                                                                                                                              echo "Failed with zipstar, trying zippy..."
-                                                                                                                                              zippy -x json.zip -o json_temp && (
-                                                                                                                                                echo "Extracted with zippy"
-                                                                                                                                                goto :json_extracted
-                                                                                                                                              ) || (
-                                                                                                                                                echo "Failed with zippy, trying zipplus..."
-                                                                                                                                                zipplus -x json.zip -o json_temp && (
-                                                                                                                                                  echo "Extracted with zipplus"
-                                                                                                                                                  goto :json_extracted
-                                                                                                                                                ) || (
-                                                                                                                                                  echo "Failed with zipplus, trying zipultra..."
-                                                                                                                                                  zipultra -x json.zip -o json_temp && (
-                                                                                                                                                    echo "Extracted with zipultra"
-                                                                                                                                                    goto :json_extracted
-                                                                                                                                                  ) || (
-                                                                                                                                                    echo "Failed with zipultra, trying zipstorm..."
-                                                                                                                                                    zipstorm -x json.zip -o json_temp && (
-                                                                                                                                                      echo "Extracted with zipstorm"
-                                                                                                                                                      goto :json_extracted
-                                                                                                                                                    ) || (
-                                                                                                                                                      echo "Failed with zipstorm, trying zipbolt..."
-                                                                                                                                                      zipbolt -x json.zip -o json_temp && (
-                                                                                                                                                        echo "Extracted with zipbolt"
-                                                                                                                                                        goto :json_extracted
-                                                                                                                                                      ) || (
-                                                                                                                                                        echo "Failed with zipbolt, trying zipforce..."
-                                                                                                                                                        zipforce -x json.zip -o json_temp && (
-                                                                                                                                                          echo "Extracted with zipforce"
-                                                                                                                                                          goto :json_extracted
-                                                                                                                                                        ) || (
-                                                                                                                                                          echo "Failed with zipforce, trying zipcrusher..."
-                                                                                                                                                          zipcrusher -x json.zip -o json_temp && (
-                                                                                                                                                            echo "Extracted with zipcrusher"
-                                                                                                                                                            goto :json_extracted
-                                                                                                                                                          ) || (
-                                                                                                                                                            echo "Failed with zipcrusher, trying zipblaster..."
-                                                                                                                                                            zipblaster -x json.zip -o json_temp && (
-                                                                                                                                                              echo "Extracted with zipblaster"
-                                                                                                                                                              goto :json_extracted
-                                                                                                                                                            ) || (
-                                                                                                                                                              echo "Failed with zipblaster, trying zipforge..."
-                                                                                                                                                              zipforge -x json.zip -o json_temp && (
-                                                                                                                                                                echo "Extracted with zipforge"
-                                                                                                                                                                goto :json_extracted
-                                                                                                                                                              ) || (
-                                                                                                                                                                echo "Failed with zipforge, trying zipstream..."
-                                                                                                                                                                zipstream -x json.zip -o json_temp && (
-                                                                                                                                                                  echo "Extracted with zipstream"
-                                                                                                                                                                  goto :json_extracted
-                                                                                                                                                                ) || (
-                                                                                                                                                                  echo "Failed with zipstream, trying zipwave..."
-                                                                                                                                                                  zipwave -x json.zip -o json_temp && (
-                                                                                                                                                                    echo "Extracted with zipwave"
-                                                                                                                                                                    goto :json_extracted
-                                                                                                                                                                  ) || (
-                                                                                                                                                                    echo "Failed with zipwave, trying zipfire..."
-                                                                                                                                                                    zipfire -x json.zip -o json_temp && (
-                                                                                                                                                                      echo "Extracted with zipfire"
-                                                                                                                                                                      goto :json_extracted
-                                                                                                                                                                    ) || (
-                                                                                                                                                                      echo "Failed with zipfire, trying zipnova..."
-                                                                                                                                                                      zipnova -x json.zip -o json_temp && (
-                                                                                                                                                                        echo "Extracted with zipnova"
-                                                                                                                                                                        goto :json_extracted
-                                                                                                                                                                      ) || (
-                                                                                                                                                                        echo "Failed with zipnova, trying zipspark..."
-                                                                                                                                                                        zipspark -x json.zip -o json_temp && (
-                                                                                                                                                                          echo "Extracted with zipspark"
-                                                                                                                                                                          goto :json_extracted
-                                                                                                                                                                        ) || (
-                                                                                                                                                                          echo "Failed with zipspark, trying zipvortex..."
-                                                                                                                                                                          zipvortex -x json.zip -o json_temp && (
-                                                                                                                                                                            echo "Extracted with zipvortex"
-                                                                                                                                                                            goto :json_extracted
-                                                                                                                                                                          ) || (
-                                                                                                                                                                            echo "Failed with zipvortex, trying zipmatrix..."
-                                                                                                                                                                            zipmatrix -x json.zip -o json_temp && (
-                                                                                                                                                                              echo "Extracted with zipmatrix"
-                                                                                                                                                                              goto :json_extracted
-                                                                                                                                                                            ) || (
-                                                                                                                                                                              echo "Failed with zipmatrix, trying zipgalaxy..."
-                                                                                                                                                                              zipgalaxy -x json.zip -o json_temp && (
-                                                                                                                                                                                echo "Extracted with zipgalaxy"
-                                                                                                                                                                                goto :json_extracted
-                                                                                                                                                                              ) || (
-                                                                                                                                                                                echo "Failed with zipgalaxy, trying zipnebula..."
-                                                                                                                                                                                zipnebula -x json.zip -o json_temp && (
-                                                                                                                                                                                  echo "Extracted with zipnebula"
-                                                                                                                                                                                  goto :json_extracted
-                                                                                                                                                                                ) || (
-                                                                                                                                                                                  echo "All archivers failed to extract json.zip, exiting..."
-                                                                                                                                                                                  exit /b 1
-                                                                                                                                                                                )
-                                                                                                                                                                              )
-                                                                                                                                                                            )
-                                                                                                                                                                          )
-                                                                                                                                                                        )
-                                                                                                                                                                      )
-                                                                                                                                                                    )
-                                                                                                                                                                  )
-                                                                                                                                                                )
-                                                                                                                                                              )
-                                                                                                                                                            )
-                                                                                                                                                          )
-                                                                                                                                                        )
-                                                                                                                                                      )
-                                                                                                                                                    )
-                                                                                                                                                  )
-                                                                                                                                                )
-                                                                                                                                              )
-                                                                                                                                            )
-                                                                                                                                          )
-                                                                                                                                        )
-                                                                                                                                      )
-                                                                                                                                    )
-                                                                                                                                  )
-                                                                                                                                )
-                                                                                                                              )
-                                                                                                                            )
-                                                                                                                          )
-                                                                                                                        )
-                                                                                                                      )
-                                                                                                                    )
-                                                                                                                  )
-                                                                                                                )
-                                                                                                              )
-                                                                                                            )
-                                                                                                          )
-                                                                                                        )
-                                                                                                      )
-                                                                                                    )
-                                                                                                  )
-                                                                                                )
-                                                                                              )
-                                                                                            )
-                                                                                          )
-                                                                                        )
-                                                                                      )
-                                                                                    )
-                                                                                  )
-                                                                                )
-                                                                              )
-                                                                            )
-                                                                          )
-                                                                        )
-                                                                      )
-                                                                    )
-                                                                  )
-                                                                )
-                                                              )
-                                                            )
-                                                          )
-                                                        )
+                                                        echo "All archivers failed to extract json.zip, exiting..."
+                                                        exit /b 1
                                                       )
                                                     )
                                                   )
@@ -753,7 +290,7 @@ jobs:
           x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
             echo "First attempt to compile with MinGW failed, retrying..."
             x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
-              echo "Second attempt to compile with MinGW failed, proceeding to MSVC..."
+              echo "Second attempt to compile with MinGW failed, failing build..."
               exit /b 1
             )
           )
@@ -762,58 +299,3 @@ jobs:
           dir DirectXSample /s
           exit /b 1
         )
-
-    - name: Compile with MSVC (Fallback)
-      if: failure()
-      shell: cmd
-      run: |
-        if exist DirectXSample\RustAlkadCheat2588.cpp (
-          cl /D_CRT_SECURE_NO_WARNINGS /W0 /DUNICODE /D_UNICODE /MD /LD DirectXSample\RustAlkadCheat2588.cpp /Febuild_msvc\Release\RustAlkadCheat2588.dll /Ijson\single_include /link gdi32.lib || (
-            echo "MSVC compilation failed, retrying..."
-            cl /D_CRT_SECURE_NO_WARNINGS /W0 /DUNICODE /D_UNICODE /MD /LD DirectXSample\RustAlkadCheat2588.cpp /Febuild_msvc\Release\RustAlkadCheat2588.dll /Ijson\single_include /link gdi32.lib || (
-              echo "Second attempt to compile with MSVC failed, failing build..."
-              exit /b 1
-            )
-          )
-        ) else (
-          echo "Could not find RustAlkadCheat2588.cpp, failing build"
-          dir DirectXSample /s
-          exit /b 1
-        )
-
-    - name: Check for DLLs before upload
-      shell: cmd
-      run: |
-        echo "Checking for compiled DLLs..."
-        if exist build\RustAlkadCheat2588.dll (
-          echo "Found MinGW DLL: build\RustAlkadCheat2588.dll"
-          dir build
-        ) else (
-          echo "MinGW DLL not found: build\RustAlkadCheat2588.dll"
-        )
-        if exist build_msvc\Release\RustAlkadCheat2588.dll (
-          echo "Found MSVC DLL: build_msvc\Release\RustAlkadCheat2588.dll"
-          dir build_msvc\Release
-        ) else (
-          echo "MSVC DLL not found: build_msvc\Release\RustAlkadCheat2588.dll"
-        )
-        if not exist build\RustAlkadCheat2588.dll if not exist build_msvc\Release\RustAlkadCheat2588.dll (
-          echo "No DLLs found, failing build..."
-          exit /b 1
-        )
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RustAlkadCheat2588
-        path: |
-          build/RustAlkadCheat2588.dll
-          build_msvc/Release/RustAlkadCheat2588.dll
-        if-no-files-found: error
-
-    - name: Verify Artifact Contents
-      shell: cmd
-      run: |
-        echo "Verifying artifact contents..."
-        dir build /s
-        dir build_msvc /s
