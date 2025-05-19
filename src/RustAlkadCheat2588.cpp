@@ -81,7 +81,6 @@ DWORD64 FindPattern(const char* pattern, const char* mask) {
 
 // Авто дампер оффсетов (улучшенный поиск)
 void DumpOffsets() {
-    // Улучшенные сигнатуры для Rust Alkad 2588 (на основе типичных паттернов Unity)
     const char* gWorldSig = "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x00\x48\x8B\x80";
     const char* gWorldMask = "xxx????xxxx?xxx";
     const char* gNamesSig = "\x4C\x8D\x0D\x00\x00\x00\x00\x48\x8D\x15\x00\x00\x00\x00\xE8";
@@ -95,7 +94,6 @@ void DumpOffsets() {
     const char* boneArraySig = "\x48\x8B\x80\x00\x00\x00\x00\x48\x85\xC0\x74\x00\x48\x8B\x88";
     const char* boneArrayMask = "xxx????xxxx?xxx";
 
-    // Поиск оффсетов
     Offsets::GWorld = FindPattern(gWorldSig, gWorldMask);
     Offsets::GNames = FindPattern(gNamesSig, gNamesMask);
     Offsets::LocalPlayer = FindPattern(localPlayerSig, localPlayerMask);
@@ -103,7 +101,6 @@ void DumpOffsets() {
     Offsets::ViewMatrix = FindPattern(viewMatrixSig, viewMatrixMask);
     Offsets::BoneArray = FindPattern(boneArraySig, boneArrayMask);
 
-    // Сохранение в файл
     std::ofstream file("offsets_dump.txt");
     file << "GWorld: 0x" << std::hex << Offsets::GWorld << "\n";
     file << "GNames: 0x" << std::hex << Offsets::GNames << "\n";
