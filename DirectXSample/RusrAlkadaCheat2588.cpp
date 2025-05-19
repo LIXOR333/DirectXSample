@@ -1,378 +1,261 @@
 #include <windows.h>
-#include <vector>
+#include <wininet.h>
 #include <string>
 #include <fstream>
-#include <ctime>
-#include "../json/single_include/nlohmann/json.hpp"
-
-using json = nlohmann::json;
-
-// Оффсеты (по умолчанию 0, обновляются автоматически)
-namespace Offsets {
-    DWORD64 GWorld = 0x0;
-    DWORD64 GNames = 0x0;
-    DWORD64 LocalPlayer = 0x0;
-    DWORD64 EntityList = 0x0;
-    DWORD64 Health = 0x320;
-    DWORD64 Position = 0x1A0;
-    DWORD64 Name = 0x4B0;
-    bool needsUpdate = true;
-}
+#include <sstream>
+#include <vector>
+#pragma comment(lib, "wininet.lib")
 
 // Глобальные переменные
-HMODULE hModule;
-bool bShowESP = false;
-bool bShowMenu = false;
-HWND hwndOverlay = NULL;
-HWND hwndMenu = NULL;
-HDC hdcOverlay = NULL;
-HDC hdcMem = NULL; // Контекст памяти для двойной буферизации
-HBITMAP hbmMem = NULL;
-HFONT hFont = NULL;
-std::vector<Player> playerList;
-int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+bool g_showMenu = false;
+bool g_enableESP = false;
+bool g_enableAimbot = false;
+int g_espColorR = 255, g_espColorG = 0, g_espColorB = 0;
+float g_aimbotFOV = 30.0f;
+float g_aimbotSmooth = 5.0f;
 
-// Структура игрока
-struct Player {
-    DWORD64 entity;
-    float x, y, z;
-    int health;
-    std::string name;
-    bool isVisible;
-};
+// Оффсеты для версии 2588 (начальные значения)
+DWORD g_entityListOffset = 0x4D19345;
+DWORD g_localPlayerOffset = 0x4D5C321;
+DWORD g_viewMatrixOffset = 0x4D6F890;
 
-// Чтение памяти
-template<typename T>
-T ReadMemory(DWORD64 address) {
-    if (!address) return T();
-    T value;
-    ReadProcessMemory(GetCurrentProcess(), (LPCVOID)address, &value, sizeof(T), NULL);
-    return value;
-}
+// Консольная настройка
+HANDLE g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-// Расшифровщик строк
-std::string DecryptString(DWORD64 address) {
-    if (!address) return "";
-    char encrypted[256];
-    SIZE_T bytesRead;
-    if (!ReadProcessMemory(GetCurrentProcess(), (LPCVOID)address, encrypted, sizeof(encrypted) - 1, &bytesRead)) return "";
-    encrypted[bytesRead] = '\0';
+// Функция поиска сигнатуры в памяти
+DWORD FindPattern(const char* moduleName, const char* pattern, const char* mask) {
+    HMODULE hModule = GetModuleHandleA(moduleName);
+    if (!hModule) return 0;
 
-    std::string decrypted;
-    srand(static_cast<unsigned>(time(0)));
-    int key = rand() % 255 + 1;
-    for (size_t i = 0; i < strlen(encrypted); i++) {
-        char c = encrypted[i] ^ key;
-        if (c >= 32 && c <= 126) decrypted += c;
-    }
-    return decrypted.empty() ? "Unknown" : decrypted;
-}
+    MODULEINFO modInfo;
+    GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(MODULEINFO));
 
-// Поиск сигнатур
-DWORD64 FindPattern(const char* pattern, const char* mask, DWORD64 start, DWORD64 end) {
-    size_t len = strlen(mask);
-    for (DWORD64 i = start; i < end - len; i++) {
+    DWORD base = (DWORD)hModule;
+    DWORD size = modInfo.SizeOfImage;
+
+    DWORD patternLength = (DWORD)strlen(mask);
+
+    for (DWORD i = 0; i < size - patternLength; i++) {
         bool found = true;
-        for (size_t j = 0; j < len; j++) {
-            if (mask[j] != '?' && pattern[j] != *(char*)(i + j)) {
-                found = false;
-                break;
-            }
+        for (DWORD j = 0; j < patternLength; j++) {
+            found &= mask[j] == '?' || pattern[j] == *(char*)(base + i + j);
         }
-        if (found) return i;
+        if (found) {
+            return base + i;
+        }
     }
     return 0;
 }
 
-// Автодампер оффсетов
-void AutoDumpOffsets() {
-    static DWORD64 lastProcessId = 0;
-    DWORD64 currentProcessId = GetCurrentProcessId();
-    if (lastProcessId != currentProcessId || Offsets::needsUpdate) {
-        DWORD64 baseAddress = (DWORD64)GetModuleHandle(NULL);
-        DWORD64 endAddress = baseAddress + 0x10000000;
+// Поиск оффсетов
+bool FindOffsets() {
+    const char* pattern = "\x48\x8B\x00\x00\x00\x00\x00\xF6\x80\x2F\x01\x00\x00";
+    const char* mask = "xx?????xxxxxx";
 
-        Offsets::GWorld = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x0F\x84", "xxx????xxxxx", baseAddress, endAddress);
-        if (!Offsets::GWorld) Offsets::GWorld = FindPattern("\x48\x8B\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00", "xxx????x????", baseAddress, endAddress);
-
-        Offsets::GNames = FindPattern("\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xC8", "xxx????x????xxx", baseAddress, endAddress);
-        if (!Offsets::GNames) Offsets::GNames = FindPattern("\x48\x89\x1D\x00\x00\x00\x00\x48\x85\xDB", "xxx????xxx", baseAddress, endAddress);
-
-        Offsets::LocalPlayer = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x0E", "xxx????xxxxxx", baseAddress, endAddress);
-        if (!Offsets::LocalPlayer) Offsets::LocalPlayer = FindPattern("\x48\x8B\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00", "xxx????x????", baseAddress, endAddress);
-
-        Offsets::EntityList = FindPattern("\x4C\x8B\x0D\x00\x00\x00\x00\x4C\x8B\xC0", "xxx????xxx", baseAddress, endAddress);
-        if (!Offsets::EntityList) Offsets::EntityList = FindPattern("\x48\x8B\x05\x00\x00\x00\x00\x48\x89\x04\xC8", "xxx????xxxxx", baseAddress, endAddress);
-
-        json offsets;
-        offsets["GWorld"] = Offsets::GWorld;
-        offsets["GNames"] = Offsets::GNames;
-        offsets["LocalPlayer"] = Offsets::LocalPlayer;
-        offsets["EntityList"] = Offsets::EntityList;
-        offsets["Health"] = Offsets::Health;
-        offsets["Position"] = Offsets::Position;
-        offsets["Name"] = Offsets::Name;
-
-        std::ofstream file("offsets_dump.json");
-        file << offsets.dump(4);
-        file.close();
-
-        Offsets::needsUpdate = false;
-        lastProcessId = currentProcessId;
-    }
-}
-
-// Обновление списка игроков
-void UpdatePlayers() {
-    playerList.clear();
-    if (!Offsets::EntityList) return;
-
-    DWORD64 entityList = ReadMemory<DWORD64>(Offsets::EntityList);
-    if (!entityList) return;
-
-    for (int i = 0; i < 100; i++) {
-        DWORD64 entity = ReadMemory<DWORD64>(entityList + i * sizeof(DWORD64));
-        if (!entity) continue;
-
-        Player player;
-        player.entity = entity;
-        player.health = ReadMemory<int>(entity + Offsets::Health);
-        player.x = ReadMemory<float>(entity + Offsets::Position);
-        player.y = ReadMemory<float>(entity + Offsets::Position + 4);
-        player.z = ReadMemory<float>(entity + Offsets::Position + 8);
-        player.name = DecryptString(entity + Offsets::Name);
-        player.isVisible = true; // Замени на реальную проверку
-        playerList.push_back(player);
-    }
-}
-
-// Простая матрица проекции для WorldToScreen
-bool WorldToScreen(float x, float y, float z, float& screenX, float& screenY) {
-    // Примерная матрица проекции (нужна реальная матрица вида из игры)
-    float fov = 90.0f; // Условный угол обзора
-    float aspectRatio = (float)screenWidth / screenHeight;
-    float nearPlane = 0.1f;
-    float farPlane = 1000.0f;
-
-    float tanHalfFOV = tanf(fov * 0.5f * 3.14159f / 180.0f);
-    float height = nearPlane * tanHalfFOV;
-    float width = height * aspectRatio;
-
-    float range = farPlane - nearPlane;
-    float projX = (2.0f * nearPlane) / (width + width);
-    float projY = (2.0f * nearPlane) / (height + height);
-    float projW = -(farPlane + nearPlane) / range;
-    float projZ = -(2.0f * farPlane * nearPlane) / range;
-
-    // Проекция (упрощённая, без ViewMatrix)
-    float worldX = x;
-    float worldY = y;
-    float worldZ = z;
-
-    screenX = (worldX * projX * screenWidth / 2) + (screenWidth / 2);
-    screenY = (worldY * projY * screenHeight / 2) + (screenHeight / 2);
-
-    return (worldZ > 0); // Простая проверка видимости
-}
-
-// Рендеринг текста через GDI
-void DrawText(HDC hdc, const char* text, float x, float y, COLORREF color) {
-    SetTextColor(hdc, color);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, hFont);
-    TextOutA(hdc, (int)x, (int)y, text, strlen(text));
-}
-
-// Рендеринг бокса через GDI
-void DrawBox(HDC hdc, float x, float y, float w, float h, COLORREF color) {
-    HPEN hPen = CreatePen(PS_SOLID, 1, color);
-    HBRUSH hBrush = (HBRUSH)GetStockObject(NULL_BRUSH); // Прозрачный фон
-    SelectObject(hdc, hPen);
-    SelectObject(hdc, hBrush);
-    Rectangle(hdc, (int)x, (int)y, (int)(x + w), (int)(y + h));
-    DeleteObject(hPen);
-}
-
-// Window procedure для меню
-LRESULT CALLBACK MenuWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_COMMAND:
-        switch (LOWORD(wParam)) {
-        case 1000: // Чекбокс ESP
-            bShowESP = !bShowESP;
-            CheckDlgButton(hWnd, 1000, bShowESP ? BST_CHECKED : BST_UNCHECKED);
-            break;
-        case 1001: // Кнопка дампа оффсетов
-            Offsets::needsUpdate = true;
-            AutoDumpOffsets();
-            break;
-        case 1002: // Кнопка перезагрузки оффсетов
-            Offsets::needsUpdate = true;
-            break;
-        }
-        return 0;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// Window procedure для оверлея
-LRESULT CALLBACK OverlayWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_SIZE:
-        screenWidth = LOWORD(lParam);
-        screenHeight = HIWORD(lParam);
-        if (hbmMem) DeleteObject(hbmMem);
-        hbmMem = CreateCompatibleBitmap(hdcOverlay, screenWidth, screenHeight);
-        SelectObject(hdcMem, hbmMem);
-        return 0;
-    case WM_PAINT:
-        if (hdcMem && hdcOverlay) {
-            BitBlt(hdcOverlay, 0, 0, screenWidth, screenHeight, hdcMem, 0, 0, SRCCOPY);
-        }
-        ValidateRect(hWnd, NULL);
-        return 0;
-    case WM_DESTROY:
-        if (hbmMem) DeleteObject(hbmMem);
-        if (hdcMem) DeleteDC(hdcMem);
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// Инициализация GDI
-bool InitGDI(HWND hWnd) {
-    hdcOverlay = GetDC(hWnd);
-    if (!hdcOverlay) return false;
-
-    hdcMem = CreateCompatibleDC(hdcOverlay);
-    if (!hdcMem) {
-        ReleaseDC(hWnd, hdcOverlay);
+    // Ищем базовый адрес в GameAssembly.dll
+    DWORD baseAddr = FindPattern("GameAssembly.dll", pattern, mask);
+    if (!baseAddr) {
         return false;
     }
 
-    hbmMem = CreateCompatibleBitmap(hdcOverlay, screenWidth, screenHeight);
-    if (!hbmMem) {
-        DeleteDC(hdcMem);
-        ReleaseDC(hWnd, hdcOverlay);
-        return false;
-    }
-    SelectObject(hdcMem, hbmMem);
+    // Смещение от сигнатуры (примерное, нужно уточнить через реверс-инжиниринг)
+    baseAddr += 0x10; // Примерное смещение после сигнатуры
 
-    hFont = CreateFontA(16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Arial");
-    if (!hFont) {
-        DeleteObject(hbmMem);
-        DeleteDC(hdcMem);
-        ReleaseDC(hWnd, hdcOverlay);
+    // Читаем адрес entityList
+    g_entityListOffset = *(DWORD*)(baseAddr + 0x100); // Примерное смещение
+    g_localPlayerOffset = *(DWORD*)(baseAddr + 0x200);
+    g_viewMatrixOffset = *(DWORD*)(baseAddr + 0x300);
+
+    // Проверка валидности (пример)
+    if (g_entityListOffset < 0x400000 || g_localPlayerOffset < 0x400000 || g_viewMatrixOffset < 0x400000) {
         return false;
     }
 
-    SetBkMode(hdcMem, TRANSPARENT);
     return true;
 }
 
-// Рендеринг сцены
-void RenderScene() {
-    if (!hdcMem || !hdcOverlay) return;
+// Чтение настроек из config.txt
+void LoadConfig() {
+    std::ifstream file("config.txt");
+    if (!file.is_open()) return;
 
-    // Очистка буфера
-    RECT rect = { 0, 0, screenWidth, screenHeight };
-    FillRect(hdcMem, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-
-    if (bShowESP) {
-        for (const auto& player : playerList) {
-            float screenX, screenY;
-            if (WorldToScreen(player.x, player.y, player.z, screenX, screenY)) {
-                char label[64];
-                sprintf(label, "%s [HP: %d]", player.name.c_str(), player.health);
-                DrawText(hdcMem, label, screenX, screenY - 20, player.isVisible ? RGB(0, 255, 0) : RGB(255, 0, 0));
-                DrawBox(hdcMem, screenX - 25, screenY - 50, 50, 100, player.isVisible ? RGB(0, 255, 0) : RGB(255, 0, 0));
-            }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        std::istringstream iss(line);
+        std::string key, value;
+        if (std::getline(iss, key, '=') && std::getline(iss, value)) {
+            if (key == "esp_enabled") g_enableESP = (value == "true");
+            else if (key == "esp_color_r") g_espColorR = std::stoi(value);
+            else if (key == "esp_color_g") g_espColorG = std::stoi(value);
+            else if (key == "esp_color_b") g_espColorB = std::stoi(value);
+            else if (key == "aimbot_enabled") g_enableAimbot = (value == "true");
+            else if (key == "aimbot_fov") g_aimbotFOV = std::stof(value);
+            else if (key == "aimbot_smooth") g_aimbotSmooth = std::stof(value);
         }
     }
-
-    // Обновление оверлея с прозрачностью
-    BLENDFUNCTION blend = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-    SIZE size = { screenWidth, screenHeight };
-    POINT ptZero = { 0, 0 };
-    POINT ptPos = { 0, 0 };
-    UpdateLayeredWindow(hwndOverlay, NULL, &ptPos, &size, hdcMem, &ptZero, 0, &blend, ULW_ALPHA);
+    file.close();
 }
 
-// Основной поток
-DWORD WINAPI MainThread(LPVOID lpParam) {
-    // Создаём оверлей
-    WNDCLASSEX wcOverlay = { sizeof(WNDCLASSEX), CS_OWNDC, OverlayWndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"Overlay", NULL };
-    RegisterClassEx(&wcOverlay);
-    hwndOverlay = CreateWindow(wcOverlay.lpszClassName, L"Rust Alkad Overlay", WS_POPUP | WS_VISIBLE, 0, 0, screenWidth, screenHeight, NULL, NULL, wcOverlay.hInstance, NULL);
-    SetWindowLong(hwndOverlay, GWL_EXSTYLE, GetWindowLong(hwndOverlay, GWL_EXSTYLE) | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT);
-    SetLayeredWindowAttributes(hwndOverlay, 0, 255, LWA_ALPHA);
+// Автообновление оффсетов (через HTTP, F5)
+bool UpdateOffsets() {
+    HINTERNET hInternet = InternetOpenA("CheatUpdater", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
 
-    // Инициализация GDI
-    if (!InitGDI(hwndOverlay)) {
-        DestroyWindow(hwndOverlay);
-        return 0;
+    HINTERNET hConnect = InternetOpenUrlA(hInternet, "http://example.com/offsets.txt", NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
     }
 
-    // Создаём меню
-    WNDCLASSEX wcMenu = { sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, MenuWndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"Menu", NULL };
-    RegisterClassEx(&wcMenu);
-    hwndMenu = CreateWindow(wcMenu.lpszClassName, L"Rust Alkad Menu", WS_OVERLAPPEDWINDOW, 100, 100, 300, 200, NULL, NULL, wcMenu.hInstance, NULL);
-    CreateWindow(L"BUTTON", L"ESP", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 10, 10, 100, 30, hwndMenu, (HMENU)1000, wcMenu.hInstance, NULL);
-    CreateWindow(L"BUTTON", L"Dump Offsets", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 10, 50, 100, 30, hwndMenu, (HMENU)1001, wcMenu.hInstance, NULL);
-    CreateWindow(L"BUTTON", L"Reload Offsets", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 10, 90, 100, 30, hwndMenu, (HMENU)1002, wcMenu.hInstance, NULL);
-    ShowWindow(hwndMenu, SW_HIDE);
+    char buffer[1024];
+    DWORD bytesRead;
+    std::string data;
+    while (InternetReadFile(hConnect, buffer, sizeof(buffer) - 1, &bytesRead) && bytesRead > 0) {
+        buffer[bytesRead] = '\0';
+        data += buffer;
+    }
 
-    MSG msg;
-    clock_t lastRender = 0;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
 
-        // Показ/скрытие меню по клавише Insert
+    std::istringstream iss(data);
+    std::string line;
+    while (std::getline(iss, line)) {
+        std::istringstream lineStream(line);
+        std::string key, value;
+        if (std::getline(lineStream, key, '=') && std::getline(lineStream, value)) {
+            if (key == "entity_list") g_entityListOffset = std::stoul(value, nullptr, 16);
+            else if (key == "local_player") g_localPlayerOffset = std::stoul(value, nullptr, 16);
+            else if (key == "view_matrix") g_viewMatrixOffset = std::stoul(value, nullptr, 16);
+        }
+    }
+    return true;
+}
+
+// Текстовый ESP (упрощённый)
+void DrawESP() {
+    if (!g_enableESP) return;
+
+    DWORD baseAddr = 0x400000; // Базовый адрес игры (нужно найти)
+    DWORD entityList = *(DWORD*)(baseAddr + g_entityListOffset);
+    if (!entityList) return;
+
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(g_hConsole, &csbi);
+    COORD pos = { 0, (SHORT)(csbi.dwCursorPosition.Y + 1) };
+
+    for (int i = 0; i < 32; i++) {
+        DWORD entity = *(DWORD*)(entityList + i * 0x4);
+        if (!entity) continue;
+
+        float x = *(float*)(entity + 0x4); // Пример координат
+        float y = *(float*)(entity + 0x8);
+        float z = *(float*)(entity + 0xC);
+
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "Player %d: X=%.1f Y=%.1f Z=%.1f", i, x, y, z);
+        SetConsoleCursorPosition(g_hConsole, pos);
+        SetConsoleTextAttribute(g_hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+        WriteConsoleA(g_hConsole, buffer, strlen(buffer), NULL, NULL);
+        pos.Y++;
+    }
+}
+
+// Аимбот
+void Aimbot() {
+    if (!g_enableAimbot) return;
+
+    DWORD baseAddr = 0x400000;
+    DWORD localPlayer = *(DWORD*)(baseAddr + g_localPlayerOffset);
+    if (!localPlayer) return;
+
+    DWORD entityList = *(DWORD*)(baseAddr + g_entityListOffset);
+    if (!entityList) return;
+
+    float closestDist = FLT_MAX;
+    float targetX = 0, targetY = 0;
+
+    for (int i = 0; i < 32; i++) {
+        DWORD entity = *(DWORD*)(entityList + i * 0x4);
+        if (!entity) continue;
+
+        float x = *(float*)(entity + 0x4);
+        float y = *(float*)(entity + 0x8);
+        float z = *(float*)(entity + 0xC);
+
+        float dist = sqrt(x * x + y * y);
+        if (dist < closestDist && dist < g_aimbotFOV) {
+            closestDist = dist;
+            targetX = x;
+            targetY = y;
+        }
+    }
+
+    if (closestDist != FLT_MAX) {
+        mouse_event(MOUSEEVENTF_MOVE, (DWORD)(targetX / g_aimbotSmooth), (DWORD)(targetY / g_aimbotSmooth), 0, 0);
+    }
+}
+
+// Поток для обработки клавиш
+DWORD WINAPI InputThread(LPVOID lpParam) {
+    AllocConsole();
+    g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTitleA("RustAlkadCheat2588 Console");
+
+    while (true) {
         if (GetAsyncKeyState(VK_INSERT) & 1) {
-            bShowMenu = !bShowMenu;
-            ShowWindow(hwndMenu, bShowMenu ? SW_SHOW : SW_HIDE);
+            g_showMenu = !g_showMenu;
+            SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+            WriteConsoleA(g_hConsole, "Menu toggled\n", 12, NULL, NULL);
+        }
+        if (GetAsyncKeyState(VK_F1) & 1) {
+            g_enableESP = !g_enableESP;
+            SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+            WriteConsoleA(g_hConsole, g_enableESP ? "ESP enabled\n" : "ESP disabled\n", g_enableESP ? 12 : 13, NULL, NULL);
+        }
+        if (GetAsyncKeyState(VK_F2) & 1) {
+            g_enableAimbot = !g_enableAimbot;
+            SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+            WriteConsoleA(g_hConsole, g_enableAimbot ? "Aimbot enabled\n" : "Aimbot disabled\n", g_enableAimbot ? 14 : 15, NULL, NULL);
+        }
+        if (GetAsyncKeyState(VK_F5) & 1) {
+            if (UpdateOffsets()) {
+                SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+                WriteConsoleA(g_hConsole, "Offsets updated successfully via HTTP!\n", 37, NULL, NULL);
+            }
+            else {
+                SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+                WriteConsoleA(g_hConsole, "Failed to update offsets via HTTP!\n", 34, NULL, NULL);
+            }
+        }
+        if (GetAsyncKeyState(VK_F6) & 1) {
+            if (FindOffsets()) {
+                SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+                char buffer[128];
+                snprintf(buffer, sizeof(buffer), "Offsets found: entityList=0x%X, localPlayer=0x%X, viewMatrix=0x%X\n", 
+                         g_entityListOffset, g_localPlayerOffset, g_viewMatrixOffset);
+                WriteConsoleA(g_hConsole, buffer, strlen(buffer), NULL, NULL);
+            }
+            else {
+                SetConsoleCursorPosition(g_hConsole, { 0, 0 });
+                WriteConsoleA(g_hConsole, "Failed to find offsets!\n", 23, NULL, NULL);
+            }
         }
 
-        // Автообновление оффсетов каждые 5 секунд
-        static clock_t lastUpdate = 0;
-        if (clock() - lastUpdate > 5000) {
-            AutoDumpOffsets();
-            lastUpdate = clock();
-        }
-
-        // Обновление игроков
-        UpdatePlayers();
-
-        // Рендеринг с частотой ~60 FPS
-        if (clock() - lastRender > 16) { // ~60 FPS
-            RenderScene();
-            lastRender = clock();
-        }
-
+        Aimbot();
+        if (g_enableESP) DrawESP();
         Sleep(1);
     }
-
-    if (hbmMem) DeleteObject(hbmMem);
-    if (hdcMem) DeleteDC(hdcMem);
-    if (hdcOverlay) ReleaseDC(hwndOverlay, hdcOverlay);
-    if (hFont) DeleteObject(hFont);
-    DestroyWindow(hwndOverlay);
-    DestroyWindow(hwndMenu);
     return 0;
 }
 
-// Entry point
-BOOL APIENTRY DllMain(HMODULE hMod, DWORD ul_reason_for_call, LPVOID lpReserved) {
+// Точка входа
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
-        DisableThreadLibraryCalls(hMod);
-        hModule = hMod;
-        CreateThread(NULL, 0, MainThread, NULL, 0, NULL);
+        DisableThreadLibraryCalls(hModule);
+        LoadConfig();
+        CreateThread(NULL, 0, InputThread, NULL, 0, NULL);
     }
     return TRUE;
 }
