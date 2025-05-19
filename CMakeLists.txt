@@ -17,7 +17,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 # Добавляем исходник
 add_library(RustAlkadCheat2588 SHARED src/RustAlkadCheat2588.cpp)
 
-# Линкуем библиотеки (убрали ZLIB)
+# Линкуем библиотеки
 target_link_libraries(RustAlkadCheat2588 PRIVATE
     imgui::imgui
     minhook::minhook
