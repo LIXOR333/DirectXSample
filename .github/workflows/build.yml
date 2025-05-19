@@ -33,19 +33,45 @@ jobs:
     - name: Install DirectX SDK
       shell: cmd
       run: |
-        choco install directx-sdk --force -y
         set DXSDK_DIR=C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)
         if not exist "%DXSDK_DIR%" (
-          echo "DirectX SDK not found at %DXSDK_DIR%, searching for alternative paths..."
-          for /f "delims=" %%i in ('dir "C:\Program Files (x86)\Microsoft DirectX*" /B /A:D') do (
-            set DXSDK_DIR=C:\Program Files (x86)\%%i
-            goto :found_dx
+          echo "DirectX SDK not found, downloading from internet..."
+          curl -L -o DXSDK_Jun10.exe https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe || (
+            echo "Failed to download from Microsoft, trying mirrors..."
+            curl -L -o DXSDK_Jun10.exe https://archive.org/download/dxsdk_jun10/DXSDK_Jun10.exe || (
+              curl -L -o DXSDK_Jun10.exe https://web.archive.org/web/20150610223024/https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe || (
+                curl -L -o DXSDK_Jun10.exe https://download.gamedev.net/sdk/directx/DirectX%20SDK%20(Jun%202010)/DXSDK_Jun10.exe || (
+                  curl -L -o DXSDK_Jun10.exe https://www.mirrorservice.org/sites/dl.eccentrica.org/public/ms/DirectX/DXSDK_Jun10.exe || (
+                    curl -L -o DXSDK_Jun10.exe https://ftp.gwdg.de/pub/misc/microsoft/DirectX/DXSDK_Jun10.exe || (
+                      curl -L -o DXSDK_Jun10.exe https://mirrors.kernel.org/microsoft/DirectX/DXSDK_Jun10.exe || (
+                        curl -L -o DXSDK_Jun10.exe https://archive.org/download/DXSDK_Jun10_202205/DXSDK_Jun10.exe || (
+                          curl -L -o DXSDK_Jun10.exe https://download.nvidia.com/developer/directx_sdk/DXSDK_Jun10.exe || (
+                            curl -L -o DXSDK_Jun10.exe https://www.dll-files.com/DXSDK_Jun10.exe || (
+                              echo "All DirectX SDK download attempts failed, trying Chocolatey as fallback..."
+                              choco install directx-sdk --force -y || (
+                                echo "DirectX SDK installation failed via all methods, exiting..."
+                                exit /b 1
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
           )
-          echo "DirectX SDK not found in Program Files (x86), failing build."
-          exit /b 1
+          echo "Installing DirectX SDK..."
+          start /wait DXSDK_Jun10.exe /S
+          if not exist "%DXSDK_DIR%" (
+            echo "DirectX SDK installation failed, directory not found."
+            exit /b 1
+          )
+          echo "DirectX SDK installed at %DXSDK_DIR%"
+        ) else (
+          echo "DirectX SDK already found at %DXSDK_DIR%"
         )
-        :found_dx
-        echo "DirectX SDK found at %DXSDK_DIR%"
 
     - name: Download and extract nlohmann-json
       shell: cmd
