@@ -139,19 +139,41 @@ jobs:
         if not exist build mkdir build
         if not exist build_msvc\Release mkdir build_msvc\Release
 
-    - name: Compile with MinGW (First Attempt)
+    - name: Check for RustAlkadCheat2588.cpp
       shell: cmd
       run: |
+        echo "Checking for RustAlkadCheat2588.cpp in DirectXSample..."
         if exist DirectXSample\RustAlkadCheat2588.cpp (
-          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
-            echo "First attempt to compile with MinGW failed, retrying..."
-            x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
-              echo "Second attempt to compile with MinGW failed, failing build..."
-              exit /b 1
-            )
-          )
+          echo "RustAlkadCheat2588.cpp found."
+          dir DirectXSample\RustAlkadCheat2588.cpp
         ) else (
-          echo "Could not find RustAlkadCheat2588.cpp, failing build"
+          echo "RustAlkadCheat2588.cpp not found in DirectXSample, listing directory contents..."
           dir DirectXSample /s
           exit /b 1
         )
+
+    - name: Check for nlohmann-json include
+      shell: cmd
+      run: |
+        echo "Checking for nlohmann-json include..."
+        if exist json\single_include\nlohmann\json.hpp (
+          echo "json.hpp found."
+          dir json\single_include\nlohmann\json.hpp
+        ) else (
+          echo "json.hpp not found, failing build..."
+          dir json /s
+          exit /b 1
+        )
+
+    - name: Compile with MinGW (First Attempt)
+      shell: cmd
+      run: |
+        echo "Starting compilation of RustAlkadCheat2588.cpp..."
+        x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+          echo "First attempt to compile with MinGW failed, retrying..."
+          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -lgdi32 -static -Wall -Wno-unknown-pragmas || (
+            echo "Second attempt to compile with MinGW failed, failing build..."
+            exit /b 1
+          )
+        )
+        echo "Compilation successful, DLL created at build\RustAlkadCheat2588.dll"
