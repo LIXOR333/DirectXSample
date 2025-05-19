@@ -30,15 +30,22 @@ jobs:
       run: |
         choco install 7zip --force -y
 
-    - name: Install CMake
-      uses: lukka/get-cmake@v3.29.0
-      with:
-        cmakeVersion: '3.29.0'
-
     - name: Install DirectX SDK
       shell: cmd
       run: |
         choco install directx-sdk --force -y
+        set DXSDK_DIR=C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)
+        if not exist "%DXSDK_DIR%" (
+          echo "DirectX SDK not found at %DXSDK_DIR%, searching for alternative paths..."
+          for /f "delims=" %%i in ('dir "C:\Program Files (x86)\Microsoft DirectX*" /B /A:D') do (
+            set DXSDK_DIR=C:\Program Files (x86)\%%i
+            goto :found_dx
+          )
+          echo "DirectX SDK not found in Program Files (x86), failing build."
+          exit /b 1
+        )
+        :found_dx
+        echo "DirectX SDK found at %DXSDK_DIR%"
 
     - name: Download and extract nlohmann-json
       shell: cmd
@@ -123,53 +130,40 @@ jobs:
         x86_64-w64-mingw32-gcc --version
         x86_64-w64-mingw32-g++ --version
 
-    - name: Debug Directory Structure
+    - name: Create directories if needed
       shell: cmd
       run: |
-        dir
-        dir DirectXSample 2> nul || echo "DirectXSample not found"
-        dir DirectXSample\RustAlkadCheat2588.cpp 2> nul || echo "RustAlkadCheat2588.cpp not found"
-        dir DirectXSample\CMakeLists.txt 2> nul || echo "CMakeLists.txt not found in DirectXSample"
-        dir json 2> nul || echo "json not found"
-        dir json\single_include\nlohmann\json.hpp 2> nul || echo "json.hpp not found"
+        if not exist build mkdir build
+        if not exist build_msvc\Release mkdir build_msvc\Release
 
-    - name: Configure CMake with MinGW (First Attempt)
+    - name: Compile with MinGW (First Attempt)
       shell: cmd
       run: |
-        if exist DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ || (
-            echo "First attempt to configure CMake with MinGW failed, retrying..."
-            cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -CMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+        if exist DirectXSample\RustAlkadCheat2588.cpp (
+          echo "Using DirectX SDK at %DXSDK_DIR%"
+          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -L"%DXSDK_DIR%\Lib\x86" -lgdi32 -ld3d9 -ld3dx9 -static -Wall -Wno-unknown-pragmas || (
+            echo "First attempt to compile with MinGW failed, retrying..."
+            x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -Ijson\single_include -L"%DXSDK_DIR%\Lib\x86" -lgdi32 -ld3d9 -ld3dx9 -static -Wall -Wno-unknown-pragmas
           )
         ) else (
-          echo "Could not find CMakeLists.txt, failing build"
+          echo "Could not find RustAlkadCheat2588.cpp, failing build"
           exit /b 1
         )
 
-    - name: Build with MinGW (First Attempt)
-      shell: cmd
-      run: |
-        cmake --build build --config Release --parallel || (
-          echo "First attempt to build with MinGW failed, retrying..."
-          cmake --build build --config Release --parallel
-        )
-
-    - name: Configure CMake with MSVC (Fallback)
+    - name: Compile with MSVC (Fallback)
       if: failure()
       shell: cmd
       run: |
-        if exist DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample -B build_msvc -G "Visual Studio 17 2022" -A x64
+        if exist DirectXSample\RustAlkadCheat2588.cpp (
+          echo "Using DirectX SDK at %DXSDK_DIR%"
+          cl /D_CRT_SECURE_NO_WARNINGS /W0 /DUNICODE /D_UNICODE /MD /LD DirectXSample\RustAlkadCheat2588.cpp /Febuild_msvc\Release\RustAlkadCheat2588.dll /Ijson\single_include /link /LIBPATH:"%DXSDK_DIR%\Lib\x86" gdi32.lib d3d9.lib d3dx9.lib || (
+            echo "MSVC compilation failed, retrying..."
+            cl /D_CRT_SECURE_NO_WARNINGS /W0 /DUNICODE /D_UNICODE /MD /LD DirectXSample\RustAlkadCheat2588.cpp /Febuild_msvc\Release\RustAlkadCheat2588.dll /Ijson\single_include /link /LIBPATH:"%DXSDK_DIR%\Lib\x86" gdi32.lib d3d9.lib d3dx9.lib
+          )
         ) else (
-          echo "Could not find CMakeLists.txt, failing build"
+          echo "Could not find RustAlkadCheat2588.cpp, failing build"
           exit /b 1
         )
-
-    - name: Build with MSVC (Fallback)
-      if: failure()
-      shell: cmd
-      run: |
-        cmake --build build_msvc --config Release --parallel
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
