@@ -28,7 +28,9 @@ jobs:
         $urls = @(
           "https://github.com/ocornut/imgui/archive/refs/heads/master.zip",
           "https://github.com/ocornut/imgui/archive/master.zip",
-          "https://gitlab.com/mirror/imgui/-/archive/master/imgui-master.zip"
+          "https://github.com/ocornut/imgui/archive/refs/tags/v1.90.zip",
+          "https://gitlab.com/mirror/imgui/-/archive/master/imgui-master.zip",
+          "https://sourceforge.net/projects/imgui/files/latest/download"
         )
         $downloaded = $false
         foreach ($url in $urls) {
@@ -57,7 +59,9 @@ jobs:
         $urls = @(
           "https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip",
           "https://github.com/TsudaKageyu/minhook/archive/master.zip",
-          "https://gitlab.com/mirrors/minhook/-/archive/master/minhook-master.zip"
+          "https://github.com/TsudaKageyu/minhook/archive/refs/tags/v1.3.3.zip",
+          "https://gitlab.com/mirrors/minhook/-/archive/master/minhook-master.zip",
+          "https://sourceforge.net/projects/minhook/files/latest/download"
         )
         $downloaded = $false
         foreach ($url in $urls) {
@@ -86,7 +90,9 @@ jobs:
         $urls = @(
           "https://zlib.net/zlib-1.2.13.zip",
           "https://www.zlib.net/zlib1213.zip",
-          "https://sourceforge.net/projects/libpng/files/zlib/1.2.13/zlib-1.2.13.zip/download"
+          "https://sourceforge.net/projects/libpng/files/zlib/1.2.13/zlib-1.2.13.zip/download",
+          "https://ftp.osuosl.org/pub/blfs/conglomeration/zlib/zlib-1.2.13.tar.gz",
+          "https://mirror.ibcp.fr/pub/blfs/conglomeration/zlib/zlib-1.2.13.zip"
         )
         $downloaded = $false
         foreach ($url in $urls) {
@@ -106,7 +112,7 @@ jobs:
     - name: Extract zlib
       run: |
         Expand-Archive -Path zlib.zip -DestinationPath zlib -Force
-        if (-not (Test-Path zlib/zlib-1.2.18/zlib.h)) { Write-Output "Failed to extract zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
+        if (-not (Test-Path zlib/zlib-1.2.13/zlib.h)) { Write-Output "Failed to extract zlib" | Out-File -FilePath logs/build.log -Append; exit 1 }
         Write-Output "zlib extracted" | Out-File -FilePath logs/build.log -Append
       shell: powershell
 
@@ -115,7 +121,9 @@ jobs:
         $urls = @(
           "https://github.com/nlohmann/json/archive/refs/heads/develop.zip",
           "https://github.com/nlohmann/json/archive/develop.zip",
-          "https://gitlab.com/mirrors/nlohmann-json/-/archive/develop/nlohmann-json-develop.zip"
+          "https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip",
+          "https://gitlab.com/mirrors/nlohmann-json/-/archive/develop/nlohmann-json-develop.zip",
+          "https://github.com/nlohmann/json/releases/latest/download/json.zip"
         )
         $downloaded = $false
         foreach ($url in $urls) {
@@ -142,7 +150,7 @@ jobs:
     - name: Build DLL
       run: |
         Write-Output "Building DLL..." | Out-File -FilePath logs/build.log -Append
-        cl /DUNICODE /D_UNICODE /MD /O2 /W4 /FeRustAlkadCheat.dll /Iimgui/imgui-master /Iminhook/minhook-master/include /Izlib/zlib-1.2.18 /Ijson/json-develop/single_include RustAlkadCheat2588.cpp /link /DLL /OUT:RustAlkadCheat.dll 2>> logs/build.log
+        cl /DUNICODE /D_UNICODE /MD /O2 /W4 /FeRustAlkadCheat.dll /Iimgui/imgui-master /Iminhook/minhook-master/include /Izlib/zlib-1.2.13 /Ijson/json-develop/single_include RustAlkadCheat2588.cpp /link /DLL /OUT:RustAlkadCheat.dll 2>> logs/build.log
         if (-not (Test-Path RustAlkadCheat.dll)) { Write-Output "Build failed: DLL not created" | Out-File -FilePath logs/build.log -Append; exit 1 }
         Write-Output "DLL built successfully" | Out-File -FilePath logs/build.log -Append
       shell: cmd
