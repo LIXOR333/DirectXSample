@@ -25,36 +25,39 @@ jobs:
         choco install mingw --force -y
         echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
 
-    - name: Install CMake
-      uses: lukka/get-cmake@v3.29.0
-      with:
-        cmakeVersion: '3.29.0'
-
     - name: Install 7zip
       shell: cmd
       run: |
         choco install 7zip --force -y
 
+    - name: Install CMake
+      uses: lukka/get-cmake@v3.29.0
+      with:
+        cmakeVersion: '3.29.0'
+
     - name: Download ImGui
       shell: cmd
       run: |
         curl -L -o imgui.zip https://github.com/ocornut/imgui/archive/refs/heads/master.zip
-        7z x imgui.zip
-        move imgui-master imgui
+        7z x imgui.zip -oimgui
+        move imgui\imgui-master\* imgui\
+        rmdir imgui\imgui-master
 
     - name: Download MinHook
       shell: cmd
       run: |
         curl -L -o minhook.zip https://github.com/TsudaKageyu/minhook/archive/refs/heads/master.zip
-        7z x minhook.zip
-        move minhook-master minhook
+        7z x minhook.zip -ominhook
+        move minhook\minhook-master\* minhook\
+        rmdir minhook\minhook-master
 
     - name: Download nlohmann-json
       shell: cmd
       run: |
         curl -L -o json.zip https://github.com/nlohmann/json/archive/refs/heads/develop.zip
-        7z x json.zip
-        move json-develop json
+        7z x json.zip -ojson
+        move json\json-develop\* json\
+        rmdir json\json-develop
 
     - name: Verify MinGW installation
       shell: cmd
@@ -73,23 +76,42 @@ jobs:
         dir minhook 2> nul || echo "minhook not found"
         dir json 2> nul || echo "json not found"
 
-    - name: Configure CMake
+    - name: Configure CMake with MinGW
       shell: cmd
       run: |
         if exist DirectXSample\CMakeLists.txt (
-          cmake -S DirectXSample -B build -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          cmake -S DirectXSample -B build -G "MinGW Makefiles" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
         ) else (
           echo "Could not find CMakeLists.txt, failing build"
           exit /b 1
         )
 
-    - name: Build
+    - name: Build with MinGW
       shell: cmd
       run: |
         cmake --build build --config Release --parallel
+
+    - name: Configure CMake with MSVC (fallback)
+      if: failure()
+      shell: cmd
+      run: |
+        if exist DirectXSample\CMakeLists.txt (
+          cmake -S DirectXSample -B build_msvc -G "Visual Studio 17 2022" -A x64
+        ) else (
+          echo "Could not find CMakeLists.txt, failing build"
+          exit /b 1
+        )
+
+    - name: Build with MSVC
+      if: failure()
+      shell: cmd
+      run: |
+        cmake --build build_msvc --config Release --parallel
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: RustAlkadCheat2588
-        path: build/RustAlkadCheat2588.dll
+        path: |
+          build/RustAlkadCheat2588.dll
+          build_msvc/Release/RustAlkadCheat2588.dll
