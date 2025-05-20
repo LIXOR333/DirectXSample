@@ -1,4 +1,4 @@
-name: Build Rust Alkad Cheat 2588
+name: Build Rust Cheat DLL
 
 on:
   push:
@@ -11,169 +11,51 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    # Проверка кода из репозитория
     - name: Checkout repository
       uses: actions/checkout@v4
-      # Клонирует репозиторий на виртуальную машину
 
-    - name: Set up network diagnostics
-      shell: cmd
+    # Установка MSVC и инструментов сборки
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    # Загрузка Nuklear
+    - name: Download Nuklear
       run: |
-        echo "Checking network connectivity to community.chocolatey.org..."
-        curl -I https://community.chocolatey.org --connect-timeout 10 --retry 2 --retry-delay 5 --retry-max-time 30 || (
-          echo "Network error: Cannot reach Chocolatey server, trying alternative URL..."
-          curl -I https://chocolatey.org --connect-timeout 10 --retry 2 --retry-delay 5 --retry-max-time 30 || (
-            echo "Network error: Failed to reach Chocolatey server after all attempts, failing build..."
-            exit /b 1
-          )
-        )
-      # Проверяет доступность Chocolatey через curl
+        curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
+        unzip nuklear.zip
+        mv nuklear-master nuklear
+      shell: bash
 
-    - name: Check if Chocolatey is already installed
-      shell: cmd
+    # Загрузка zlib
+    - name: Download zlib
       run: |
-        echo "Checking if Chocolatey is already installed..."
-        choco --version && (
-          echo "Chocolatey is already installed, skipping installation..."
-          exit /b 0
-        ) || (
-          echo "Chocolatey not found, proceeding with installation..."
-        )
-      # Проверяет, установлен ли Chocolatey
-
-    - name: Install Chocolatey with retry
+        curl -L -o zlib.zip https://zlib.net/zlib1217.zip
+        unzip zlib.zip
+        mv zlib-1.2.17 zlib
+        cd zlib
+        nmake -f win32/Makefile.msc
       shell: cmd
-      run: |
-        powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" || (
-          echo "First attempt to install Chocolatey failed, retrying with alternative URL..."
-          powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" || (
-            echo "Second attempt to install Chocolatey failed, failing build..."
-            exit /b 1
-          )
-        )
-      # Устанавливает Chocolatey с двумя попытками
 
-    - name: Install MinGW with retry
+    # Загрузка libcurl
+    - name: Download libcurl
+      run: |
+        curl -L -o curl.zip https://curl.se/download/curl-8.10.1.zip
+        unzip curl.zip
+        mv curl-8.10.1 curl
+        cd curl/winbuild
+        nmake /f Makefile.vc mode=static VC=15
       shell: cmd
-      run: |
-        choco install mingw --force -y || (
-          echo "First attempt to install MinGW failed, retrying..."
-          choco install mingw --force -y || (
-            echo "Second attempt to install MinGW failed, failing build..."
-            exit /b 1
-          )
-        )
-        echo "C:\ProgramData\mingw64\mingw64\bin" >> %GITHUB_PATH%
-      # Устанавливает MinGW
 
-    - name: Verify MinGW installation
+    # Компиляция DLL
+    - name: Build DLL
+      run: |
+        cl /LD /Fe:RustAlkadCheat2588.dll cheat.cpp nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
       shell: cmd
-      run: |
-        x86_64-w64-mingw32-gcc --version || (
-          echo "MinGW installation failed, attempting to fix..."
-          choco install mingw --force -y
-          x86_64-w64-mingw32-gcc --version || (
-            echo "MinGW verification failed, failing build..."
-            exit /b 1
-          )
-        )
-        x86_64-w64-mingw32-g++ --version
-      # Проверяет установку MinGW
 
-    - name: Create directories if needed
-      shell: cmd
-      run: |
-        if not exist build mkdir build
-        if not exist build_msvc\Release mkdir build_msvc\Release
-      # Создаёт директории для сборки
-
-    - name: Check for RustAlkadCheat2588.cpp with fallback
-      shell: cmd
-      run: |
-        echo "Checking for RustAlkadCheat2588.cpp in DirectXSample..."
-        if exist DirectXSample\RustAlkadCheat2588.cpp (
-          echo "RustAlkadCheat2588.cpp found in DirectXSample."
-          dir DirectXSample\RustAlkadCheat2588.cpp
-        ) else (
-          echo "RustAlkadCheat2588.cpp not found in DirectXSample, checking DirectXSample\DirectXSample..."
-          if exist DirectXSample\DirectXSample\RustAlkadCheat2588.cpp (
-            echo "Found RustAlkadCheat2588.cpp in DirectXSample\DirectXSample, moving to DirectXSample..."
-            move DirectXSample\DirectXSample\RustAlkadCheat2588.cpp DirectXSample\RustAlkadCheat2588.cpp
-            if exist DirectXSample\RustAlkadCheat2588.cpp (
-              echo "Moved successfully."
-              dir DirectXSample\RustAlkadCheat2588.cpp
-            ) else (
-              echo "Failed to move RustAlkadCheat2588.cpp, listing directory contents..."
-              dir DirectXSample /s
-              exit /b 1
-            )
-          ) else if exist DirectXSample\RustAlkadaCheat2588.cpp (
-            echo "Found RustAlkadaCheat2588.cpp in DirectXSample, renaming to RustAlkadCheat2588.cpp..."
-            ren DirectXSample\RustAlkadaCheat2588.cpp RustAlkadCheat2588.cpp
-            if exist DirectXSample\RustAlkadCheat2588.cpp (
-              echo "Renamed successfully."
-              dir DirectXSample\RustAlkadCheat2588.cpp
-            ) else (
-              echo "Renaming failed, listing directory contents..."
-              dir DirectXSample /s
-              exit /b 1
-            )
-          ) else if exist DirectXSample\DirectXSample\RustAlkadaCheat2588.cpp (
-            echo "Found RustAlkadaCheat2588.cpp in DirectXSample\DirectXSample, moving and renaming..."
-            move DirectXSample\DirectXSample\RustAlkadaCheat2588.cpp DirectXSample\RustAlkadCheat2588.cpp
-            if exist DirectXSample\RustAlkadCheat2588.cpp (
-              echo "Moved and renamed successfully."
-              dir DirectXSample\RustAlkadCheat2588.cpp
-            ) else (
-              echo "Moving/renaming failed, listing directory contents..."
-              dir DirectXSample /s
-              exit /b 1
-            )
-          ) else (
-            echo "RustAlkadCheat2588.cpp not found, searching for similar files..."
-            dir DirectXSample\*Cheat2588.cpp /b > temp.txt 2>nul
-            dir DirectXSample\DirectXSample\*Cheat2588.cpp /b >> temp.txt 2>nul
-            set /p SIMILAR_FILE=<temp.txt
-            if defined SIMILAR_FILE (
-              echo "Found similar file: !SIMILAR_FILE!"
-              if exist DirectXSample\!SIMILAR_FILE! (
-                ren DirectXSample\!SIMILAR_FILE! RustAlkadCheat2588.cpp
-              ) else if exist DirectXSample\DirectXSample\!SIMILAR_FILE! (
-                move DirectXSample\DirectXSample\!SIMILAR_FILE! DirectXSample\RustAlkadCheat2588.cpp
-              )
-              if exist DirectXSample\RustAlkadCheat2588.cpp (
-                echo "Renamed/moved successfully."
-                dir DirectXSample\RustAlkadCheat2588.cpp
-              ) else (
-                echo "Renaming/moving failed, listing directory contents..."
-                dir DirectXSample /s
-                exit /b 1
-              )
-            ) else (
-              echo "No similar files found, listing directory contents..."
-              dir DirectXSample /s
-              exit /b 1
-            )
-          )
-        )
-      # Проверяет наличие файла, перемещает/переименовывает при необходимости
-
-    - name: Compile with MinGW (First Attempt)
-      shell: cmd
-      run: |
-        echo "Starting compilation of RustAlkadCheat2588.cpp..."
-        x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -lpsapi -static -Wall -Wno-unknown-pragmas -static-libgcc -static-libstdc++ || (
-          echo "First attempt to compile with MinGW failed, retrying..."
-          x86_64-w64-mingw32-g++ -shared -o build\RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp -lwininet -lgdi32 -lpsapi -static -Wall -Wno-unknown-pragmas -static-libgcc -static-libstdc++ || (
-            echo "Second attempt to compile with MinGW failed, failing build..."
-            exit /b 1
-          )
-        )
-        echo "Compilation successful, DLL created at build\RustAlkadCheat2588.dll"
-      # Компилирует с двумя попытками
-
-    - name: Upload DLL as artifact
+    # Сохранение DLL как артефакта
+    - name: Upload DLL artifact
       uses: actions/upload-artifact@v4
       with:
-        name: RustAlkadCheat2588-dll
-        path: build\RustAlkadCheat2588.dll
-      # Загружает DLL как артефакт
+        name: RustAlkadCheat2588
+        path: RustAlkadCheat2588.dll
