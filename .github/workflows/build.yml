@@ -61,7 +61,7 @@ jobs:
     # Проверка наличия исходных файлов
     - name: Verify source files
       run: |
-        dir cheat.cpp
+        dir DirectXSample\RustAlkadCheat2588.cpp
         dir nuklear\nuklear_d3d11.c
       shell: cmd
       continue-on-error: true
@@ -69,7 +69,7 @@ jobs:
     # Компиляция DLL
     - name: Build DLL
       run: |
-        cl /LD /Fe:RustAlkadCheat2588.dll cheat.cpp nuklear/nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
+        cl /LD /Fe:RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp nuklear\nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
       shell: cmd
       env:
         VSSDKINSTALL: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VSSDK
