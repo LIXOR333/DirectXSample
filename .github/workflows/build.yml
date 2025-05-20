@@ -34,9 +34,10 @@ jobs:
         curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
         unzip nuklear.zip
         mv nuklear-master nuklear
-        # Загрузка nuklear_d3d11.c
-        curl -L -o nuklear/nuklear_d3d11.c https://raw.githubusercontent.com/Immediate-Mode-UI/Nuklear/master/demo/d3d11/nuklear_d3d11.c
+        # Проверка структуры директорий
+        ls -R nuklear
       shell: bash
+      continue-on-error: true
 
     # Загрузка zlib
     - name: Download and Build zlib
@@ -61,7 +62,7 @@ jobs:
     # Проверка наличия исходных файлов
     - name: Verify source files
       run: |
-        dir DirectXSample\RustAlkadCheat2588.cpp
+        dir DirectXSample\DirectXSample\RustAlkadCheat2588.cpp
         dir nuklear\nuklear_d3d11.c
       shell: cmd
       continue-on-error: true
@@ -69,7 +70,7 @@ jobs:
     # Компиляция DLL
     - name: Build DLL
       run: |
-        cl /LD /Fe:RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp nuklear\nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
+        cl /LD /Fe:RustAlkadCheat2588.dll DirectXSample\DirectXSample\RustAlkadCheat2588.cpp nuklear\nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
       shell: cmd
       env:
         VSSDKINSTALL: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VSSDK
