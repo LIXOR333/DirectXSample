@@ -34,7 +34,7 @@ jobs:
         curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
         unzip nuklear.zip
         mv nuklear-master nuklear
-        # Загрузка nuklear_d3d11.c, если отсутствует
+        # Загрузка nuklear_d3d11.c
         curl -L -o nuklear/nuklear_d3d11.c https://raw.githubusercontent.com/Immediate-Mode-UI/Nuklear/master/demo/d3d11/nuklear_d3d11.c
       shell: bash
 
