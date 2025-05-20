@@ -14,6 +14,9 @@ jobs:
     # Проверка кода из репозитория
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        repository: LIXOR333/DirectXSample
+        path: DirectXSample
 
     # Установка unzip
     - name: Install unzip
