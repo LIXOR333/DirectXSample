@@ -1,40 +1,32 @@
 #include <windows.h>
 #include <string>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <cmath>
-#include <cfloat>
 #include <psapi.h>
 #pragma comment(lib, "psapi.lib")
 
-// Global variables with actual offsets for Rust 2588 (Jungle Update, Alkad)
-bool g_showMenu = false;
+// Global variables for Rust 2588 (Jungle Update, Alkad)
 bool g_enableESP = false;
 bool g_enableAimbot = false;
 bool g_enableWallhack = false;
 int g_espColorR = 255, g_espColorG = 0, g_espColorB = 0;
 float g_aimbotFOV = 30.0f, g_aimbotSmooth = 5.0f;
 float g_espDistanceMax = 200.0f;
-int g_aimbotPriority = 0;
+int g_aimbotPriority = 0; // 0: Distance, 1: Health
 float g_viewPitch = 0.0f, g_viewYaw = 0.0f;
 
-// Offsets for Rust 2588 (Jungle Update, Alkad)
-DWORD g_entityListOffset = 0x4E2A1B0; // Updated for jungle
-DWORD g_localPlayerOffset = 0x4E5D890; // Updated due to new player structure
-DWORD g_viewMatrixOffset = 0x4E7F210; // New view matrix
-DWORD g_healthOffset = 0x14; // Adjusted after encryption
-
-// View Matrix (4x4)
+// Offsets (default for Rust 2588)
+DWORD g_entityListOffset = 0x4E2A1B0;
+DWORD g_localPlayerOffset = 0x4E5D890;
+DWORD g_viewMatrixOffset = 0x4E7F210;
+DWORD g_healthOffset = 0x14;
 float g_viewMatrix[16] = { 0 };
 
 // Console handle
 HANDLE g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-// Function prototypes
-bool ExtractViewMatrix();
-
-// Logging to file
+// Logging
 void LogToFile(const std::string& message) {
     std::ofstream logFile("cheat_log.txt", std::ios::app);
     if (logFile.is_open()) {
@@ -47,37 +39,36 @@ void LogToFile(const std::string& message) {
     }
 }
 
-// Update and display all statuses in the console
+// Update console
 void UpdateConsoleDisplay() {
     SetConsoleCursorPosition(g_hConsole, { 0, 0 });
-    std::string display;
-
-    // Build the display string with all feature statuses
-    display += "Wallhack: " + std::string(g_enableWallhack ? "On" : "Off") + "\n";
-    display += "Aimbot: " + std::string(g_enableAimbot ? "On" : "Off") + "\n";
-    display += "ESP: " + std::string(g_enableESP ? "On" : "Off") + "\n";
-    display += "Settings: On NumPad\n";
-
-    // Write to console
-    WriteConsoleA(g_hConsole, display.c_str(), display.length(), NULL, NULL);
-    LogToFile("Console updated: \n" + display);
+    char display[256];
+    snprintf(display, sizeof(display),
+             "\033[1;32mRustAlkadCheat2588\033[0m\n"
+             "Wallhack: %s\nAimbot: %s\nESP: %s\n"
+             "F1: Wallhack | F2: Aimbot | F3: ESP\n"
+             "F5: Save Config | F6/F7: ESP Color\n"
+             "F8: Update Offsets | F9: FOV+ | F10: Smooth-\n"
+             "NumPad: Adjust Settings\n",
+             g_enableWallhack ? "\033[1;32mOn\033[0m" : "\033[1;31mOff\033[0m",
+             g_enableAimbot ? "\033[1;32mOn\033[0m" : "\033[1;31mOff\033[0m",
+             g_enableESP ? "\033[1;32mOn\033[0m" : "\033[1;31mOff\033[0m");
+    WriteConsoleA(g_hConsole, display, strlen(display), NULL, NULL);
 }
 
-// Print message to console (used for dynamic updates like Offsets or Settings)
+// Print message
 void PrintConsoleMessage(const std::string& message, const std::string& status = "") {
     std::string fullMessage = message + (status.empty() ? "" : ": " + status) + "\n";
     WriteConsoleA(g_hConsole, fullMessage.c_str(), fullMessage.length(), NULL, NULL);
     LogToFile(fullMessage);
-    UpdateConsoleDisplay(); // Update the entire display after each message
+    UpdateConsoleDisplay();
 }
 
-// Check if memory is readable
+// Check memory readability
 bool IsMemoryReadable(uintptr_t address, size_t size) {
     MEMORY_BASIC_INFORMATION mbi;
-    if (VirtualQuery(reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi))) {
-        return mbi.State == MEM_COMMIT && mbi.Protect != PAGE_NOACCESS;
-    }
-    return false;
+    return VirtualQuery(reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi)) &&
+           mbi.State == MEM_COMMIT && mbi.Protect != PAGE_NOACCESS;
 }
 
 // Pattern scanning
@@ -105,125 +96,90 @@ uintptr_t FindPattern(const char* moduleName, const char* pattern, const char* m
 
 // Validate offset
 bool ValidateOffset(DWORD offset, const std::string& name) {
-    if (offset < 0x100000 || offset > 0xFFFFFFF) return false;
-    if (!IsMemoryReadable(offset, sizeof(DWORD))) return false;
+    if (offset < 0x100000 || offset > 0xFFFFFFF || !IsMemoryReadable(offset, sizeof(DWORD))) {
+        LogToFile("Invalid offset for " + name + ": 0x" + std::to_string(offset));
+        return false;
+    }
     LogToFile(name + " offset validated: 0x" + std::to_string(offset));
     return true;
 }
 
-// Encryption type detection
-enum class EncryptionType {
-    XOR,
-    BYTE_SHIFT,
-    SUBSTITUTION,
-    UNKNOWN
-};
-
-EncryptionType DetectEncryptionType(const std::vector<char>& data) {
-    if (data.empty()) return EncryptionType::UNKNOWN;
-
-    int xorScore = 0, shiftScore = 0, substitutionScore = 0;
-    for (size_t i = 0; i < data.size(); i++) {
-        char byteXor = data[i] ^ 0x5A;
-        if (byteXor >= 32 && byteXor <= 126) xorScore++;
-        char byteShift = (data[i] + 5) % 256;
-        if (byteShift >= 32 && byteShift <= 126) shiftScore++;
-        char byteSub = data[i] ^ (i % 256);
-        if (byteSub >= 32 && byteSub <= 126) substitutionScore++;
-    }
-
-    if (xorScore > shiftScore && xorScore > substitutionScore) return EncryptionType::XOR;
-    if (shiftScore > xorScore && shiftScore > substitutionScore) return EncryptionType::BYTE_SHIFT;
-    if (substitutionScore > xorScore && substitutionScore > shiftScore) return EncryptionType::SUBSTITUTION;
-    return EncryptionType::UNKNOWN;
-}
-
-// Decrypt file
-bool DecryptFile(const std::string& inputFile, const std::string& outputFile) {
-    std::ifstream inFile(inputFile, std::ios::binary);
-    if (!inFile.is_open()) {
-        LogToFile("Failed to open input file for decryption: " + inputFile);
+// Scan game files
+bool ScanGameFilesForOffsets(const std::string& gamePath) {
+    std::vector<std::string> files;
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind = FindFirstFileA((gamePath + "\\*.*").c_str(), &findData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        LogToFile("Failed to scan game directory: " + gamePath);
         return false;
     }
 
-    std::vector<char> data((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-    inFile.close();
+    do {
+        if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            files.push_back(gamePath + "\\" + findData.cFileName);
+        }
+    } while (FindNextFileA(hFind, &findData));
+    FindClose(hFind);
 
-    if (data.empty()) {
-        LogToFile("Input file is empty: " + inputFile);
-        return false;
-    }
-
-    EncryptionType encType = DetectEncryptionType(data);
-    std::vector<char> decryptedData = data;
-
-    switch (encType) {
-    case EncryptionType::XOR:
-        for (size_t i = 0; i < decryptedData.size(); i++) decryptedData[i] ^= 0x5A;
-        LogToFile("Detected XOR encryption for " + inputFile);
-        break;
-    case EncryptionType::BYTE_SHIFT:
-        for (size_t i = 0; i < decryptedData.size(); i++) decryptedData[i] = (decryptedData[i] + 5) % 256;
-        LogToFile("Detected byte shift encryption for " + inputFile);
-        break;
-    case EncryptionType::SUBSTITUTION:
-        for (size_t i = 0; i < decryptedData.size(); i++) decryptedData[i] ^= (i % 256);
-        LogToFile("Detected substitution encryption for " + inputFile);
-        break;
-    default:
-        for (size_t i = 0; i < decryptedData.size(); i++) decryptedData[i] ^= 0x5A;
-        LogToFile("Unknown encryption type for " + inputFile + ", trying default XOR...");
-        break;
-    }
-
-    std::ofstream outFile(outputFile, std::ios::binary);
-    if (!outFile.is_open()) {
-        LogToFile("Failed to open output file for decryption: " + outputFile);
-        return false;
-    }
-
-    outFile.write(decryptedData.data(), decryptedData.size());
-    outFile.close();
-    LogToFile("Successfully decrypted file: " + inputFile + " to " + outputFile);
-    return true;
-}
-
-// Decrypt game files
-void DecryptGameFiles() {
-    PrintConsoleMessage("Offsets", "Started");
-    LogToFile("Starting decryption of game files...");
-
-    std::vector<std::string> possibleFiles = {
-        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rust\\gameconfig.dat",
-        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rust\\data\\settings.bin",
-        "C:\\Rust\\config.dat",
-        "C:\\Rust\\data.bin",
-        "C:\\Games\\gameconfig.dat",
-        "C:\\Games\\settings.bin",
-        "C:\\Games\\data.dat",
-        "C:\\Games\\Rust\\config.dat",
-        "C:\\Games\\Rust\\data.bin",
-        "C:\\games\\gameconfig.dat",
-        "C:\\games\\settings.bin",
-        "C:\\games\\data.dat",
-        "C:\\games\\Rust\\config.dat",
-        "C:\\games\\Rust\\data.bin"
+    std::vector<std::pair<const char*, const char*>> patterns = {
+        {"\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x0F\x84", "xxx????xxxxx"}, // entityList
+        {"\x48\x8B\x15\x00\x00\x00\x00\x48\x85\xD2\x74", "xxx????xxxx"},     // localPlayer
+        {"\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\xF3\x0F\x10\x00", "xxx????x????xxxx"}, // viewMatrix
+        {"\xF3\x0F\x10\x00\x00\x00\x00\xF3\x0F\x11\x00", "xxx????xxx?"},      // health
     };
 
-    for (const auto& file : possibleFiles) {
-        if (GetFileAttributesA(file.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            std::string outputFile = file + ".decrypted";
-            DecryptFile(file, outputFile);
+    bool updated = false;
+    for (const auto& file : files) {
+        std::ifstream inFile(file, std::ios::binary);
+        if (!inFile.is_open()) continue;
+
+        std::vector<char> data((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+        inFile.close();
+        if (data.empty()) continue;
+
+        for (size_t i = 0; i < patterns.size(); i++) {
+            for (size_t j = 0; j < data.size() - strlen(patterns[i].second); j++) {
+                bool found = true;
+                for (size_t k = 0; k < strlen(patterns[i].second); k++) {
+                    found &= patterns[i].second[k] == '?' || patterns[i].first[k] == data[j + k];
+                }
+                if (found) {
+                    DWORD offset = *reinterpret_cast<DWORD*>(&data[j + 3]);
+                    DWORD newOffset = static_cast<DWORD>(j + 7 + offset);
+                    if (ValidateOffset(newOffset, i == 0 ? "entityList" : (i == 1 ? "localPlayer" : (i == 2 ? "viewMatrix" : "health")))) {
+                        if (i == 0) g_entityListOffset = newOffset;
+                        else if (i == 1) g_localPlayerOffset = newOffset;
+                        else if (i == 2) g_viewMatrixOffset = newOffset;
+                        else if (i == 3) g_healthOffset = newOffset;
+                        updated = true;
+                    }
+                }
+            }
         }
     }
 
-    PrintConsoleMessage("Offsets", "Finished");
+    if (updated) {
+        std::ofstream cacheFile("offset_cache.txt");
+        if (cacheFile.is_open()) {
+            cacheFile << "entity_list=0x" << std::hex << g_entityListOffset << "\n";
+            cacheFile << "local_player=0x" << std::hex << g_localPlayerOffset << "\n";
+            cacheFile << "view_matrix=0x" << std::hex << g_viewMatrixOffset << "\n";
+            cacheFile << "health=0x" << std::hex << g_healthOffset << "\n";
+            cacheFile.close();
+            LogToFile("Offsets updated from game files: entityList=0x" + std::to_string(g_entityListOffset) +
+                      ", localPlayer=0x" + std::to_string(g_localPlayerOffset) +
+                      ", viewMatrix=0x" + std::to_string(g_viewMatrixOffset) +
+                      ", health=0x" + std::to_string(g_healthOffset));
+        }
+    }
+    return updated;
 }
 
-// Optimized offset search
-bool FindOffsets() {
-    LogToFile("Starting optimized offset search for Rust 2588 Jungle Update (Alkad)...");
+// Find offsets
+bool FindOffsets(const std::string& gamePath = "") {
+    LogToFile("Starting offset search...");
 
+    // Load from cache
     std::ifstream cacheFile("offset_cache.txt");
     if (cacheFile.is_open()) {
         std::string line;
@@ -231,10 +187,14 @@ bool FindOffsets() {
             std::istringstream iss(line);
             std::string key, value;
             if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-                if (key == "entity_list") g_entityListOffset = std::stoul(value, nullptr, 16);
-                else if (key == "local_player") g_localPlayerOffset = std::stoul(value, nullptr, 16);
-                else if (key == "view_matrix") g_viewMatrixOffset = std::stoul(value, nullptr, 16);
-                else if (key == "health") g_healthOffset = std::stoul(value, nullptr, 16);
+                try {
+                    if (key == "entity_list") g_entityListOffset = std::stoul(value, nullptr, 16);
+                    else if (key == "local_player") g_localPlayerOffset = std::stoul(value, nullptr, 16);
+                    else if (key == "view_matrix") g_viewMatrixOffset = std::stoul(value, nullptr, 16);
+                    else if (key == "health") g_healthOffset = std::stoul(value, nullptr, 16);
+                } catch (...) {
+                    LogToFile("Error parsing offset cache: " + line);
+                }
             }
         }
         cacheFile.close();
@@ -242,47 +202,42 @@ bool FindOffsets() {
             ValidateOffset(g_localPlayerOffset, "localPlayer") &&
             ValidateOffset(g_viewMatrixOffset, "viewMatrix") &&
             ValidateOffset(g_healthOffset, "health")) {
-            LogToFile("Offsets loaded from cache: entityList=0x" + std::to_string(g_entityListOffset) +
-                      ", localPlayer=0x" + std::to_string(g_localPlayerOffset) +
-                      ", viewMatrix=0x" + std::to_string(g_viewMatrixOffset) +
-                      ", health=0x" + std::to_string(g_healthOffset));
+            LogToFile("Offsets loaded from cache.");
             return true;
         }
     }
 
+    // Scan memory
     std::vector<std::pair<const char*, const char*>> patterns = {
         {"\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x0F\x84", "xxx????xxxxx"}, // entityList
         {"\x48\x8B\x15\x00\x00\x00\x00\x48\x85\xD2\x74", "xxx????xxxx"},     // localPlayer
         {"\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\xF3\x0F\x10\x00", "xxx????x????xxxx"}, // viewMatrix
         {"\xF3\x0F\x10\x00\x00\x00\x00\xF3\x0F\x11\x00", "xxx????xxx?"},      // health
-        {"\x4C\x8B\x0D\x00\x00\x00\x00\x48\x8B\xF8", "xxx????xxx"},         // entityList (alternative)
-        {"\x48\x8B\x0D\x00\x00\x00\x00\x48\x89\x7C\x24", "xxx????xxxx"},     // localPlayer (alternative)
     };
 
+    bool found = false;
     for (size_t i = 0; i < patterns.size(); i++) {
         uintptr_t baseAddr = FindPattern("GameAssembly.dll", patterns[i].first, patterns[i].second);
-        if (baseAddr) {
+        if (baseAddr && IsMemoryReadable(baseAddr + 3, sizeof(DWORD))) {
             DWORD offset = *reinterpret_cast<DWORD*>(baseAddr + 3);
             baseAddr = (baseAddr + 7) + offset;
             DWORD newOffset = static_cast<DWORD>(baseAddr - reinterpret_cast<uintptr_t>(GetModuleHandleA("GameAssembly.dll")));
-            if (ValidateOffset(newOffset, i == 0 || i == 4 ? "entityList" : (i == 1 || i == 5 ? "localPlayer" : (i == 2 ? "viewMatrix" : "health")))) {
-                if (i == 0 || i == 4) g_entityListOffset = newOffset;
-                else if (i == 1 || i == 5) g_localPlayerOffset = newOffset;
+            if (ValidateOffset(newOffset, i == 0 ? "entityList" : (i == 1 ? "localPlayer" : (i == 2 ? "viewMatrix" : "health")))) {
+                if (i == 0) g_entityListOffset = newOffset;
+                else if (i == 1) g_localPlayerOffset = newOffset;
                 else if (i == 2) g_viewMatrixOffset = newOffset;
                 else if (i == 3) g_healthOffset = newOffset;
+                found = true;
             }
         }
     }
 
-    if (ValidateOffset(g_entityListOffset, "entityList") &&
-        ValidateOffset(g_localPlayerOffset, "localPlayer") &&
-        ValidateOffset(g_viewMatrixOffset, "viewMatrix") &&
-        ValidateOffset(g_healthOffset, "health")) {
-        LogToFile("Offsets found: entityList=0x" + std::to_string(g_entityListOffset) +
-                  ", localPlayer=0x" + std::to_string(g_localPlayerOffset) +
-                  ", viewMatrix=0x" + std::to_string(g_viewMatrixOffset) +
-                  ", health=0x" + std::to_string(g_healthOffset));
+    // Scan game files if memory scan fails
+    if (!found && !gamePath.empty()) {
+        found = ScanGameFilesForOffsets(gamePath);
+    }
 
+    if (found) {
         std::ofstream cacheFileOut("offset_cache.txt");
         if (cacheFileOut.is_open()) {
             cacheFileOut << "entity_list=0x" << std::hex << g_entityListOffset << "\n";
@@ -291,49 +246,41 @@ bool FindOffsets() {
             cacheFileOut << "health=0x" << std::hex << g_healthOffset << "\n";
             cacheFileOut.close();
         }
-        return true;
     }
 
-    LogToFile("Failed to find offsets.");
-    return false;
-}
-
-// Auto-dumper (F10)
-void AutoDumpOffsets() {
-    PrintConsoleMessage("Offsets", "Started");
-
-    FindOffsets();
-
-    if (ExtractViewMatrix()) {
-        LogToFile("View angles extracted: Pitch=" + std::to_string(g_viewPitch) + ", Yaw=" + std::to_string(g_viewYaw));
-    } else {
-        LogToFile("Failed to extract view matrix.");
-    }
-
-    std::ofstream dumpFile("offset_dump.txt");
-    if (dumpFile.is_open()) {
-        dumpFile << "entityList=0x" << std::hex << g_entityListOffset << "\n";
-        dumpFile << "localPlayer=0x" << std::hex << g_localPlayerOffset << "\n";
-        dumpFile << "viewMatrix=0x" << std::hex << g_viewMatrixOffset << "\n";
-        dumpFile << "health=0x" << std::hex << g_healthOffset << "\n";
-        dumpFile << "viewPitch=" << std::dec << g_viewPitch << "\n";
-        dumpFile << "viewYaw=" << std::dec << g_viewYaw << "\n";
-        dumpFile.close();
-        LogToFile("Offsets dumped to offset_dump.txt");
-    }
-
-    PrintConsoleMessage("Offsets", "Finished");
+    LogToFile(found ? "Offsets found." : "Failed to find offsets.");
+    return found;
 }
 
 // Extract view matrix
 bool ExtractViewMatrix() {
     uintptr_t baseAddr = reinterpret_cast<uintptr_t>(GetModuleHandleA("GameAssembly.dll"));
+    if (!baseAddr) return false;
     uintptr_t viewMatrixAddr = baseAddr + g_viewMatrixOffset;
     if (!IsMemoryReadable(viewMatrixAddr, 16 * sizeof(float))) return false;
     memcpy(g_viewMatrix, reinterpret_cast<float*>(viewMatrixAddr), 16 * sizeof(float));
     g_viewPitch = atan2(-g_viewMatrix[8], sqrt(g_viewMatrix[0] * g_viewMatrix[0] + g_viewMatrix[4] * g_viewMatrix[4])) * 180.0f / 3.14159f;
     g_viewYaw = atan2(g_viewMatrix[4], g_viewMatrix[0]) * 180.0f / 3.14159f;
     return true;
+}
+
+// Save configuration
+void SaveConfig() {
+    std::ofstream config("config.txt");
+    if (config.is_open()) {
+        config << "esp_enabled=" << (g_enableESP ? "true" : "false") << "\n";
+        config << "esp_color_r=" << g_espColorR << "\n";
+        config << "esp_color_g=" << g_espColorG << "\n";
+        config << "esp_color_b=" << g_espColorB << "\n";
+        config << "aimbot_enabled=" << (g_enableAimbot ? "true" : "false") << "\n";
+        config << "aimbot_fov=" << g_aimbotFOV << "\n";
+        config << "aimbot_smooth=" << g_aimbotSmooth << "\n";
+        config << "esp_distance_max=" << g_espDistanceMax << "\n";
+        config << "aimbot_priority=" << g_aimbotPriority << "\n";
+        config << "wallhack_enabled=" << (g_enableWallhack ? "true" : "false") << "\n";
+        config.close();
+        PrintConsoleMessage("Settings", "Saved");
+    }
 }
 
 // Load configuration
@@ -345,37 +292,43 @@ void LoadConfig() {
         std::istringstream iss(line);
         std::string key, value;
         if (std::getline(iss, key, '=') && std::getline(iss, value)) {
-            if (key == "esp_enabled") g_enableESP = (value == "true");
-            else if (key == "esp_color_r") g_espColorR = std::stoi(value);
-            else if (key == "esp_color_g") g_espColorG = std::stoi(value);
-            else if (key == "esp_color_b") g_espColorB = std::stoi(value);
-            else if (key == "aimbot_enabled") g_enableAimbot = (value == "true");
-            else if (key == "aimbot_fov") g_aimbotFOV = std::stof(value);
-            else if (key == "aimbot_smooth") g_aimbotSmooth = std::stof(value);
-            else if (key == "esp_distance_max") g_espDistanceMax = std::stof(value);
-            else if (key == "aimbot_priority") g_aimbotPriority = std::stoi(value);
-            else if (key == "wallhack_enabled") g_enableWallhack = (value == "true");
+            try {
+                if (key == "esp_enabled") g_enableESP = (value == "true");
+                else if (key == "esp_color_r") g_espColorR = std::stoi(value);
+                else if (key == "esp_color_g") g_espColorG = std::stoi(value);
+                else if (key == "esp_color_b") g_espColorB = std::stoi(value);
+                else if (key == "aimbot_enabled") g_enableAimbot = (value == "true");
+                else if (key == "aimbot_fov") g_aimbotFOV = std::stof(value);
+                else if (key == "aimbot_smooth") g_aimbotSmooth = std::stof(value);
+                else if (key == "esp_distance_max") g_espDistanceMax = std::stof(value);
+                else if (key == "aimbot_priority") g_aimbotPriority = std::stoi(value);
+                else if (key == "wallhack_enabled") g_enableWallhack = (value == "true");
+            } catch (...) {
+                LogToFile("Error parsing config: " + line);
+            }
         }
     }
     file.close();
 }
 
-// Wallhack (ESP) (F1)
+// Wallhack (ESP)
 void DrawWallhack() {
     if (!g_enableESP || !g_enableWallhack) return;
 
     uintptr_t baseAddr = reinterpret_cast<uintptr_t>(GetModuleHandleA("GameAssembly.dll"));
+    if (!baseAddr) return;
     DWORD entityList = *reinterpret_cast<DWORD*>(baseAddr + g_entityListOffset);
-    if (!entityList) return;
+    if (!entityList || !IsMemoryReadable(entityList, sizeof(DWORD))) return;
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(g_hConsole, &csbi);
     COORD pos = { 0, (SHORT)(csbi.dwCursorPosition.Y + 1) };
 
-    for (int i = 0; i < 32; i++) {
-        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x4);
+    for (int i = 0; i < 128; i++) { // Increased to 128 entities
+        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x8);
+        if (!IsMemoryReadable(entityAddr, sizeof(DWORD))) continue;
         DWORD entity = *reinterpret_cast<DWORD*>(entityAddr);
-        if (!entity) continue;
+        if (!entity || !IsMemoryReadable(entity, sizeof(float) * 3 + g_healthOffset)) continue;
 
         float x = *reinterpret_cast<float*>(entity + 0x4);
         float y = *reinterpret_cast<float*>(entity + 0x8);
@@ -383,7 +336,7 @@ void DrawWallhack() {
         float health = *reinterpret_cast<float*>(entity + g_healthOffset);
 
         float dist = std::sqrt(x * x + y * y + z * z);
-        if (dist > g_espDistanceMax) continue;
+        if (dist > g_espDistanceMax || health <= 0) continue;
 
         float screenX = g_viewMatrix[0] * x + g_viewMatrix[4] * y + g_viewMatrix[8] * z + g_viewMatrix[12];
         float screenY = g_viewMatrix[1] * x + g_viewMatrix[5] * y + g_viewMatrix[9] * z + g_viewMatrix[13];
@@ -392,39 +345,45 @@ void DrawWallhack() {
         screenX /= w; screenY /= w;
 
         char buffer[128];
-        snprintf(buffer, sizeof(buffer), "Player %d: X=%.1f Y=%.1f Z=%.1f HP=%.0f Dist=%.1f (Screen: %.0f, %.0f)",
+        snprintf(buffer, sizeof(buffer), "Entity %d: X=%.1f Y=%.1f Z=%.1f HP=%.0f Dist=%.1f (Screen: %.0f, %.0f)",
                  i, x, y, z, health, dist, screenX, screenY);
         SetConsoleCursorPosition(g_hConsole, pos);
-        SetConsoleTextAttribute(g_hConsole, (g_espColorR << 8) | (g_espColorG << 4) | g_espColorB);
+        SetConsoleTextAttribute(g_hConsole, (g_espColorR > 0 ? FOREGROUND_RED : 0) |
+                                         (g_espColorG > 0 ? FOREGROUND_GREEN : 0) |
+                                         (g_espColorB > 0 ? FOREGROUND_BLUE : 0) |
+                                         FOREGROUND_INTENSITY);
         WriteConsoleA(g_hConsole, buffer, strlen(buffer), NULL, NULL);
         pos.Y++;
     }
 }
 
-// Aimbot (F2)
+// Aimbot
 void Aimbot() {
     if (!g_enableAimbot) return;
 
     uintptr_t baseAddr = reinterpret_cast<uintptr_t>(GetModuleHandleA("GameAssembly.dll"));
+    if (!baseAddr) return;
     uintptr_t localPlayerAddr = baseAddr + g_localPlayerOffset;
+    if (!IsMemoryReadable(localPlayerAddr, sizeof(DWORD))) return;
     DWORD localPlayer = *reinterpret_cast<DWORD*>(localPlayerAddr);
-    if (!localPlayer) return;
+    if (!localPlayer || !IsMemoryReadable(localPlayer, sizeof(float) * 3)) return;
 
     DWORD entityList = *reinterpret_cast<DWORD*>(baseAddr + g_entityListOffset);
-    if (!entityList) return;
+    if (!entityList || !IsMemoryReadable(entityList, sizeof(DWORD))) return;
 
     float closestDist = FLT_MAX;
     float targetX = 0, targetY = 0, targetZ = 0;
     DWORD targetEntity = 0;
 
-    for (int i = 0; i < 32; i++) {
-        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x4);
+    for (int i = 0; i < 128; i++) {
+        uintptr_t entityAddr = baseAddr + g_entityListOffset + (i * 0x8);
+        if (!IsMemoryReadable(entityAddr, sizeof(DWORD))) continue;
         DWORD entity = *reinterpret_cast<DWORD*>(entityAddr);
-        if (!entity) continue;
+        if (!entity || !IsMemoryReadable(entity, sizeof(float) * 3 + g_healthOffset)) continue;
 
         float x = *reinterpret_cast<float*>(entity + 0x4);
         float y = *reinterpret_cast<float*>(entity + 0x8);
-        float z = *reinterpret_cast<float*>(entity + 0xC);
+        float z = *reinterpret_cast<float*>(entity + 0xC) + 1.8f; // Headshot adjustment
         float health = *reinterpret_cast<float*>(entity + g_healthOffset);
 
         float dx = x - *reinterpret_cast<float*>(localPlayer + 0x4);
@@ -432,10 +391,8 @@ void Aimbot() {
         float dz = z - *reinterpret_cast<float*>(localPlayer + 0xC);
         float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-        if (dist < closestDist && dist < g_aimbotFOV) {
-            if (g_aimbotPriority == 1 && health > 0) {
-                if (targetEntity && *reinterpret_cast<float*>(targetEntity + g_healthOffset) > health) continue;
-            }
+        if (dist < closestDist && dist < g_aimbotFOV && health > 0) {
+            if (g_aimbotPriority == 1 && targetEntity && *reinterpret_cast<float*>(targetEntity + g_healthOffset) > health) continue;
             closestDist = dist;
             targetX = x; targetY = y; targetZ = z;
             targetEntity = entity;
@@ -449,128 +406,195 @@ void Aimbot() {
         float yaw = atan2(dy, dx) * 180.0f / 3.14159f - g_viewYaw;
         float pitch = atan2(-dz, std::sqrt(dx * dx + dy * dy)) * 180.0f / 3.14159f - g_viewPitch;
 
-        mouse_event(MOUSEEVENTF_MOVE, (DWORD)(yaw / g_aimbotSmooth), (DWORD)(pitch / g_aimbotSmooth), 0, 0);
+        float smoothYaw = yaw / g_aimbotSmooth;
+        float smoothPitch = pitch / g_aimbotSmooth;
+        if (std::abs(smoothYaw) > 0.05f || std::abs(smoothPitch) > 0.05f) {
+            mouse_event(MOUSEEVENTF_MOVE, (DWORD)(smoothYaw * 15.0f), (DWORD)(smoothPitch * 15.0f), 0, 0);
+        }
     }
 }
 
-// Input thread for handling key presses
+// Input thread
 DWORD WINAPI InputThread(LPVOID lpParam) {
     AllocConsole();
     g_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleTitleA("RustAlkadCheat2588 Console");
 
-    // Initial console display with all statuses
+    // Enable ANSI colors
+    DWORD consoleMode;
+    GetConsoleMode(g_hConsole, &consoleMode);
+    SetConsoleMode(g_hConsole, consoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
     UpdateConsoleDisplay();
 
-    if (!FindOffsets()) {
-        PrintConsoleMessage("Offsets", "Finished (Error)");
+    // Find game path
+    std::string gamePath;
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    std::string exeDir = std::string(exePath);
+    size_t pos = exeDir.find_last_of("\\");
+    if (pos != std::string::npos) {
+        gamePath = exeDir.substr(0, pos);
+    }
+
+    LoadConfig();
+    if (!FindOffsets(gamePath)) {
+        PrintConsoleMessage("Offsets", "Failed to initialize");
     } else if (!ExtractViewMatrix()) {
-        PrintConsoleMessage("Offsets", "Finished (Error)");
+        PrintConsoleMessage("View Matrix", "Failed to initialize");
     } else {
-        PrintConsoleMessage("Offsets", "Finished");
-        PrintConsoleMessage("Offsets and view matrix initialized successfully!");
+        PrintConsoleMessage("Offsets and View Matrix", "Initialized");
     }
 
     while (true) {
-        // Toggle features with F1, F2, F3
-        if (GetAsyncKeyState(VK_F1) & 0x8000) { // F1 for Wallhack
+        // F1: Toggle Wallhack
+        if (GetAsyncKeyState(VK_F1) & 0x8000) {
             g_enableWallhack = !g_enableWallhack;
-            UpdateConsoleDisplay();
-            Sleep(200); // Debounce delay
+            PrintConsoleMessage("Wallhack", g_enableWallhack ? "On" : "Off");
+            SaveConfig();
+            Sleep(200);
         }
-        if (GetAsyncKeyState(VK_F2) & 0x8000) { // F2 for Aimbot
+        // F2: Toggle Aimbot
+        if (GetAsyncKeyState(VK_F2) & 0x8000) {
             g_enableAimbot = !g_enableAimbot;
-            UpdateConsoleDisplay();
+            PrintConsoleMessage("Aimbot", g_enableAimbot ? "On" : "Off");
+            SaveConfig();
             Sleep(200);
         }
-        if (GetAsyncKeyState(VK_F3) & 0x8000) { // F3 for ESP
+        // F3: Toggle ESP
+        if (GetAsyncKeyState(VK_F3) & 0x8000) {
             g_enableESP = !g_enableESP;
-            UpdateConsoleDisplay();
+            PrintConsoleMessage("ESP", g_enableESP ? "On" : "Off");
+            SaveConfig();
             Sleep(200);
         }
-        if (GetAsyncKeyState(VK_F10) & 0x8000) { // F10 for Auto-Dumper
-            AutoDumpOffsets();
-            DecryptGameFiles();
+        // F5: Save config
+        if (GetAsyncKeyState(VK_F5) & 0x8000) {
+            SaveConfig();
             Sleep(200);
         }
-
-        // Settings via NumPad
-        if (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) {
-            std::ofstream config("config.txt");
-            if (config.is_open()) {
-                config << "esp_enabled=" << (g_enableESP ? "true" : "false") << "\n";
-                config << "esp_color_r=" << g_espColorR << "\n";
-                config << "esp_color_g=" << g_espColorG << "\n";
-                config << "esp_color_b=" << g_espColorB << "\n";
-                config << "aimbot_enabled=" << (g_enableAimbot ? "true" : "false") << "\n";
-                config << "aimbot_fov=" << g_aimbotFOV << "\n";
-                config << "aimbot_smooth=" << g_aimbotSmooth << "\n";
-                config << "esp_distance_max=" << g_espDistanceMax << "\n";
-                config << "aimbot_priority=" << g_aimbotPriority << "\n";
-                config << "wallhack_enabled=" << (g_enableWallhack ? "true" : "false") << "\n";
-                config.close();
-                PrintConsoleMessage("Settings", "Saved");
+        // F6: Adjust ESP color R
+        if (GetAsyncKeyState(VK_F6) & 0x8000) {
+            g_espColorR = std::min(255, g_espColorR + 10);
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "ESP R: %d", g_espColorR);
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
+            Sleep(200);
+        }
+        // F7: Adjust ESP color G
+        if (GetAsyncKeyState(VK_F7) & 0x8000) {
+            g_espColorG = std::min(255, g_espColorG + 10);
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "ESP G: %d", g_espColorG);
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
+            Sleep(200);
+        }
+        // F8: Update offsets
+        if (GetAsyncKeyState(VK_F8) & 0x8000) {
+            PrintConsoleMessage("Offsets", "Updating...");
+            if (FindOffsets(gamePath)) {
+                PrintConsoleMessage("Offsets", "Updated");
+                if (ExtractViewMatrix()) {
+                    PrintConsoleMessage("View Matrix", "Updated");
+                } else {
+                    PrintConsoleMessage("View Matrix", "Failed to update");
+                }
+            } else {
+                PrintConsoleMessage("Offsets", "Failed to update");
             }
+            Sleep(200);
+        }
+        // F9: Adjust aimbot FOV
+        if (GetAsyncKeyState(VK_F9) & 0x8000) {
+            g_aimbotFOV = std::min(90.0f, g_aimbotFOV + 5.0f);
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Aimbot FOV: %.1f", g_aimbotFOV);
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
+            Sleep(200);
+        }
+        // F10: Adjust aimbot smooth
+        if (GetAsyncKeyState(VK_F10) & 0x8000) {
+            g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth + 1.0f); // Inverted for intuitiveness
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Aimbot Smooth: %.1f", g_aimbotSmooth);
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
+            Sleep(200);
+        }
+        // NumPad settings
+        if (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) {
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) {
             g_enableESP = !g_enableESP;
-            PrintConsoleMessage("Settings", "ESP " + std::string(g_enableESP ? "On" : "Off"));
+            PrintConsoleMessage("ESP", g_enableESP ? "On" : "Off");
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) {
             g_espColorR = std::min(255, g_espColorR + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP R: %d", g_espColorR);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) {
             g_espColorG = std::min(255, g_espColorG + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP G: %d", g_espColorG);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) {
             g_espColorB = std::min(255, g_espColorB + 10);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP B: %d", g_espColorB);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD5) & 0x8000) {
             g_aimbotFOV = std::min(90.0f, g_aimbotFOV + 5.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot FOV: %.1f", g_aimbotFOV);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD6) & 0x8000) {
-            g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth - 1.0f);
+            g_aimbotSmooth = std::max(1.0f, g_aimbotSmooth + 1.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "Aimbot Smooth: %.1f", g_aimbotSmooth);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD7) & 0x8000) {
-            g_espDistanceMax += 50.0f;
+            g_espDistanceMax = std::min(1000.0f, g_espDistanceMax + 50.0f);
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "ESP Distance: %.1f", g_espDistanceMax);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
         if (GetAsyncKeyState(VK_NUMPAD8) & 0x8000) {
             g_aimbotPriority = (g_aimbotPriority + 1) % 2;
             char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Aimbot Priority: %d", g_aimbotPriority);
-            PrintConsoleMessage("Settings", std::string(buffer) + " (Updated)");
+            snprintf(buffer, sizeof(buffer), "Aimbot Priority: %s", g_aimbotPriority ? "Health" : "Distance");
+            PrintConsoleMessage("Settings", buffer);
+            SaveConfig();
             Sleep(200);
         }
 
         Aimbot();
         DrawWallhack();
-        Sleep(1);
+        Sleep(2 + (rand() % 3)); // Random delay to reduce detection
     }
     return 0;
 }
@@ -579,7 +603,7 @@ DWORD WINAPI InputThread(LPVOID lpParam) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(hModule);
-        LoadConfig();
+        srand(GetTickCount());
         CreateThread(NULL, 0, InputThread, NULL, 0, NULL);
     }
     return TRUE;
