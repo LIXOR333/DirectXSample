@@ -15,6 +15,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # Установка unzip
+    - name: Install unzip
+      run: |
+        choco install unzip
+      shell: powershell
+
     # Настройка MSVC и Windows SDK
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -26,7 +32,7 @@ jobs:
     - name: Download Nuklear
       run: |
         curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
-        tar -xf nuklear.zip
+        unzip nuklear.zip
         mv nuklear-master nuklear
       shell: bash
 
