@@ -1,89 +1,255 @@
-name: Build Rust Cheat DLL
+#include <windows.h>
+#include <d3d11.h>
+#include "nuklear.h"
+#include "nuklear_d3d11.h"
+#include <curl/curl.h>
+#include <zlib.h>
+#include <vector>
+#include <cmath>
+#include <string>
+#include <fstream>
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+// Глобальные переменные
+static IDXGISwapChain* swap_chain = nullptr;
+static ID3D11Device* device = nullptr;
+static ID3D11DeviceContext* context = nullptr;
+static nk_context* nk_ctx = nullptr;
 
-jobs:
-  build:
-    runs-on: windows-latest
+// Смещения для Rust 2588 (Jungle Update), примерные, проверь через Cheat Engine
+static uintptr_t g_baseModule = 0x0; // База RustClient.exe
+static uintptr_t g_weaponRecoilOffset = 0x1B0; // +0x10 от 2585 (0x1A0)
+static uintptr_t g_weaponSpreadOffset = 0x1B4; // +0x10 от 2585 (0x1A4)
+static uintptr_t g_weaponFireRateOffset = 0x1B8; // +0x10 от 2585 (0x1A8)
+static uintptr_t g_weaponSwapSpeedOffset = 0x1BC; // +0x10 от 2585 (0x1AC)
+static uintptr_t g_playerListOffset = 0x5C0; // +0x10 от 2585 (0x5B0)
+static uintptr_t g_localPlayerOffset = 0x5D0; // +0x10 от 2585 (0x5C0)
+static uintptr_t g_headOffset = 0x130; // Без изменений, проверь
+static uintptr_t g_positionOffset = 0x140; // +0x10 от 2585 (0x130)
+static uintptr_t g_viewAnglesOffset = 0x150; // +0x10 от 2585 (0x140)
 
-    steps:
-    # Проверка кода из репозитория
-    - name: Checkout repository
-      uses: actions/checkout@v4
+// Структура для игрока
+struct Player {
+    uintptr_t base;
+    float position[3];
+    float headPosition[3];
+};
 
-    # Установка unzip
-    - name: Install unzip
-      run: |
-        choco install unzip
-      shell: powershell
+// Функции чита
+void NoRecoil(uintptr_t weaponBase) {
+    if (weaponBase && g_weaponRecoilOffset) {
+        float* recoil = (float*)(weaponBase + g_weaponRecoilOffset);
+        *recoil = 0.0f; // Отключаем отдачу
+    }
+}
 
-    # Настройка MSVC и Windows SDK
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
-        sdk: 10.0.26100.0
+void NoSpread(uintptr_t weaponBase) {
+    if (weaponBase && g_weaponSpreadOffset) {
+        float* spread = (float*)(weaponBase + g_weaponSpreadOffset);
+        *spread = 0.0f; // Отключаем разброс
+    }
+}
 
-    # Загрузка Nuklear и nuklear_d3d11.c
-    - name: Download Nuklear and nuklear_d3d11.c
-      run: |
-        curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
-        unzip nuklear.zip
-        mv nuklear-master nuklear
-        # Загрузка nuklear_d3d11.c
-        curl -L -o nuklear/nuklear_d3d11.c https://raw.githubusercontent.com/vurtun/nuklear/master/demo/d3d11/nuklear_d3d11.c
-        # Проверка структуры директорий
-        ls -R nuklear
-        # Проверка первых строк nuklear_d3d11.c
-        head -n 5 nuklear/nuklear_d3d11.c
-      shell: bash
-      continue-on-error: true
+void RapidFire(uintptr_t weaponBase) {
+    if (weaponBase && g_weaponFireRateOffset) {
+        float* fireRate = (float*)(weaponBase + g_weaponFireRateOffset);
+        *fireRate = 0.01f; // Увеличиваем скорострельность
+    }
+}
 
-    # Загрузка zlib
-    - name: Download and Build zlib
-      run: |
-        curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
-        tar -xzf zlib.tar.gz
-        mv zlib-1.3.1 zlib
-        cd zlib
-        nmake -f win32/Makefile.msc
-      shell: cmd
+void FastSwap(uintptr_t weaponBase) {
+    if (weaponBase && g_weaponSwapSpeedOffset) {
+        float* swapSpeed = (float*)(weaponBase + g_weaponSwapSpeedOffset);
+        *swapSpeed = 0.0f; // Ускоряем смену оружия
+    }
+}
 
-    # Загрузка libcurl
-    - name: Download and Build libcurl
-      run: |
-        curl -L -o curl.tar.gz https://curl.se/download/curl-8.10.1.tar.gz
-        tar -xzf curl.tar.gz
-        mv curl-8.10.1 curl
-        cd curl/winbuild
-        nmake /f Makefile.vc mode=static VC=15
-      shell: cmd
+// Получение списка игроков
+std::vector<Player> GetPlayers() {
+    std::vector<Player> players;
+    if (!g_baseModule) {
+        g_baseModule = (uintptr_t)GetModuleHandle(L"RustClient.exe");
+        if (!g_baseModule) return players;
+    }
 
-    # Проверка наличия исходных файлов
-    - name: Verify source files
-      run: |
-        dir DirectXSample\RustAlkadCheat2588.cpp
-        dir nuklear\nuklear_d3d11.c
-      shell: cmd
-      continue-on-error: true
+    uintptr_t playerList = *(uintptr_t*)(g_baseModule + g_playerListOffset);
+    if (!playerList) return players;
 
-    # Компиляция DLL
-    - name: Build DLL
-      run: |
-        cl /LD /Fe:RustAlkadCheat2588.dll DirectXSample\RustAlkadCheat2588.cpp nuklear\nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
-      shell: cmd
-      env:
-        VSSDKINSTALL: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VSSDK
-        WindowsSdkDir: C:\Program Files (x86)\Windows Kits\10\
-        WindowsSDKVersion: 10.0.26100.0\
+    int playerCount = *(int*)(playerList + 0x8); // Предполагаемое смещение для количества игроков
+    uintptr_t playerArray = *(uintptr_t*)(playerList + 0x10); // Предполагаемое смещение для массива игроков
 
-    # Сохранение DLL как артефакта
-    - name: Upload DLL artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RustAlkadCheat2588
-        path: RustAlkadCheat2588.dll
+    for (int i = 0; i < playerCount; i++) {
+        uintptr_t playerBase = *(uintptr_t*)(playerArray + i * 0x8);
+        if (!playerBase) continue;
+
+        float* position = (float*)(playerBase + g_positionOffset);
+        float* head = (float*)(playerBase + g_headOffset);
+
+        Player p;
+        p.base = playerBase;
+        p.position[0] = position[0];
+        p.position[1] = position[1];
+        p.position[2] = position[2];
+        p.headPosition[0] = head[0];
+        p.headPosition[1] = head[1];
+        p.headPosition[2] = head[2];
+        players.push_back(p);
+    }
+    return players;
+}
+
+// WH (ESP)
+void DrawESP(nk_context* ctx, const std::vector<Player>& players) {
+    for (const auto& player : players) {
+        // Упрощённая проекция (нужна реальная WorldToScreen)
+        float screenX = player.position[0] * 10.0f + 960.0f;
+        float screenY = player.position[1] * 10.0f + 540.0f;
+
+        nk_layout_row_dynamic(ctx, 0, 1);
+        nk_label(ctx, "Player", NK_TEXT_CENTERED);
+        struct nk_rect box = nk_rect(screenX - 25, screenY - 50, 50, 100);
+        nk_fill_rect(nk_window_get_canvas(ctx), box, 0, nk_rgb(255, 0, 0));
+    }
+}
+
+// Aimbot
+void Aimbot(uintptr_t localPlayer, const std::vector<Player>& players) {
+    if (!localPlayer || players.empty()) return;
+
+    float* localPos = (float*)(localPlayer + g_positionOffset);
+    float* viewAngles = (float*)(localPlayer + g_viewAnglesOffset);
+
+    float closestDist = FLT_MAX;
+    float targetAngles[2] = { 0.0f, 0.0f };
+
+    for (const auto& player : players) {
+        if (player.base == localPlayer) continue;
+
+        float dx = player.headPosition[0] - localPos[0];
+        float dy = player.headPosition[1] - localPos[1];
+        float dz = player.headPosition[2] - localPos[2];
+        float dist = sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (dist < closestDist) {
+            closestDist = dist;
+            float yaw = atan2(dy, dx) * 180.0f / 3.14159f;
+            float pitch = -atan2(dz, sqrt(dx * dx + dy * dy)) * 180.0f / 3.14159f;
+            targetAngles[0] = pitch;
+            targetAngles[1] = yaw;
+        }
+    }
+
+    if (closestDist != FLT_MAX) {
+        viewAngles[0] = targetAngles[0]; // Pitch
+        viewAngles[1] = targetAngles[1]; // Yaw
+    }
+}
+
+// Функция для скачивания и обновления чита
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::ofstream* out = (std::ofstream*)userp;
+    out->write((char*)contents, totalSize);
+    return totalSize;
+}
+
+bool DownloadAndUpdate(const char* url, const char* outputPath) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return false;
+
+    std::ofstream outFile(outputPath, std::ios::binary);
+    if (!outFile.is_open()) {
+        curl_easy_cleanup(curl);
+        return false;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outFile);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    outFile.close();
+    curl_easy_cleanup(curl);
+
+    return res == CURLE_OK;
+}
+
+// Инициализация Nuklear GUI
+bool InitGUI() {
+    nk_ctx = nk_d3d11_init(&device, &context, swap_chain, 1920, 1080);
+    return nk_ctx != nullptr;
+}
+
+// Отрисовка GUI
+void RenderGUI() {
+    nk_d3d11_begin(nk_ctx);
+
+    if (!g_baseModule) {
+        g_baseModule = (uintptr_t)GetModuleHandle(L"RustClient.exe");
+    }
+    uintptr_t localPlayer = *(uintptr_t*)(g_baseModule + g_localPlayerOffset);
+    std::vector<Player> players = GetPlayers();
+
+    DrawESP(nk_ctx, players);
+
+    if (nk_begin(nk_ctx, "Rust Cheat", nk_rect(50, 50, 300, 500), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE)) {
+        nk_layout_row_dynamic(nk_ctx, 30, 1);
+        if (nk_button_label(nk_ctx, "No Recoil")) {
+            NoRecoil(0xDEADBEEF); // Замени на адрес оружия
+        }
+        if (nk_button_label(nk_ctx, "No Spread")) {
+            NoSpread(0xDEADBEEF);
+        }
+        if (nk_button_label(nk_ctx, "Rapid Fire")) {
+            RapidFire(0xDEADBEEF);
+        }
+        if (nk_button_label(nk_ctx, "Fast Swap")) {
+            FastSwap(0xDEADBEEF);
+        }
+        if (nk_button_label(nk_ctx, "Aimbot")) {
+            Aimbot(localPlayer, players);
+        }
+        if (nk_button_label(nk_ctx, "Update Cheat")) {
+            DownloadAndUpdate("http://your-server/update.zip", "update.zip");
+        }
+    }
+    nk_end(nk_ctx);
+
+    nk_d3d11_end();
+}
+
+// Перехват Present
+typedef HRESULT(WINAPI* Present_t)(IDXGISwapChain*, UINT, UINT);
+Present_t oPresent = nullptr;
+
+HRESULT WINAPI hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags) {
+    if (!device) {
+        pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&device);
+        device->GetImmediateContext(&context);
+        swap_chain = pSwapChain;
+        InitGUI();
+    }
+
+    RenderGUI();
+    return oPresent(pSwapChain, SyncInterval, Flags);
+}
+
+// Инициализация чита
+DWORD WINAPI MainThread(LPVOID lpParam) {
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    HMODULE dxgi = GetModuleHandle(L"dxgi.dll");
+    oPresent = (Present_t)GetProcAddress(dxgi, "Present");
+
+    *(uintptr_t*)&oPresent = (uintptr_t)hkPresent;
+
+    return 0;
+}
+
+// Точка входа
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+    if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
+        CreateThread(nullptr, 0, MainThread, hModule, 0, nullptr);
+    }
+    return TRUE;
+}
