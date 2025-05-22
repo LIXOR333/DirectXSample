@@ -2,91 +2,815 @@ name: Build Rust Cheat DLL
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
+  workflow_dispatch:  # Позволяет запускать workflow вручную
+
+env:
+  SOLUTION_FILE_PATH: RustAlcatrazCheat.vcxproj
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: x64
 
 jobs:
   build:
     runs-on: windows-latest
-
+    
     steps:
-    # Проверка кода из репозитория
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - name: Проверка репозитория
+      uses: actions/checkout@v3
+    
+    - name: Добавление MSBuild в PATH
+      uses: microsoft/setup-msbuild@v1.1
+    
+    - name: Создание структуры проекта
+      run: |
+        mkdir -p include
+        mkdir -p src
+        mkdir -p lib
+      shell: pwsh
+    
+    - name: Загрузка ImGui
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/ocornut/imgui/archive/refs/tags/v1.89.5.zip" -OutFile "imgui.zip"
+        Expand-Archive -Path "imgui.zip" -DestinationPath "temp_imgui"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui.h" -Destination "include/imgui.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui_internal.h" -Destination "include/imgui_internal.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imconfig.h" -Destination "include/imconfig.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imstb_rectpack.h" -Destination "include/imstb_rectpack.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imstb_textedit.h" -Destination "include/imstb_textedit.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imstb_truetype.h" -Destination "include/imstb_truetype.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/backends/imgui_impl_dx9.h" -Destination "include/imgui_impl_dx9.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/backends/imgui_impl_win32.h" -Destination "include/imgui_impl_win32.h"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui.cpp" -Destination "src/imgui.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui_demo.cpp" -Destination "src/imgui_demo.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui_draw.cpp" -Destination "src/imgui_draw.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui_tables.cpp" -Destination "src/imgui_tables.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/imgui_widgets.cpp" -Destination "src/imgui_widgets.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/backends/imgui_impl_dx9.cpp" -Destination "src/imgui_impl_dx9.cpp"
+        Copy-Item -Path "temp_imgui/imgui-1.89.5/backends/imgui_impl_win32.cpp" -Destination "src/imgui_impl_win32.cpp"
+      shell: pwsh
+    
+    - name: Установка DirectX SDK через Windows SDK
+      run: |
+        # Windows SDK уже включает DirectX, поэтому отдельная установка не требуется
+        echo "Используем DirectX из Windows SDK"
+      shell: pwsh
+    
+    - name: Создание файла проекта Visual Studio
+      run: |
+        $vcxprojContent = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{12345678-1234-1234-1234-123456789abc}</ProjectGuid>
+    <RootNamespace>RustAlcatrazCheat</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'`$(Configuration)|`$(Platform)'=='Debug|Win32'">
+    <Import Project="`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props" Condition="exists('`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'`$(Configuration)|`$(Platform)'=='Release|Win32'">
+    <Import Project="`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props" Condition="exists('`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'`$(Configuration)|`$(Platform)'=='Debug|x64'">
+    <Import Project="`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props" Condition="exists('`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'`$(Configuration)|`$(Platform)'=='Release|x64'">
+    <Import Project="`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props" Condition="exists('`$(UserRootDir)\Microsoft.Cpp.`$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>`$(ProjectDir)include;`$(WindowsSDK_IncludePath);`$(IncludePath)</IncludePath>
+    <LibraryPath>`$(ProjectDir)lib;`$(WindowsSDK_LibraryPath_x86);`$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>`$(ProjectDir)include;`$(WindowsSDK_IncludePath);`$(IncludePath)</IncludePath>
+    <LibraryPath>`$(ProjectDir)lib;`$(WindowsSDK_LibraryPath_x86);`$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>`$(ProjectDir)include;`$(WindowsSDK_IncludePath);`$(IncludePath)</IncludePath>
+    <LibraryPath>`$(ProjectDir)lib;`$(WindowsSDK_LibraryPath_x64);`$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>`$(ProjectDir)include;`$(WindowsSDK_IncludePath);`$(IncludePath)</IncludePath>
+    <LibraryPath>`$(ProjectDir)lib;`$(WindowsSDK_LibraryPath_x64);`$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;RUSTCHEAT_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;RUSTCHEAT_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'`$(Configuration)|`$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;RUSTCHEAT_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'`$(Configuration)|`$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;RUSTCHEAT_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="include\imgui.h" />
+    <ClInclude Include="include\imgui_impl_dx9.h" />
+    <ClInclude Include="include\imgui_impl_win32.h" />
+    <ClInclude Include="include\imconfig.h" />
+    <ClInclude Include="include\imgui_internal.h" />
+    <ClInclude Include="include\imstb_rectpack.h" />
+    <ClInclude Include="include\imstb_textedit.h" />
+    <ClInclude Include="include\imstb_truetype.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\imgui.cpp" />
+    <ClCompile Include="src\imgui_demo.cpp" />
+    <ClCompile Include="src\imgui_draw.cpp" />
+    <ClCompile Include="src\imgui_impl_dx9.cpp" />
+    <ClCompile Include="src\imgui_impl_win32.cpp" />
+    <ClCompile Include="src\imgui_tables.cpp" />
+    <ClCompile Include="src\imgui_widgets.cpp" />
+    <ClCompile Include="src\rust_imgui_cheat.cpp" />
+  </ItemGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
+"@
+        Set-Content -Path "RustAlcatrazCheat.vcxproj" -Value $vcxprojContent
+      shell: pwsh
+    
+    - name: Создание основного файла исходного кода
+      run: |
+        $sourceCode = @"
+#include <windows.h>
+#include <d3d9.h>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <chrono>
+#include <thread>
+#include <random>
+#define IMGUI_API __declspec(dllexport)
+
+// ImGui includes
+#include "imgui.h"
+#include "imgui_impl_dx9.h"
+#include "imgui_impl_win32.h"
+
+// XOR encryption for EAC evasion
+std::string XorCrypt(const std::string& data, const std::string& key = "FuckEAC2588") {
+    std::string result = data;
+    for (size_t i = 0; i < data.size(); ++i) {
+        result[i] = data[i] ^ key[i % key.size()];
+    }
+    return result;
+}
+
+// Offset structure
+struct Offset {
+    std::string name;
+    uintptr_t address;
+    bool active;
+    std::vector<uintptr_t> backups;
+
+    Offset(const std::string& n, uintptr_t a, bool act) : name(n), address(a), active(act), backups() {}
+};
+
+// ESP object structure
+struct EspObject {
+    std::string name;
+    float x, y, z;
+    float health;
+    std::string type;
+    float lastUpdateTime;
+
+    EspObject(const std::string& n, float x_, float y_, float z_, float h, const std::string& t)
+        : name(n), x(x_), y(y_), z(z_), health(h), type(t), lastUpdateTime(0.0f) {}
+};
+
+// Cheat config
+struct CheatConfig {
+    bool aimbotEnabled = false;
+    float aimFov = 90.0f;
+    float aimSmoothness = 5.0f;
+    bool aimSilent = false;
+    bool aimTargetPlayers = true;
+    bool aimTargetNPCs = false;
+    bool espEnabled = false;
+    bool espPlayers = true;
+    bool espItems = false;
+    bool noRecoil = false;
+    float bulletDamageMultiplier = 1.0f;
+    float bulletSpeed = 300.0f;
+    bool collisionEnabled = true;
+    std::vector<Offset> offsets;
+    std::vector<EspObject> espObjects;
+    
+    CheatConfig() {
+        // Initialize with some default offsets
+        offsets.push_back(Offset("NoRecoil", 0x12345678, false));
+        offsets.push_back(Offset("BulletDamage", 0x23456789, false));
+        offsets.push_back(Offset("BulletSpeed", 0x34567890, false));
+        offsets.push_back(Offset("PlayerCollision", 0x45678901, false));
+        
+        // Add some test ESP objects
+        espObjects.push_back(EspObject("Player1", 100.0f, 200.0f, 300.0f, 100.0f, "Player"));
+        espObjects.push_back(EspObject("Player2", 400.0f, 500.0f, 600.0f, 75.0f, "Player"));
+        espObjects.push_back(EspObject("Crate", 700.0f, 800.0f, 900.0f, 100.0f, "Item"));
+    }
+};
+
+// Global variables
+bool menuVisible = false;
+CheatConfig config;
+HWND gameWindow = NULL;
+WNDPROC originalWndProc = NULL;
+IDirect3D9* g_pD3D = NULL;
+IDirect3DDevice9* g_pd3dDevice = NULL;
+
+// Forward declarations
+bool CreateDeviceD3D(HWND hWnd);
+void CleanupDeviceD3D();
+void ResetDevice();
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Function to save config
+void SaveConfig(const CheatConfig& cfg) {
+    std::ofstream file("RustCheatConfig.cfg");
+    if (file.is_open()) {
+        file << "AimbotEnabled=" << cfg.aimbotEnabled << std::endl;
+        file << "AimFov=" << cfg.aimFov << std::endl;
+        file << "AimSmoothness=" << cfg.aimSmoothness << std::endl;
+        file << "AimSilent=" << cfg.aimSilent << std::endl;
+        file << "AimTargetPlayers=" << cfg.aimTargetPlayers << std::endl;
+        file << "AimTargetNPCs=" << cfg.aimTargetNPCs << std::endl;
+        file << "EspEnabled=" << cfg.espEnabled << std::endl;
+        file << "EspPlayers=" << cfg.espPlayers << std::endl;
+        file << "EspItems=" << cfg.espItems << std::endl;
+        file << "NoRecoil=" << cfg.noRecoil << std::endl;
+        file << "BulletDamageMultiplier=" << cfg.bulletDamageMultiplier << std::endl;
+        file << "BulletSpeed=" << cfg.bulletSpeed << std::endl;
+        file << "CollisionEnabled=" << cfg.collisionEnabled << std::endl;
+        file.close();
+    }
+}
+
+// Function to load config
+void LoadConfig(CheatConfig& cfg) {
+    std::ifstream file("RustCheatConfig.cfg");
+    if (file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            std::istringstream iss(line);
+            std::string key;
+            std::getline(iss, key, '=');
+            
+            if (key == "AimbotEnabled") iss >> cfg.aimbotEnabled;
+            else if (key == "AimFov") iss >> cfg.aimFov;
+            else if (key == "AimSmoothness") iss >> cfg.aimSmoothness;
+            else if (key == "AimSilent") iss >> cfg.aimSilent;
+            else if (key == "AimTargetPlayers") iss >> cfg.aimTargetPlayers;
+            else if (key == "AimTargetNPCs") iss >> cfg.aimTargetNPCs;
+            else if (key == "EspEnabled") iss >> cfg.espEnabled;
+            else if (key == "EspPlayers") iss >> cfg.espPlayers;
+            else if (key == "EspItems") iss >> cfg.espItems;
+            else if (key == "NoRecoil") iss >> cfg.noRecoil;
+            else if (key == "BulletDamageMultiplier") iss >> cfg.bulletDamageMultiplier;
+            else if (key == "BulletSpeed") iss >> cfg.bulletSpeed;
+            else if (key == "CollisionEnabled") iss >> cfg.collisionEnabled;
+        }
+        file.close();
+    }
+}
+
+// Function to check if offset is valid
+bool IsValidOffset(uintptr_t address) {
+    // This is just a placeholder. In a real cheat, you would check if the memory address is valid.
+    return (address != 0);
+}
+
+// Function to try to use an offset
+bool TryOffset(uintptr_t address, std::vector<uintptr_t>& backups) {
+    // This is just a placeholder. In a real cheat, you would try to use the offset and backup the original value.
+    backups.push_back(0x12345678); // Placeholder for original value
+    return true;
+}
+
+// Function to apply bullet mods
+void ApplyBulletMods(const CheatConfig& cfg) {
+    // This is just a placeholder. In a real cheat, you would modify the game's memory.
+    if (cfg.offsets.size() >= 2) {
+        // Apply bullet damage multiplier
+        // Apply bullet speed
+    }
+}
+
+// Function to render the cheat menu
+void RenderCheatMenu(CheatConfig& cfg, bool& visible) {
+    if (!visible) return;
+    
+    ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Rust Alcatraz Cheat", &visible, ImGuiWindowFlags_MenuBar)) {
+        ImGui::End();
+        return;
+    }
+    
+    if (ImGui::BeginMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Save Config")) SaveConfig(cfg);
+            if (ImGui::MenuItem("Load Config")) LoadConfig(cfg);
+            if (ImGui::MenuItem("Exit")) visible = false;
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Help")) {
+            if (ImGui::MenuItem("About")) {
+                // Show about dialog
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+    
+    ImGui::BeginTabBar("CheatTabs", ImGuiTabBarFlags_None);
+    
+    // Aimbot Tab
+    if (ImGui::BeginTabItem("Aimbot")) {
+        ImGui::Checkbox("Enable Aimbot", &cfg.aimbotEnabled);
+        ImGui::SliderFloat("FOV", &cfg.aimFov, 1.0f, 180.0f, "%.1f");
+        ImGui::SliderFloat("Smoothness", &cfg.aimSmoothness, 1.0f, 20.0f, "%.1f");
+        ImGui::Checkbox("Silent Aim", &cfg.aimSilent);
+        ImGui::Checkbox("Target Players", &cfg.aimTargetPlayers);
+        ImGui::Checkbox("Target NPCs", &cfg.aimTargetNPCs);
+        ImGui::EndTabItem();
+    }
+    
+    // ESP Tab
+    if (ImGui::BeginTabItem("ESP")) {
+        ImGui::Checkbox("Enable ESP", &cfg.espEnabled);
+        ImGui::Checkbox("Show Players", &cfg.espPlayers);
+        ImGui::Checkbox("Show Items", &cfg.espItems);
+        
+        ImGui::Separator();
+        ImGui::Text("ESP Objects:");
+        
+        if (ImGui::BeginTable("ESPObjects", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Type");
+            ImGui::TableSetupColumn("Position");
+            ImGui::TableSetupColumn("Health");
+            ImGui::TableHeadersRow();
+            
+            for (const auto& obj : cfg.espObjects) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", obj.name.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", obj.type.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("%.1f, %.1f, %.1f", obj.x, obj.y, obj.z);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.1f", obj.health);
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndTabItem();
+    }
+    
+    // Offsets Tab
+    if (ImGui::BeginTabItem("Offsets")) {
+        ImGui::Text("Memory Offsets:");
+        
+        if (ImGui::BeginTable("Offsets", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Address");
+            ImGui::TableSetupColumn("Status");
+            ImGui::TableHeadersRow();
+            
+            for (auto& offset : cfg.offsets) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", offset.name.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%X", offset.address);
+                ImGui::TableNextColumn();
+                if (offset.active) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+                    ImGui::Text("Active");
+                    ImGui::PopStyleColor();
+                } else {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+                    ImGui::Text("Inactive");
+                    ImGui::PopStyleColor();
+                    if (ImGui::Button(("Activate##" + offset.name).c_str())) {
+                        offset.active = TryOffset(offset.address, offset.backups);
+                    }
+                }
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndTabItem();
+    }
+    
+    // Weapon Mods Tab
+    if (ImGui::BeginTabItem("Weapon Mods")) {
+        ImGui::Checkbox("No Recoil", &cfg.noRecoil);
+        ImGui::SliderFloat("Bullet Damage Multiplier", &cfg.bulletDamageMultiplier, 0.5f, 5.0f, "%.1fx");
+        ImGui::SliderFloat("Bullet Speed", &cfg.bulletSpeed, 100.0f, 1000.0f, "%.1f");
+        ImGui::Checkbox("Collision Enabled", &cfg.collisionEnabled);
+        
+        if (ImGui::Button("Apply Bullet Mods")) {
+            ApplyBulletMods(cfg);
+        }
+        ImGui::EndTabItem();
+    }
+    
+    // Config Tab
+    if (ImGui::BeginTabItem("Config")) {
+        if (ImGui::Button("Save Config")) {
+            SaveConfig(cfg);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load Config")) {
+            LoadConfig(cfg);
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("Hotkeys:");
+        ImGui::Text("Insert - Toggle Menu");
+        ImGui::Text("F6 - Toggle Collision");
+        ImGui::Text("F7 - Toggle ESP");
+        ImGui::Text("F8 - Toggle Aimbot");
+        ImGui::Text("F9 - Toggle No Recoil");
+        ImGui::EndTabItem();
+    }
+    
+    ImGui::EndTabBar();
+    ImGui::End();
+}
+
+// Function to render ESP
+void RenderESP(const CheatConfig& cfg) {
+    if (!cfg.espEnabled) return;
+    
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    
+    for (const auto& obj : cfg.espObjects) {
+        if ((obj.type == "Player" && cfg.espPlayers) || (obj.type == "Item" && cfg.espItems)) {
+            // This is just a placeholder. In a real cheat, you would project 3D coordinates to 2D screen coordinates.
+            ImVec2 screenPos(obj.x, obj.y); // Placeholder
+            
+            // Draw box
+            drawList->AddRect(
+                ImVec2(screenPos.x - 20, screenPos.y - 40),
+                ImVec2(screenPos.x + 20, screenPos.y + 40),
+                ImColor(255, 0, 0, 255)
+            );
+            
+            // Draw name
+            drawList->AddText(
+                ImVec2(screenPos.x - 20, screenPos.y - 55),
+                ImColor(255, 255, 255, 255),
+                obj.name.c_str()
+            );
+            
+            // Draw health bar
+            float healthPercent = obj.health / 100.0f;
+            drawList->AddRectFilled(
+                ImVec2(screenPos.x - 20, screenPos.y + 45),
+                ImVec2(screenPos.x - 20 + 40 * healthPercent, screenPos.y + 50),
+                ImColor(0, 255, 0, 255)
+            );
+        }
+    }
+}
+
+// Window procedure hook
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_KEYDOWN) {
+        if (wParam == VK_INSERT) {
+            menuVisible = !menuVisible;
+            return 0;
+        } else if (wParam == VK_F6) {
+            config.collisionEnabled = !config.collisionEnabled;
+            return 0;
+        } else if (wParam == VK_F7) {
+            config.espEnabled = !config.espEnabled;
+            return 0;
+        } else if (wParam == VK_F8) {
+            config.aimbotEnabled = !config.aimbotEnabled;
+            return 0;
+        } else if (wParam == VK_F9) {
+            config.noRecoil = !config.noRecoil;
+            return 0;
+        }
+    }
+    
+    if (menuVisible) {
+        ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+        return true;
+    }
+    
+    return CallWindowProc(originalWndProc, hWnd, msg, wParam, lParam);
+}
+
+// Function to find the game window
+HWND FindGameWindow() {
+    // This is just a placeholder. In a real cheat, you would find the game window by name or process.
+    return FindWindowA("UnityWndClass", "Rust"); // Example for Rust
+}
+
+// Function to hook the window procedure
+void HookWindowProc() {
+    gameWindow = FindGameWindow();
+    if (gameWindow) {
+        originalWndProc = (WNDPROC)SetWindowLongPtr(gameWindow, GWLP_WNDPROC, (LONG_PTR)WndProc);
+    }
+}
+
+// Function to unhook the window procedure
+void UnhookWindowProc() {
+    if (gameWindow && originalWndProc) {
+        SetWindowLongPtr(gameWindow, GWLP_WNDPROC, (LONG_PTR)originalWndProc);
+    }
+}
+
+// Function to create D3D device
+bool CreateDeviceD3D(HWND hWnd) {
+    if ((g_pD3D = Direct3DCreate9(D3D_SDK_VERSION)) == NULL)
+        return false;
+
+    // Create the D3DDevice
+    ZeroMemory(&g_d3dpp, sizeof(g_d3dpp));
+    g_d3dpp.Windowed = TRUE;
+    g_d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    g_d3dpp.BackBufferFormat = D3DFMT_UNKNOWN;
+    g_d3dpp.EnableAutoDepthStencil = TRUE;
+    g_d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
+    g_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;           // Present with vsync
+    //g_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;   // Present without vsync, maximum unthrottled framerate
+    if (g_pD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &g_d3dpp, &g_pd3dDevice) < 0)
+        return false;
+
+    return true;
+}
+
+// Function to cleanup D3D device
+void CleanupDeviceD3D() {
+    if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = NULL; }
+    if (g_pD3D) { g_pD3D->Release(); g_pD3D = NULL; }
+}
+
+// Function to reset D3D device
+void ResetDevice() {
+    ImGui_ImplDX9_InvalidateDeviceObjects();
+    HRESULT hr = g_pd3dDevice->Reset(&g_d3dpp);
+    if (hr == D3DERR_INVALIDCALL)
+        IM_ASSERT(0);
+    ImGui_ImplDX9_CreateDeviceObjects();
+}
+
+// DLL entry point
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+    switch (ul_reason_for_call) {
+    case DLL_PROCESS_ATTACH:
+        // Create a thread for the cheat
+        CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)InitializeCheat, NULL, 0, NULL);
+        break;
+    case DLL_PROCESS_DETACH:
+        // Cleanup
+        ShutdownCheat();
+        break;
+    }
+    return TRUE;
+}
+
+// Function to initialize the cheat
+extern "C" __declspec(dllexport) void InitializeCheat() {
+    // Hook the window procedure
+    HookWindowProc();
+    
+    // Create D3D device
+    if (!CreateDeviceD3D(gameWindow)) {
+        CleanupDeviceD3D();
+        return;
+    }
+    
+    // Setup ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    
+    // Setup ImGui style
+    ImGui::StyleColorsDark();
+    
+    // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(gameWindow);
+    ImGui_ImplDX9_Init(g_pd3dDevice);
+    
+    // Load config
+    LoadConfig(config);
+    
+    // Main loop
+    MSG msg;
+    ZeroMemory(&msg, sizeof(msg));
+    while (msg.message != WM_QUIT) {
+        if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+            continue;
+        }
+        
+        // Start the ImGui frame
+        ImGui_ImplDX9_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+        
+        // Render cheat menu and ESP
+        RenderCheatMenu(config, menuVisible);
+        RenderESP(config);
+        
+        // Apply cheats
+        if (config.noRecoil) {
+            // Apply no recoil (placeholder)
+        }
+        
+        // End the ImGui frame
+        ImGui::EndFrame();
+        
+        g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
+        g_pd3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+        g_pd3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        g_pd3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+        
+        g_pd3dDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
+        if (g_pd3dDevice->BeginScene() >= 0) {
+            ImGui::Render();
+            ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+            g_pd3dDevice->EndScene();
+        }
+        
+        HRESULT result = g_pd3dDevice->Present(NULL, NULL, NULL, NULL);
+        if (result == D3DERR_DEVICELOST && g_pd3dDevice->TestCooperativeLevel() == D3DERR_DEVICENOTRESET)
+            ResetDevice();
+        
+        Sleep(10); // Don't use too much CPU
+    }
+}
+
+// Function to update the cheat
+extern "C" __declspec(dllexport) void UpdateCheat() {
+    // This function can be called from outside to update the cheat
+    // For example, to update ESP objects or offsets
+}
+
+// Function to shutdown the cheat
+extern "C" __declspec(dllexport) void ShutdownCheat() {
+    // Cleanup
+    ImGui_ImplDX9_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+    
+    CleanupDeviceD3D();
+    UnhookWindowProc();
+}
+"@
+        New-Item -Path "src" -ItemType Directory -Force
+        Set-Content -Path "src\rust_imgui_cheat.cpp" -Value $sourceCode
+      shell: pwsh
+    
+    - name: Компиляция проекта
+      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=${{env.BUILD_PLATFORM}} ${{env.SOLUTION_FILE_PATH}}
+    
+    - name: Проверка результатов сборки
+      run: |
+        if (Test-Path "${{env.BUILD_PLATFORM}}\${{env.BUILD_CONFIGURATION}}\RustAlcatrazCheat.dll") {
+          echo "DLL успешно скомпилирована!"
+        } else {
+          echo "Ошибка: DLL не найдена!"
+          exit 1
+        }
+      shell: pwsh
+    
+    - name: Загрузка артефактов
+      uses: actions/upload-artifact@v3
       with:
-        repository: LIXOR333/DirectXSample
-        path: DirectXSample
-
-    # Установка unzip
-    - name: Install unzip
-      run: |
-        choco install unzip
-      shell: powershell
-
-    # Настройка MSVC и Windows SDK
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
-        sdk: 10.0.26100.0
-
-    # Загрузка Nuklear и nuklear_d3d11.c
-    - name: Download Nuklear and nuklear_d3d11.c
-      run: |
-        curl -L -o nuklear.zip https://github.com/vurtun/nuklear/archive/refs/heads/master.zip
-        unzip nuklear.zip
-        mv nuklear-master nuklear
-        # Загрузка nuklear_d3d11.c
-        curl -L -o nuklear/nuklear_d3d11.c https://raw.githubusercontent.com/vurtun/nuklear/master/demo/d3d11/nuklear_d3d11.c
-        # Проверка структуры директорий
-        ls -R nuklear
-        # Проверка первых строк nuklear_d3d11.c
-        head -n 5 nuklear/nuklear_d3d11.c
-      shell: bash
-      continue-on-error: true
-
-    # Загрузка и сборка zlib
-    - name: Download and Build zlib
-      run: |
-        curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
-        tar -xzf zlib.tar.gz
-        mv zlib-1.3.1 zlib
-        cd zlib
-        nmake -f win32/Makefile.msc
-      shell: cmd
-
-    # Загрузка и сборка libcurl
-    - name: Download and Build libcurl
-      run: |
-        curl -L -o curl.tar.gz https://curl.se/download/curl-8.10.1.tar.gz
-        tar -xzf curl.tar.gz
-        mv curl-8.10.1 curl
-        cd curl/winbuild
-        nmake /f Makefile.vc mode=static VC=15
-      shell: cmd
-
-    # Проверка наличия исходных файлов
-    - name: Verify source files
-      run: |
-        dir DirectXSample\DirectXSample\RustAlkadCheat2588.cpp
-        dir nuklear\nuklear_d3d11.c
-      shell: cmd
-      continue-on-error: true
-
-    # Компиляция DLL
-    - name: Build DLL
-      run: |
-        cl /LD /Fe:RustAlkadCheat2588.dll DirectXSample\DirectXSample\RustAlkadCheat2588.cpp nuklear\nuklear_d3d11.c /I nuklear /I zlib /I curl/include /link /LIBPATH:zlib /LIBPATH:curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib zlib.lib libcurl_a.lib psapi.lib d3d11.lib user32.lib
-      shell: cmd
-      env:
-        VSSDKINSTALL: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VSSDK
-        WindowsSdkDir: C:\Program Files (x86)\Windows Kits\10\
-        WindowsSDKVersion: 10.0.26100.0\
-
-    # Сохранение DLL как артефакта
-    - name: Upload DLL artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RustAlkadCheat2588
-        path: RustAlkadCheat2588.dll
+        name: RustAlcatrazCheat
+        path: |
+          ${{env.BUILD_PLATFORM}}/${{env.BUILD_CONFIGURATION}}/RustAlcatrazCheat.dll
+          RustAlcatrazCheat.vcxproj
